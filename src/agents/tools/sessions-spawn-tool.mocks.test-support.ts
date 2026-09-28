@@ -36,8 +36,8 @@ vi.mock("../subagents/registry/subagent-registry.js", () => ({
   registerSubagentRun: (...args: unknown[]) => hoisted.registerSubagentRunMock(...args),
 }));
 
-vi.mock("./in-process-gateway.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./in-process-gateway.js")>();
+vi.mock("./gateway.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./gateway.js")>();
   return {
     ...actual,
     callInProcessGatewayToolWithCreation: (...args: unknown[]) =>

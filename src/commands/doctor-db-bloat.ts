@@ -1,5 +1,6 @@
 import { note } from "../../packages/terminal-core/src/note.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
+import { runOpenClawStateWorkerOperation } from "../state/openclaw-state-worker-store.js";
 import type { SqliteBloatStats } from "./doctor-db-bloat.read.js";
 import { formatBytes } from "./doctor-disk-space.js";
 
@@ -28,8 +29,6 @@ function describeBloat(label: string, stats: SqliteBloatStats): string | null {
 
 export async function noteSqliteDatabaseBloat(deps?: { env?: NodeJS.ProcessEnv }): Promise<void> {
   const context = captureOpenClawStateWorkerContext({ env: deps?.env });
-  const { runOpenClawStateWorkerOperation } =
-    await import("../state/openclaw-state-worker-store.js");
   const results = await runOpenClawStateWorkerOperation(
     context,
     (scope) => scope.execute({ type: "doctor.databaseBloat", input: undefined }),

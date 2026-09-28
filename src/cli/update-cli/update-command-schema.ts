@@ -33,11 +33,13 @@ import {
   UpdatePreMutationError,
   type UpdateCommandOptions,
 } from "./shared.js";
+import { inspectUpdateDatabaseContexts } from "./update-command-database-context.js";
 import {
   handleDryRunPreflightError,
   printUpdateDryRun,
   type UpdateDryRunFailure,
 } from "./update-command-dry-run.js";
+import { preflightConfiguredNpmPluginTargets } from "./update-command-plugin-preflight.js";
 import type { RefuseUpdate } from "./update-command-result.js";
 import type { prepareUpdateCommand } from "./update-command-run.js";
 import type {
@@ -173,8 +175,6 @@ export async function preflightUpdateCommandSchemas(params: {
   let service: PreManagedServiceStop | undefined;
   if ((opts.dryRun || updateInstallKind === "package") && updateInstallKind !== "unknown") {
     try {
-      const { inspectUpdateDatabaseContexts } =
-        await import("./update-command-database-context.js");
       const { inspectGitDryRunTargetSchemaVersions } = await import("./update-command-git.js");
       const admission = await inspectUpdateDatabaseContexts({
         roots: switchToGit ? [root, resolveGitInstallDir()] : [root],
@@ -264,8 +264,6 @@ export async function preflightUpdateCommandSchemas(params: {
             "Configured plugin availability will be checked against the staged package before update checks or activation; this preview does not stage the target.",
           );
         } else {
-          const { preflightConfiguredNpmPluginTargets } =
-            await import("./update-command-plugin-preflight.js");
           const context = admission.contexts.at(-1)!;
           const pluginWarnings = await preflightConfiguredNpmPluginTargets({
             config: context.configSnapshot.sourceConfig,

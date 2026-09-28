@@ -5,7 +5,6 @@ import {
   validateSessionsStorageParams,
 } from "../../../packages/gateway-protocol/src/index.js";
 import { runSessionsCleanup, serializeSessionCleanupResult } from "../../config/sessions.js";
-import { getSessionColdStorageStatus } from "../../config/sessions/session-cold-storage.js";
 import { formatErrorMessage } from "../../infra/errors.js";
 import {
   getSessionColdStorageMaintenanceStatus,
@@ -32,6 +31,8 @@ function createSessionStorageHandler(
       return;
     }
     try {
+      const { getSessionColdStorageStatus } =
+        await import("../../config/sessions/session-cold-storage.js");
       const agents = await getSessionColdStorageStatus(context.getRuntimeConfig());
       if (method === "sessions.storage.run") {
         signal?.throwIfAborted();

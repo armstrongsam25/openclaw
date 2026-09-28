@@ -1,5 +1,5 @@
 import type { AgentMessage, SessionTreeEntry } from "@openclaw/agent-core";
-import { isCompactionReplayCheckpoint } from "@openclaw/ai/transports";
+import { isCompactionReplayCheckpoint } from "@openclaw/ai/internal/shared";
 import { sql, type AliasableExpression } from "kysely";
 import {
   iterateSessionContextEntries,
@@ -18,6 +18,8 @@ import { withOpenClawAgentDatabaseReadOnly } from "../../state/openclaw-agent-db
 import type { OpenClawAgentDatabase } from "../../state/openclaw-agent-db.js";
 import { chunkItems } from "../../utils/chunk-items.js";
 import type {
+  SessionModelContextLimits,
+  SessionTranscriptModelContext,
   SessionTranscriptContextVersion,
   SessionTranscriptReadScope,
   TranscriptEvent,
@@ -49,12 +51,6 @@ import {
 } from "./transcript-tree.js";
 
 type ContextEntry = SessionTreeEntry & { seq: number };
-export type SessionModelContextLimits = {
-  maxBytes: number;
-  maxEvents: number;
-  /** Detached model views may omit result bodies; evidence and fork readers remain strict. */
-  toolResultOverflow?: "omit";
-};
 type ModelContextRequest = {
   entry: ContextEntry;
   omitCheckpoint: boolean;
@@ -318,10 +314,7 @@ export function readSessionTranscriptModelContext(
   scope: SessionTranscriptReadScope,
   through?: TranscriptEntryAnchor,
   limits?: SessionModelContextLimits,
-): {
-  events: TranscriptEvent[];
-  version?: SessionTranscriptContextVersion;
-} {
+): SessionTranscriptModelContext {
   if (
     limits &&
     (!Number.isSafeInteger(limits.maxBytes) ||

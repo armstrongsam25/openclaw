@@ -593,18 +593,22 @@ vi.mock("../plugins/status.js", () => ({
       await retirePluginDiagnosticsMock();
     }
   },
-  buildPluginCompatibilityNotices: ((
-    ...args: Parameters<(typeof import("../plugins/status.js"))["buildPluginCompatibilityNotices"]>
-  ) =>
-    invokeMock<
-      Parameters<(typeof import("../plugins/status.js"))["buildPluginCompatibilityNotices"]>,
-      ReturnType<(typeof import("../plugins/status.js"))["buildPluginCompatibilityNotices"]>
-    >(
-      buildPluginCompatibilityNoticesMock,
-      ...args,
-    )) as (typeof import("../plugins/status.js"))["buildPluginCompatibilityNotices"],
-  formatPluginCompatibilityNotice: (entry: { message: string }) => entry.message,
 }));
+
+vi.mock("../plugins/status-compatibility.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../plugins/status-compatibility.js")>();
+  return {
+    ...actual,
+    buildPluginCompatibilityNotices: (
+      ...args: Parameters<typeof actual.buildPluginCompatibilityNotices>
+    ) =>
+      invokeMock<
+        Parameters<typeof actual.buildPluginCompatibilityNotices>,
+        ReturnType<typeof actual.buildPluginCompatibilityNotices>
+      >(buildPluginCompatibilityNoticesMock, ...args),
+    formatPluginCompatibilityNotice: (entry: { message: string }) => entry.message,
+  };
+});
 
 vi.mock("../plugins/status-snapshot.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../plugins/status-snapshot.js")>();

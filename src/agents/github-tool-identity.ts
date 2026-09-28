@@ -5,7 +5,7 @@ import { root as fsRoot } from "@openclaw/fs-safe/root";
 import { readSecretFile } from "@openclaw/fs-safe/secret";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { readNonBlankString } from "@openclaw/normalization-core/string-coerce";
-import { parseDocument, stringify as stringifyYaml } from "yaml";
+import { parseDocument } from "yaml";
 import type {
   GitHubIdentityFacts,
   ToolsGitHubStatusResult,
@@ -37,6 +37,11 @@ import {
   type PreparedGitHubSourceReadIdentity,
 } from "./github-read-identity.js";
 import type { GitHubToolAccount } from "./github-tool-account.js";
+import {
+  managedGitHubHosts,
+  managedGitHubIdentityEnvironment,
+  writeManagedGitHubProfileFiles,
+} from "./github-tool-profile.js";
 
 export { GitHubIdentityError } from "./github-read-identity.js";
 
@@ -145,35 +150,6 @@ export type PreparedGitHubToolEnvironment = Readonly<{
   /** A local process must retain the host-selected profile and author identity. */
   managedLocalIdentity: boolean;
 }>;
-
-export function managedGitHubIdentityEnvironment(params: {
-  profileDir: string;
-  gitAuthor?: { name?: string; email?: string };
-  gitConfig?: readonly (readonly [string, string])[];
-}): Readonly<Record<string, string>> {
-  const author = params.gitAuthor;
-  const gitConfigEntries = [
-    ...(params.gitConfig ?? []),
-    ...Object.entries({
-      ...(author?.name ? { "user.name": author.name } : {}),
-      ...(author?.email ? { "user.email": author.email } : {}),
-    }),
-  ];
-  const gitConfigEnv = Object.fromEntries(
-    gitConfigEntries.flatMap(([key, value], index) => [
-      [`GIT_CONFIG_KEY_${index}`, key],
-      [`GIT_CONFIG_VALUE_${index}`, value],
-    ]),
-  );
-  return {
-    GH_CONFIG_DIR: params.profileDir,
-    ...(gitConfigEntries.length > 0
-      ? { GIT_CONFIG_COUNT: String(gitConfigEntries.length), ...gitConfigEnv }
-      : {}),
-    ...(author?.name ? { GIT_AUTHOR_NAME: author.name, GIT_COMMITTER_NAME: author.name } : {}),
-    ...(author?.email ? { GIT_AUTHOR_EMAIL: author.email, GIT_COMMITTER_EMAIL: author.email } : {}),
-  };
-}
 
 /** Prepares the non-secret child overlay and store exclusions once per agent run. */
 export function prepareGitHubToolEnvironment(
@@ -611,11 +587,6 @@ export async function prepareGitHubReadIdentity(
   });
 }
 
-export async function removeManagedGitHubProfile(profileDir: string): Promise<void> {
-  await fs.rm(profileDir, { recursive: true, force: true });
-  clearNativeGitHubTokenCache();
-}
-
 async function verifyManagedGitHubCredential(token: string) {
   const credential = normalizeManagedGitHubToken(token);
   const verified = await verifyGitHubCredential(credential);
@@ -632,28 +603,6 @@ async function verifyManagedGitHubCredential(token: string) {
     throw new Error("GitHub credential is missing required repo or read:org scopes.");
   }
   return { account: verified.account, credential };
-}
-
-function managedGitHubHosts(identity: { login: string; token: string }): string {
-  return stringifyYaml({
-    [GITHUB_HOST]: {
-      user: identity.login,
-      oauth_token: identity.token,
-      users: { [identity.login]: { oauth_token: identity.token } },
-    },
-  });
-}
-
-/** Write gh's external file contract without touching its OS keyring or verifying again. */
-export async function writeManagedGitHubProfileFiles(
-  profileDir: string,
-  identity: { login: string; token: string },
-): Promise<void> {
-  await fs.mkdir(profileDir, { recursive: true, mode: 0o700 });
-  await fs.chmod(profileDir, 0o700);
-  const profile = await fsRoot(profileDir, { mode: 0o600, mkdir: false, durable: false });
-  await profile.write("config.yml", stringifyYaml({ version: "1" }));
-  await profile.write("hosts.yml", managedGitHubHosts(identity));
 }
 
 /** Verifies a rotated token, then atomically replaces credentials in one stable profile. */

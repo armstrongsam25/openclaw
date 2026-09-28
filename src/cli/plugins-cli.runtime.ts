@@ -24,6 +24,10 @@ import type {
 import type { PluginPackageInstall } from "../plugins/package-manifest.types.js";
 import { withPluginLifecycleLease } from "../plugins/plugin-lifecycle-lease.js";
 import { tracePluginLifecyclePhaseAsync } from "../plugins/plugin-lifecycle-trace.js";
+import {
+  buildPluginCompatibilityNotices,
+  formatPluginCompatibilityNotice,
+} from "../plugins/status-compatibility.js";
 import { defaultRuntime } from "../runtime.js";
 import { createLazyRuntimeModule } from "../shared/lazy-runtime.js";
 import { shortenHomeInString, shortenHomePath } from "../utils.js";
@@ -306,11 +310,7 @@ export async function runPluginsRegistryCommand(opts: PluginRegistryOptions): Pr
 
 /** Print plugin install-tree, compatibility, and plugin-owned config diagnostics. */
 export async function runPluginsDoctorCommand(opts: PluginDoctorOptions = {}): Promise<void> {
-  const {
-    buildPluginCompatibilityNotices,
-    withPluginDiagnosticsReportForInspection,
-    formatPluginCompatibilityNotice,
-  } = await loadPluginsStatus();
+  const { withPluginDiagnosticsReportForInspection } = await loadPluginsStatus();
   const {
     collectStalePluginConfigWarnings,
     isStalePluginAutoRepairBlocked,

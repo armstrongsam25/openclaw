@@ -22,8 +22,13 @@ export function retirePreparedModelRuntimeGeneration(
 }
 
 type ModelRuntimeClose = (error: Error) => Promise<void>;
+type ModelCatalogRecovery = (
+  borrowers: readonly { agentDir: string; isCurrent: () => boolean }[],
+) => Promise<void>;
 class ProcessModelRuntimeLifetimes {
   readonly closeCallbacks = new Set<ModelRuntimeClose>();
+  // Retained runtime copies can predate this additive recovery metadata.
+  catalogRecoveries?: Map<ModelRuntimeClose, { recover?: ModelCatalogRecovery }>;
   retirePlugins?: () => Promise<void>;
   epoch = 0;
   closing?: Promise<void>;
@@ -46,10 +51,40 @@ export function capturePreparedModelRuntimeLifetime(): () => void {
   return assertCurrent;
 }
 
-export function registerPreparedModelRuntimeClose(close: ModelRuntimeClose): () => void {
+export function registerPreparedModelRuntimeClose(
+  close: ModelRuntimeClose,
+  recoverCatalog?: ModelCatalogRecovery,
+): () => void {
   capturePreparedModelRuntimeLifetime();
   lifetimes.closeCallbacks.add(close);
-  return () => lifetimes.closeCallbacks.delete(close);
+  const registration = { recover: recoverCatalog };
+  (lifetimes.catalogRecoveries ??= new Map()).set(close, registration);
+  return () => {
+    if (lifetimes.catalogRecoveries?.get(close) !== registration) {
+      return;
+    }
+    lifetimes.closeCallbacks.delete(close);
+    lifetimes.catalogRecoveries.delete(close);
+  };
+}
+
+/** Worker failures return to the live model owner after all failed borrowers settle. */
+export async function recoverPreparedModelCatalogBorrowers(
+  borrowers: Parameters<ModelCatalogRecovery>[0],
+): Promise<void> {
+  const results = await Promise.allSettled(
+    [...(lifetimes.catalogRecoveries?.entries() ?? [])].map(async ([close, registration]) => {
+      if (lifetimes.catalogRecoveries?.get(close) === registration) {
+        await registration.recover?.(borrowers);
+      }
+    }),
+  );
+  const failures = results.flatMap((result) =>
+    result.status === "rejected" ? [result.reason] : [],
+  );
+  if (failures.length) {
+    throw new AggregateError(failures, "Prepared model catalog recovery failed");
+  }
 }
 
 /** Install the shared plugin resource owner only when a real generation acquires it. */

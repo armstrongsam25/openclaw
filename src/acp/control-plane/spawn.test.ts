@@ -1,7 +1,7 @@
 import type { AcpRuntime } from "@openclaw/acp-core/runtime/types";
 import { afterEach, beforeAll, describe, expect, it, vi, type MockInstance } from "vitest";
 import { withGatewayToolCallerIdentity } from "../../agents/tools/gateway-caller-context.js";
-import { callInProcessGatewayTool } from "../../agents/tools/in-process-gateway.js";
+import { callInProcessGatewayTool } from "../../agents/tools/gateway.js";
 import type { CliDeps } from "../../cli/deps.types.js";
 import {
   loadSessionEntry,

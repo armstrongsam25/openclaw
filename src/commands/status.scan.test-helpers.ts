@@ -2,10 +2,12 @@
 import type { Mock } from "vitest";
 import { vi } from "vitest";
 import type { OpenClawConfig } from "../config/types.js";
+import type { CallGatewayOptions } from "../gateway/call.js";
 import { withEnvAsync } from "../test-utils/env.js";
 
 type UnknownMock = Mock<(...args: unknown[]) => unknown>;
 type ResolveConfigPathMock = Mock<() => string>;
+type StatusGatewayCall = (options: CallGatewayOptions) => Promise<unknown>;
 
 type StatusScanSharedMocks = {
   resolveConfigPath: ResolveConfigPathMock;
@@ -91,12 +93,12 @@ function createStatusGatewayProbeModuleMock(
 
 type StatusGatewayCallModuleMock = {
   buildGatewayConnectionDetails: StatusScanSharedMocks["buildGatewayConnectionDetails"];
-  callGateway?: unknown;
+  callGateway?: StatusGatewayCall;
 };
 
 function createStatusGatewayCallModuleMock(
   mocks: Pick<StatusScanSharedMocks, "buildGatewayConnectionDetails"> & {
-    callGateway?: unknown;
+    callGateway?: StatusGatewayCall;
   },
 ): StatusGatewayCallModuleMock {
   return {
@@ -116,11 +118,9 @@ function createStatusPluginRegistryModuleMock(
 function createStatusPluginStatusModuleMock(
   mocks: Pick<StatusScanSharedMocks, "buildPluginCompatibilityNotices">,
 ): {
-  buildPluginCompatibilityNotices: StatusScanSharedMocks["buildPluginCompatibilityNotices"];
   buildPluginCompatibilitySnapshotNotices: StatusScanSharedMocks["buildPluginCompatibilityNotices"];
 } {
   return {
-    buildPluginCompatibilityNotices: mocks.buildPluginCompatibilityNotices,
     buildPluginCompatibilitySnapshotNotices: mocks.buildPluginCompatibilityNotices,
   };
 }
@@ -164,7 +164,7 @@ function createStatusExecModuleMock(): { runExec: UnknownMock } {
 
 type StatusScanModuleTestMocks = StatusScanSharedMocks & {
   buildChannelsTable?: UnknownMock;
-  callGateway?: UnknownMock;
+  callGateway?: StatusGatewayCall;
   getStatusCommandSecretTargetIds?: UnknownMock;
   resolveMemorySearchConfig?: UnknownMock;
 };

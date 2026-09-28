@@ -2,6 +2,7 @@ import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 import { readLegacyCompactionHistory } from "../../config/sessions/legacy-compaction-history.js";
 import type {
   ChatHistoryPage,
+  ReadRecentSessionMessagesResult,
   ChatHistoryPageParams,
 } from "../../config/sessions/session-history-types.js";
 import { resolveSessionTranscriptActiveLeafEntryId } from "../../config/sessions/transcript-tree.js";
@@ -26,7 +27,6 @@ import {
 } from "../session-history-tail.js";
 import type {
   SessionTranscriptReader,
-  ReadRecentSessionMessagesResult,
   SessionTranscriptReadScope,
 } from "../session-transcript-read-kernel.js";
 

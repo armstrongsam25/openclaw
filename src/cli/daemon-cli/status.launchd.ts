@@ -1,8 +1,5 @@
 /** Live launchd job diagnostics shared by shallow and deep Gateway status. */
-import {
-  findForeignLaunchdJobs,
-  type ForeignLaunchdJob,
-} from "../../daemon/launchd-foreign-jobs.js";
+import type { ForeignLaunchdJob } from "../../daemon/launchd-foreign-jobs.js";
 import type { StaleOpenClawUpdateLaunchdJob } from "../../daemon/launchd.js";
 import {
   readGatewayForcedRestartSummary,
@@ -31,6 +28,7 @@ export async function gatherLaunchdJobDiagnostics(
     diagnostics.staleUpdateLaunchdJobs = stale;
   }
   try {
+    const { findForeignLaunchdJobs } = await import("../../daemon/launchd-foreign-jobs.js");
     const jobs = await findForeignLaunchdJobs(env);
     if (jobs.length) {
       diagnostics.foreignLaunchdJobs = jobs;

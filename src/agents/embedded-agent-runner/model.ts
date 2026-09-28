@@ -41,8 +41,6 @@ import {
   resolveBundledStaticCatalogModel,
 } from "./model.static-catalog.js";
 
-export { resolveModelWithRegistry } from "./model.registry-resolution.js";
-
 type CommonModelResolutionOptions = {
   assertCurrent?: () => void;
   authStorage?: AuthStorage;

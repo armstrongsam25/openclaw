@@ -5,10 +5,8 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as githubOAuth from "../agents/github-oauth-client.js";
-import {
-  resolveManagedGitHubProfileDir,
-  writeManagedGitHubProfileFiles,
-} from "../agents/github-tool-identity.js";
+import { resolveManagedGitHubProfileDir } from "../agents/github-tool-identity.js";
+import { writeManagedGitHubProfileFiles } from "../agents/github-tool-profile.js";
 import { managedWorktrees } from "../agents/worktrees/service.js";
 import * as sessionEntries from "../config/sessions/session-accessor.js";
 import { loadSessionEntry, upsertSessionEntryCore } from "../config/sessions/session-accessor.js";

@@ -1,6 +1,5 @@
 import { resolveIntegerOption } from "@openclaw/normalization-core/number-coercion";
 import { sql } from "kysely";
-import type { TranscriptDisplayPosition } from "../../chat/transcript-display-position.js";
 import { executeSqliteQuerySync } from "../../infra/kysely-sync.js";
 import { pruneMapToMaxSize } from "../../infra/map-size.js";
 import { hasSqlitePostCommitScope } from "../../infra/sqlite-post-commit.js";
@@ -18,7 +17,6 @@ import type {
 } from "./session-accessor.sqlite-active-events.js";
 import type {
   SessionTranscriptRawDeltaLimits,
-  SessionTranscriptRawDeltaResult,
   TranscriptEvent,
 } from "./session-accessor.sqlite-contract.js";
 import { positionTranscriptDisplayEvents } from "./session-accessor.sqlite-display-position.js";
@@ -56,6 +54,10 @@ import {
   resolveVisibleMessagePositions,
 } from "./session-accessor.sqlite-reset-window.js";
 import { MAX_VISIBLE_MESSAGE_MAX_MESSAGES } from "./session-accessor.sqlite-visible-cursor.js";
+import type {
+  SessionTranscriptDisplayDeltaResult,
+  SessionTranscriptMessageByIdOptions,
+} from "./session-history-types.js";
 import { resolveSessionTranscriptReadFence } from "./session-transcript-read-fence.js";
 import { transcriptEventJsonSql } from "./transcript-payload.js";
 
@@ -207,10 +209,6 @@ type SessionTranscriptMessageById = SessionTranscriptMessageEvent & {
 type HistoryEventById =
   | SessionTranscriptMessageById
   | { historical: NonNullable<ReturnType<typeof readDisplayableActiveEventById>> };
-export type SessionTranscriptMessageByIdOptions =
-  | { currentOnly?: false; maxBytes?: never }
-  | { currentOnly: true; maxBytes: number };
-
 function resolveHistoryEventById(
   projection: CurrentTranscriptProjection,
   eventId: string,
@@ -255,20 +253,6 @@ function resolveHistoryEventById(
           : {}),
       };
 }
-
-type SessionTranscriptRawDeltaPage = Extract<SessionTranscriptRawDeltaResult, { kind: "page" }>;
-
-export type SessionTranscriptDisplayDeltaResult =
-  | (Omit<SessionTranscriptRawDeltaPage, "events"> & {
-      activeLeafEntryId: string | null;
-      events: Array<
-        SessionTranscriptRawDeltaPage["events"][number] & {
-          messageSeq?: number;
-          displayPosition?: TranscriptDisplayPosition;
-        }
-      >;
-    })
-  | Exclude<SessionTranscriptRawDeltaResult, { kind: "page" }>;
 
 /** Raw cursor progress carries the same reset-relative ordinals as pages and live messages. */
 export function readTranscriptDisplayDeltaFromProjection(

@@ -7,7 +7,6 @@ import { resolveTimerTimeoutMs } from "@openclaw/normalization-core/number-coerc
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { truncateUtf16Safe } from "@openclaw/normalization-core/utf16-slice";
 import { stylePromptTitle } from "../../packages/terminal-core/src/prompt-style.js";
-import { resolveAgentEffectiveModelPrimary, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { DEFAULT_AGENT_WORKSPACE_DIR, ensureAgentWorkspace } from "../agents/workspace.js";
 import { printClawBanner } from "../cli/claw-banner.js";
 import { readSourceConfigBestEffort } from "../config/config.js";
@@ -31,11 +30,7 @@ export {
   resolveControlUiLinks,
   resolveLocalControlUiProbeLinks,
 } from "../gateway/control-ui-links.js";
-export {
-  detectBrowserOpenSupport,
-  openUrl,
-  resolveBrowserOpenCommand,
-} from "../infra/browser-open.js";
+export { detectBrowserOpenSupport, openUrl } from "../infra/browser-open.js";
 export { detectBinary } from "../infra/detect-binary.js";
 export { randomToken } from "./random-token.js";
 
@@ -284,7 +279,7 @@ function throwIfResetFailed(failures: string[]): void {
   }
 }
 
-type OnboardingGatewayProbeParams = {
+export type OnboardingGatewayProbeParams = {
   url: string;
   config?: OpenClawConfig;
   originScopedDeviceAuth?: boolean;
@@ -296,7 +291,7 @@ type OnboardingGatewayProbeParams = {
   timeoutMs?: number;
 };
 
-function runOnboardingGatewayProbe(
+export function runOnboardingGatewayProbe(
   params: OnboardingGatewayProbeParams,
   detailLevel: "none" | "config",
 ): Promise<GatewayProbeResult> {
@@ -331,60 +326,7 @@ export async function probeGatewayReachable(
     }
     return { ok: true };
   } catch (err) {
-    return { ok: false, detail: summarizeError(err) };
-  }
-}
-
-export type GatewayConfiguredModelProbeResult =
-  | { kind: "configured" }
-  | { kind: "missing-configured-model"; detail: string }
-  | { kind: "reachable-unverified"; detail?: string }
-  | { kind: "unreachable"; detail?: string };
-
-/** Reads only Gateway config and classifies whether its default agent has inference. */
-export async function probeGatewayConfiguredModel(
-  params: OnboardingGatewayProbeParams,
-): Promise<GatewayConfiguredModelProbeResult> {
-  let probe: GatewayProbeResult;
-  try {
-    probe = await runOnboardingGatewayProbe(params, "config");
-  } catch (err) {
-    return { kind: "unreachable", detail: summarizeError(err) };
-  }
-  const detail = probe.error ?? undefined;
-  if (!probe.gatewayReached) {
-    return { kind: "unreachable", ...(detail ? { detail } : {}) };
-  }
-  if (!probe.ok) {
-    return { kind: "reachable-unverified", detail };
-  }
-  const snapshot = probe.configSnapshot as {
-    valid?: unknown;
-    runtimeConfig?: unknown;
-    config?: unknown;
-  } | null;
-  const configCandidate =
-    snapshot?.valid === true ? (snapshot.runtimeConfig ?? snapshot.config) : null;
-  if (!configCandidate || typeof configCandidate !== "object" || Array.isArray(configCandidate)) {
-    return {
-      kind: "reachable-unverified",
-      detail: "Gateway returned an invalid config snapshot",
-    };
-  }
-  try {
-    const config = configCandidate as OpenClawConfig;
-    const model = resolveAgentEffectiveModelPrimary(config, resolveDefaultAgentId(config));
-    return model
-      ? { kind: "configured" }
-      : {
-          kind: "missing-configured-model",
-          detail: "Gateway default agent has no configured model",
-        };
-  } catch {
-    return {
-      kind: "reachable-unverified",
-      detail: "Gateway returned an invalid config snapshot",
-    };
+    return { ok: false, detail: summarizeGatewayProbeError(err) };
   }
 }
 
@@ -423,7 +365,7 @@ export async function waitForGatewayReachable(
   return { ok: false, detail: lastDetail };
 }
 
-function summarizeError(err: unknown): string {
+export function summarizeGatewayProbeError(err: unknown): string {
   let raw = "unknown error";
   if (err instanceof Error) {
     raw = err.message || raw;

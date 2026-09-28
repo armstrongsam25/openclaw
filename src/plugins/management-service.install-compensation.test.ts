@@ -44,6 +44,8 @@ vi.mock("./marketplace.js", () => ({
 vi.mock("./install-record-commit.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./install-record-commit.js")>()),
   commitPluginInstallRecordsWithConfig: (...args: unknown[]) => mocks.commit(...args),
+  // Mocked commits never record retained publications.
+  getRetainedPluginInstallPublication: () => undefined,
 }));
 vi.mock("./installed-plugin-index-records.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./installed-plugin-index-records.js")>()),

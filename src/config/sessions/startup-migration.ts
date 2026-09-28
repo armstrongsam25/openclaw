@@ -38,10 +38,8 @@ import { SessionStoreMigrationRequiredError } from "./migration-required.js";
 import { resolveSqliteReadScope, toDatabaseOptions } from "./session-accessor.sqlite-scope.js";
 import { isCanonicalSqliteSessionMainKeyCurrent } from "./session-canonical-key-read.js";
 import { setCanonicalSqliteSessionMainKey } from "./session-canonical-key.js";
-import {
-  resolveSqliteTargetFromSessionStorePath,
-  type SessionStoreRegistryRead,
-} from "./session-sqlite-target.js";
+import { resolveSqliteTargetFromSessionStorePath } from "./session-sqlite-target.js";
+import type { SessionStoreRegistryRead } from "./session-store-target.types.js";
 import {
   resolveAllAgentSessionStoreTargetsSync,
   resolveConfiguredAgentDatabaseTargets,

@@ -14,10 +14,10 @@ import {
 } from "../../infra/agent-run-registry.js";
 import { createOperationalRunInstanceRef } from "../admitted-run-context.js";
 import { withGatewayToolCallerIdentity } from "./gateway-caller-context.js";
+import { resolveGatewayOptions } from "./gateway-options.js";
 import {
   callGatewayTool,
   readGatewayCallOptions,
-  resolveGatewayOptions,
   resolveMessageActionAgentRuntimeIdentityToken,
 } from "./gateway.js";
 

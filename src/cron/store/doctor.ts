@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { isDeepStrictEqual } from "node:util";
 import { deferSqlitePostCommitPublication } from "../../infra/sqlite-post-commit.js";
-import { createVerifiedSqliteSnapshot } from "../../infra/sqlite-snapshot.js";
 import type { PluginDoctorRepairAuthority } from "../../infra/state-migrations.types.js";
 import type {
   PluginDoctorCronChange,
@@ -79,6 +78,8 @@ export async function repairCronJobsForDoctor(
   };
   const sourcePath = resolveOpenClawStateSqlitePath(scope.env);
   const backupPath = `${sourcePath}.doctor-cron-${Date.now()}-${randomUUID()}.bak`;
+  const { createVerifiedSqliteSnapshot } = await import("../../infra/sqlite-snapshot.js");
+  authority.assertCurrent();
   await createVerifiedSqliteSnapshot({
     sourcePath,
     targetPath: backupPath,

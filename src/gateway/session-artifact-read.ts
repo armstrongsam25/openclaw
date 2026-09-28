@@ -13,20 +13,20 @@ import {
   iterateVisibleMessageRange,
   resolveVisibleMessagePositions,
 } from "../config/sessions/session-accessor.sqlite-reset-window.js";
+import type {
+  SessionArtifactReadQuery,
+  SessionArtifactReadResult,
+} from "../config/sessions/session-history-types.js";
 import { SessionTranscriptProjectionUnavailableError } from "../config/sessions/session-transcript-projection-error.js";
 import { resolveSessionTranscriptReadFence } from "../config/sessions/session-transcript-read-fence.js";
 import { pruneMapToMaxSize } from "../infra/map-size.js";
 import { hasSqlitePostCommitScope } from "../infra/sqlite-post-commit.js";
 import { isImageMediaFact, readPersistedMediaFacts } from "../media/media-facts.js";
-import type { TranscriptReadWindow } from "../sessions/transcript-read-window.js";
 import {
   ASSISTANT_DISPLAY_CONTENT_FIELD,
   readAssistantDisplayContent,
 } from "../shared/assistant-display-content.js";
 import {
-  type ArtifactDownloadResponse,
-  type ArtifactDownloadResponseRequest,
-  type PreparedArtifactDownload,
   prepareArtifactDownload,
   prepareArtifactDownloadResponse,
 } from "./artifact-download-projection.js";
@@ -50,63 +50,10 @@ const IMAGE_PAGE_MESSAGES = 32;
 const IMAGE_PAGE_BYTES = 1024 * 1024;
 const IMAGE_INLINE_PREVIEW_MAX_BYTES = 256 * 1024;
 
-type SessionArtifactFilters = Pick<ArtifactsListParams, "runId" | "messageRole">;
 type ArtifactReaders = Pick<
   SessionTranscriptReader,
   "visitSessionMessagesAsync" | "readSessionMessagesPageWithStatsAsync"
 >;
-
-export type SessionArtifactReadQuery = SessionArtifactFilters &
-  (
-    | {
-        kind: "list";
-        sessionKey: string;
-        includeDownloadData?: boolean;
-        downloadArtifactIds?: string[];
-      }
-    | {
-        kind: "image-page";
-        sessionKey: string;
-        limit: number;
-        beforeSeq?: number;
-        imageOffset?: number;
-        readWindow?: TranscriptReadWindow;
-      }
-    | {
-        kind: "image";
-        sessionKey: string;
-        artifactId: string;
-        includeData: boolean;
-      }
-    | {
-        kind: "download-grant";
-        sessionKey: string;
-        artifactId: string;
-      }
-    | {
-        kind: "download-response";
-        sessionKey: string;
-        artifactId: string;
-        response: ArtifactDownloadResponseRequest;
-      }
-  );
-
-export type SessionArtifactReadResult =
-  | { kind: "list"; artifacts: ArtifactRecord[] }
-  | {
-      kind: "image-page";
-      artifacts: ArtifactSummary[];
-      next?: { beforeSeq: number; imageOffset: number; readWindow: TranscriptReadWindow };
-      omittedOversized?: boolean;
-    }
-  | { kind: "image"; artifact?: ArtifactRecord }
-  | {
-      kind: "download-grant";
-      selection?:
-        | { kind: "prepared"; download: PreparedArtifactDownload }
-        | { kind: "raw"; artifact: ArtifactRecord };
-    }
-  | { kind: "download-response"; response?: ArtifactDownloadResponse };
 
 const artifactTypes = new Map([
   ["image", "image"],

@@ -15,7 +15,8 @@ import {
   enqueuePluginNextTurnInjection,
 } from "../host-hook-state.js";
 import { createEmptyPluginRegistry } from "../registry-empty.js";
-import { clearActivePluginRegistry, setActivePluginRegistry } from "../runtime.js";
+import { setActivePluginRegistry } from "../runtime.js";
+import { clearActivePluginRegistry } from "../runtime.test-support.js";
 import { createPluginRecord } from "../status.test-helpers.js";
 
 describe("next-turn injection identity", () => {

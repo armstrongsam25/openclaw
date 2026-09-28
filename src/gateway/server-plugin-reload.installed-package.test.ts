@@ -23,11 +23,8 @@ import {
   clearPluginMetadataLifecycleCaches,
   retainGatewayPluginMetadata,
 } from "../plugins/plugin-metadata-lifecycle.js";
-import {
-  clearActivePluginRegistry,
-  createPluginRegistryOwner,
-  resetPluginRuntimeStateForTest,
-} from "../plugins/runtime.js";
+import { createPluginRegistryOwner, resetPluginRuntimeStateForTest } from "../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../plugins/runtime.test-support.js";
 import { startPluginServices, type PluginServicesHandle } from "../plugins/services.js";
 import { cleanupTrackedTempDirs, makeTrackedTempDir } from "../plugins/test-helpers/fs-fixtures.js";
 import { writeManagedNpmPlugin } from "../plugins/test-helpers/managed-npm-plugin.js";

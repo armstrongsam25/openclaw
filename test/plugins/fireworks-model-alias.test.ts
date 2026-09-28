@@ -19,8 +19,11 @@ vi.mock("../../src/plugins/manifest-registry.js", async (importOriginal) => ({
   loadPluginManifestRegistryCore: manifestMocks.loadPluginManifestRegistryCore,
 }));
 
+import {
+  createEmptyAgentDiscoveryStores,
+  resolveModelAsync,
+} from "../../src/agents/embedded-agent-runner/model.js";
 import { resolveRuntimeHooks } from "../../src/agents/embedded-agent-runner/model.provider-hooks.js";
-import { resolveModelWithRegistry } from "../../src/agents/embedded-agent-runner/model.registry-resolution.js";
 import { resolveBundledStaticCatalogModel } from "../../src/agents/embedded-agent-runner/model.static-catalog.js";
 import { loadPluginManifest } from "../../src/plugins/manifest.js";
 import { clearPluginMetadataLifecycleCaches } from "../../src/plugins/plugin-metadata-lifecycle.js";
@@ -57,7 +60,7 @@ describe("Fireworks manifest provider alias", () => {
     manifestMocks.loadPluginManifestRegistryCore.mockReturnValue(snapshot.manifestRegistry);
   });
 
-  function resolveFireworksGlm(provider: string, cfg?: OpenClawConfig) {
+  async function resolveFireworksGlm(provider: string, cfg?: OpenClawConfig) {
     const catalogModel = resolveBundledStaticCatalogModel({
       provider: "fireworks",
       modelId,
@@ -66,22 +69,18 @@ describe("Fireworks manifest provider alias", () => {
     if (!catalogModel) {
       throw new Error("Missing Fireworks GLM catalog model");
     }
-    return resolveModelWithRegistry({
-      provider,
-      modelId,
-      cfg,
-      modelRegistry: {
-        getAll: () => [catalogModel],
-        getAvailable: () => [],
-        hasConfiguredAuth: () => false,
-        find: (candidateProvider, candidateId) =>
-          candidateProvider === catalogModel.provider && candidateId === catalogModel.id
-            ? catalogModel
-            : undefined,
-      },
+    const stores = createEmptyAgentDiscoveryStores();
+    vi.spyOn(stores.modelRegistry, "find").mockImplementation((candidateProvider, candidateId) =>
+      candidateProvider === catalogModel.provider && candidateId === catalogModel.id
+        ? catalogModel
+        : undefined,
+    );
+    const { model } = await resolveModelAsync(provider, modelId, undefined, cfg, {
+      ...stores,
       runtimeHooks: resolveRuntimeHooks({ skipProviderRuntimeHooks: true }),
       authProfileMode: "api_key",
     });
+    return model;
   }
 
   it("finds the alias owner before runtime loading and resolves the canonical catalog model", async () => {

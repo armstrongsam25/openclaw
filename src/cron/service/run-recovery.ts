@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
+import { createSqliteWorkerWriteAdmission } from "../../infra/sqlite-worker-store.js";
 import { executeExistingOpenClawStateRead } from "../../state/openclaw-state-db-readonly.js";
 import { captureOpenClawStateWorkerContext } from "../../state/openclaw-state-worker-context.js";
 import type { OpenClawStateWorkerContext } from "../../state/openclaw-state-worker-context.types.js";
@@ -71,7 +72,6 @@ async function observeRecoveryProposals(
       context.admission.assertCurrent();
       assertCurrent();
     };
-    const { createSqliteWorkerWriteAdmission } = await import("../../infra/sqlite-worker-store.js");
     await runOpenClawStateWorkerOperation(
       context,
       (scope) => scope.execute({ type: "cron.initializeRunReceipts", input: {} }),

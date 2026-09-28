@@ -60,6 +60,7 @@ import {
   resumeGatewayRestartTraceFromHandoff,
 } from "./restart-trace.js";
 import type { GatewayServerOptions } from "./server-public.js";
+import { prepareGatewayStartupConfig } from "./server-startup-config-helpers.js";
 import { createGatewayStartupTrace } from "./server-startup-trace.js";
 import { maybeSeedControlUiAllowedOriginsAtStartup } from "./startup-control-ui-origins.js";
 
@@ -270,7 +271,6 @@ export async function prepareGatewayServerBootstrap(input: {
   const startupActivationSourceConfig = configSnapshot.sourceConfig;
   const startupRuntimeConfig = captureConfigOverrideApplier()(startupConfigSnapshot.config);
   startupTrace.setConfig(startupRuntimeConfig);
-  const { prepareGatewayStartupConfig } = await import("./server-startup-config-helpers.js");
   const authBootstrap = await startupTrace.measure(
     "config.auth",
     () =>

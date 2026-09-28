@@ -27,6 +27,7 @@ import {
 import { resolvePluginCapabilityProvider } from "../../plugins/capability-provider-runtime.js";
 import { runWithAsyncWorkResources } from "../../shared/async-work-resources.js";
 import type { AuthProfileStore } from "../auth-profiles/types.js";
+import { resolveModelAsync as resolveModelAsyncDefault } from "../embedded-agent-runner/model.js";
 import { isMinimaxVlmProvider } from "../minimax-vlm.js";
 import type { PreparedModelRuntimeSnapshot } from "../prepared-model-runtime.js";
 import { createSandboxBridgeReadFile } from "../sandbox-media-paths.js";
@@ -86,13 +87,6 @@ type ImageWebMediaRuntime = {
 async function loadImageWebMediaRuntime(): Promise<ImageWebMediaRuntime> {
   return await import("../../media/web-media.js");
 }
-
-type ResolveModelAsync = (typeof import("../embedded-agent-runner/model.js"))["resolveModelAsync"];
-
-const resolveModelAsyncDefault: ResolveModelAsync = async (...args) => {
-  const { resolveModelAsync } = await import("../embedded-agent-runner/model.js");
-  return await resolveModelAsync(...args);
-};
 
 function resolveRegisteredMediaUnderstandingProvider(params: {
   providerId: string;

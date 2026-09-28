@@ -5,7 +5,10 @@ import {
   type SqliteSchemaFacts,
 } from "../../infra/sqlite-schema-facts.js";
 import { withOpenClawAgentDatabaseReadOnly } from "../../state/openclaw-agent-db-readonly.js";
-import type { SessionAccessScope } from "./session-accessor.sqlite-contract.js";
+import type {
+  SessionAccessScope,
+  SessionPendingInputReceipt,
+} from "./session-accessor.sqlite-contract.js";
 import {
   getSessionKysely,
   resolveSqliteTranscriptScope,
@@ -19,10 +22,7 @@ const receiptSchemas = new WeakMap<SqliteSchemaFacts, boolean>();
 export function listSessionPendingInputReceipts(
   scope: PendingInputScope,
   options: { runIds: readonly string[] },
-): Array<
-  | { runId: string; state: "pending"; cancelled?: true }
-  | { runId: string; state: "consumed"; consumedByEventId: string }
-> {
+): SessionPendingInputReceipt[] {
   if (options.runIds.length > 50) {
     throw new Error("Pending input receipt lookup accepts at most 50 run IDs");
   }

@@ -17,11 +17,6 @@ import {
   resolveOnboardingSetupTarget,
 } from "../onboard-agent-target.js";
 import {
-  applyLocalSetupWorkspaceConfig,
-  applySkipBootstrapConfig,
-  resolveOnboardingWorkspaceConflict,
-} from "../onboard-config.js";
-import {
   applyWizardMetadata,
   DEFAULT_WORKSPACE,
   probeGatewayReachable,
@@ -149,6 +144,11 @@ export async function runNonInteractiveLocalSetup(params: {
     return;
   }
   const firstAgentName = opts.agentName ?? (opts.team ? "coordinator" : "main");
+  const {
+    applyLocalSetupWorkspaceConfig,
+    applySkipBootstrapConfig,
+    resolveOnboardingWorkspaceConflict,
+  } = await import("../onboard-config.js");
   const workspaceConflict = resolveOnboardingWorkspaceConflict(
     sourceConfigBeforeMigrations,
     requestedWorkspaceDir,

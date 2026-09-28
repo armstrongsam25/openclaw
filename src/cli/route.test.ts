@@ -31,7 +31,8 @@ vi.mock("../commands/channels/status.js", () => ({ channelsStatusCommand: runRou
 vi.mock("./plugins-list-command.js", () => ({ runPluginsListCommand: runRouteMock }));
 vi.mock("./daemon-cli/status.js", () => ({ runDaemonStatus: runRouteMock }));
 vi.mock("./gateway-cli/health-route.js", () => ({ runGatewayHealthJsonRoute: runRouteMock }));
-vi.mock("./config-cli.js", () => ({ runConfigGet: runRouteMock, runConfigUnset: runRouteMock }));
+vi.mock("./config-cli-read.js", () => ({ runConfigGet: runRouteMock }));
+vi.mock("./config-cli.js", () => ({ runConfigUnset: runRouteMock }));
 vi.mock("../commands/models/list.status-command.js", () => ({ modelsStatusCommand: runRouteMock }));
 
 vi.mock("../runtime.js", () => ({

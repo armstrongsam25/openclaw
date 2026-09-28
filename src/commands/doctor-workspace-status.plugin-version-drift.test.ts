@@ -25,10 +25,12 @@ vi.mock("../agents/agent-scope.js", () => ({
   tryResolveDefaultAgentId: () => undefined,
 }));
 
-vi.mock("../plugins/status.js", () => ({
+vi.mock("../plugins/status-compatibility.js", () => ({
   buildPluginCompatibilityWarnings: () => {
     throw new Error("plugin drift evidence must not use compatibility warnings");
   },
+}));
+vi.mock("../plugins/status-snapshot.js", () => ({
   buildPluginRegistrySnapshotReport: () => {
     throw new Error("plugin drift evidence must not use registry diagnostics");
   },

@@ -13,7 +13,7 @@ import {
 } from "../../packages/gateway-protocol/src/client-info.js";
 import { createHeartbeatToolResponsePayload } from "../auto-reply/heartbeat-tool-response.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import { runHeartbeatOnce } from "../infra/heartbeat-runner.js";
+import { runHeartbeatOnce } from "../infra/heartbeat-runner-run.js";
 import { enqueueSystemEvent, peekSystemEventEntries } from "../infra/system-events.js";
 import { removeSessionTestDirectories } from "./session-test-directories.test-support.js";
 import { testState } from "./test-helpers.runtime-state.js";

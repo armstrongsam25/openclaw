@@ -1,3 +1,8 @@
+import {
+  clearLoadInstalledPluginIndexInstallRecordsCache,
+  loadInstalledPluginIndexInstallRecordsSync,
+} from "../plugins/installed-plugin-index-records.js";
+
 type RetainedPluginCleanupLogger = {
   info: (message: string) => void;
   warn: (message: string) => void;
@@ -8,10 +13,6 @@ export async function cleanupRetainedPluginInstallGenerations(params: {
   startupInstallPaths: Iterable<string>;
 }): Promise<void> {
   try {
-    const {
-      clearLoadInstalledPluginIndexInstallRecordsCache,
-      loadInstalledPluginIndexInstallRecordsSync,
-    } = await import("../plugins/installed-plugin-index-records.js");
     // An external install may have advanced the ledger during the idle delay.
     // Protect both the desired install and the code still owned by this Gateway.
     clearLoadInstalledPluginIndexInstallRecordsCache();

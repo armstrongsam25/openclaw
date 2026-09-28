@@ -6,14 +6,14 @@ import { withCurrentProjectionSnapshot } from "../config/sessions/session-access
 import type { SessionTranscriptReadScope } from "../config/sessions/session-accessor.sqlite-contract.js";
 import { bindSessionTranscriptStoreScope } from "../config/sessions/session-accessor.transcript-target.js";
 import { readRestoredSessionTranscript } from "../config/sessions/session-cold-storage-read.js";
+import type {
+  SessionArtifactReadQuery,
+  SessionArtifactReadResult,
+} from "../config/sessions/session-history-types.js";
 import { captureSessionTranscriptStorageEnvironment } from "../config/sessions/transcript-target-binding.js";
 import { resolveAgentIdFromSessionKey } from "../routing/session-key.js";
 import { isIncognitoSessionKey } from "../shared/incognito-session-key.js";
 import { isIncognitoOpenClawAgentSqlitePath } from "../state/openclaw-agent-db.paths.js";
-import type {
-  SessionArtifactReadQuery,
-  SessionArtifactReadResult,
-} from "./session-artifact-read.js";
 import { createSessionTranscriptReader } from "./session-transcript-read-kernel.js";
 import {
   resolveTranscriptReadTarget,

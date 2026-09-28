@@ -6,6 +6,7 @@ import {
   resolveSystemAgentOnboardingTarget,
 } from "../commands/onboard-agent-target.js";
 import type { FirstOnboardingAgent } from "../commands/onboard-agent.js";
+import * as onboardHelpers from "../commands/onboard-helpers.js";
 import { hasResolvedRosterBeforeMigrations } from "../config/agent-roster-provenance.js";
 import {
   readConfigFileSnapshot,
@@ -16,11 +17,13 @@ import {
 import type { ConfigFileSnapshot, OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { formatExternalSupervisorActionRequired } from "../infra/gateway-supervision.js";
+import { transformConfigWithPendingPluginInstalls } from "../plugins/install-record-commit.js";
 import { normalizeAgentId } from "../routing/session-key.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { shortenHomePath } from "../utils.js";
-import type { WizardPrompter } from "../wizard/prompts.js";
+import { createQuickstartNotePrompter } from "../wizard/prompts.js";
 import type { GatewayServiceSetupOutcome } from "../wizard/setup.finalize.js";
+import { resolveSetupSecretInputString } from "../wizard/setup.secret-input.js";
 import {
   assertSetupTarget,
   projectInferenceRoute,
@@ -82,42 +85,6 @@ type SystemAgentSetupApplyHooks = {
   beforePersistentApply?: () => void;
 };
 
-/** Prompter for quickstart-only flows: notes go to the log, prompts fail loud. */
-export function createQuickstartNotePrompter(runtime: RuntimeEnv): WizardPrompter {
-  const unexpected = (kind: string) => {
-    throw new Error(`openclaw setup hit an interactive ${kind} prompt; quickstart must not ask`);
-  };
-  return {
-    intro: async () => {},
-    outro: async () => {},
-    note: async (message, title) => {
-      runtime.log(title ? `${title}: ${message}` : message);
-    },
-    select: async (params) => {
-      // Quickstart paths never select interactively; honor defaults if a
-      // pre-answered prompt sneaks through, otherwise fail loud.
-      if (params.initialValue !== undefined) {
-        return params.initialValue;
-      }
-      return unexpected("select");
-    },
-    multiselect: async () => unexpected("multiselect"),
-    text: async () => unexpected("text"),
-    confirm: async (params) => params.initialValue ?? true,
-    progress: (label) => {
-      runtime.log(label);
-      return {
-        update: (message) => runtime.log(message),
-        stop: (message) => {
-          if (message) {
-            runtime.log(message);
-          }
-        },
-      };
-    },
-  };
-}
-
 function applySecurityAcknowledgement(config: OpenClawConfig): OpenClawConfig {
   if (config.wizard?.securityAcknowledgedAt) {
     return config;
@@ -149,14 +116,10 @@ export async function applySystemAgentSetup(
   const beforePersistentApply = hooks?.beforePersistentApply;
   const [
     { readSetupConfigFileSnapshot, resolveQuickstartGatewayDefaults },
-    onboardHelpers,
     { applyLocalSetupWorkspaceConfig, resolveOnboardingWorkspaceConflict },
-    { transformConfigWithPendingPluginInstalls },
   ] = await Promise.all([
     import("../wizard/setup.shared.js"),
-    import("../commands/onboard-helpers.js"),
     import("../commands/onboard-config.js"),
-    import("../plugins/install-record-commit.js"),
   ]);
 
   let snapshot = await readSetupConfigFileSnapshot();
@@ -565,9 +528,7 @@ export async function applySystemAgentSetup(
             token: settings.authMode === "token" ? settings.gatewayToken : undefined,
             password:
               settings.authMode === "password"
-                ? await (
-                    await import("../wizard/setup.secret-input.js")
-                  ).resolveSetupSecretInputString({
+                ? await resolveSetupSecretInputString({
                     config: nextConfig,
                     value: nextConfig.gateway?.auth?.password,
                     path: "gateway.auth.password",

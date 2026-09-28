@@ -7,7 +7,7 @@ import { buildChannelOutboundSessionRoute } from "../plugin-sdk/core.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
 import { createTestRegistry } from "../test-utils/channel-plugins.js";
 import { resolveHeartbeatPreflight } from "./heartbeat-runner-prompt.js";
-import { runHeartbeatOnce } from "./heartbeat-runner.js";
+import { runHeartbeatOnce } from "./heartbeat-runner-run.js";
 import { installHeartbeatRunnerTestRuntime } from "./heartbeat-runner.test-harness.js";
 import {
   type HeartbeatReplySpy,

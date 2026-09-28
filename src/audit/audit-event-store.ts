@@ -16,6 +16,7 @@ import {
   type OpenClawStateDatabaseOptions,
 } from "../state/openclaw-state-db.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
+import { executeOpenClawStateWorker } from "../state/openclaw-state-worker-store.js";
 import { getAuditEventQueries, type AuditEventInsert } from "./audit-event-queries.js";
 import {
   AUDIT_EVENT_SCHEMA_VERSION,
@@ -668,7 +669,6 @@ export async function listAuditEvents(
     ...(params.filters ? { filters: { ...params.filters } } : {}),
   };
   const context = captureOpenClawStateWorkerContext(params.database);
-  const { executeOpenClawStateWorker } = await import("../state/openclaw-state-worker-store.js");
   return executeOpenClawStateWorker(context, { type: "audit.events.list", input });
 }
 

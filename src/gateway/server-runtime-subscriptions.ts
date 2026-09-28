@@ -59,6 +59,7 @@ import type {
   ToolEventRecipientRegistry,
 } from "./server-chat-state.js";
 import { resolveVisibleActiveSessionRunState } from "./server-methods/session-active-runs.js";
+import { resolveSessionKeyForRun } from "./server-session-key.js";
 import { createSessionActivitySummaries } from "./session-activity-summaries.js";
 import { broadcastSessionActivitySummary } from "./session-activity-summary-events.js";
 import { defaultSessionCompanionContextReader } from "./session-companion-context.js";
@@ -297,99 +298,86 @@ export function startGatewayEventSubscriptions(params: {
     }
     return tracked;
   };
-  const getSessionKeyModule = createLazyPromise(() => import("./server-session-key.js"), {
-    cacheRejections: true,
-  });
   const agentEventHandlerLoader = createLazyPromiseLoader(
     () => {
       // Lazy-load heavy chat modules only after the first agent event reaches the gateway.
-      return Promise.all([import("./server-chat.js"), getSessionKeyModule()]).then(
-        ([{ createAgentEventHandler }, { resolveSessionKeyForRun }]) =>
-          createAgentEventHandler({
-            broadcast: params.broadcast,
-            broadcastToConnIds: params.broadcastToConnIds,
-            nodeHasSessionSubscribers: params.nodeHasSessionSubscribers,
-            nodeSendToSession: params.nodeSendToSession,
-            agentRunSeq: params.agentRunSeq,
-            chatRunState: params.chatRunState,
-            resolveSessionKeyForRun: (runId, options) =>
-              resolveSessionKeyForRun(runId, {
-                ...options,
-                projection: params.getSessionRowProjection?.(),
-              }),
-            clearAgentRunContext,
-            toolEventRecipients: params.toolEventRecipients,
-            sessionEventSubscribers: params.sessionEventSubscribers,
-            sessionMessageSubscribers: params.sessionMessageSubscribers,
-            getSessionRowProjection: params.getSessionRowProjection,
-            loadGatewaySessionLifecycleSnapshotForEvent: (key, options) => {
-              // Tool progress must not wait for optional row enrichment before reply capture.
-              if (
-                !options?.ownerEvent &&
-                params.getSessionRowProjection?.()?.needsMaterialization
-              ) {
-                return { row: null };
+      return import("./server-chat.js").then(({ createAgentEventHandler }) =>
+        createAgentEventHandler({
+          broadcast: params.broadcast,
+          broadcastToConnIds: params.broadcastToConnIds,
+          nodeHasSessionSubscribers: params.nodeHasSessionSubscribers,
+          nodeSendToSession: params.nodeSendToSession,
+          agentRunSeq: params.agentRunSeq,
+          chatRunState: params.chatRunState,
+          resolveSessionKeyForRun: (runId, options) =>
+            resolveSessionKeyForRun(runId, {
+              ...options,
+              projection: params.getSessionRowProjection?.(),
+            }),
+          clearAgentRunContext,
+          toolEventRecipients: params.toolEventRecipients,
+          sessionEventSubscribers: params.sessionEventSubscribers,
+          sessionMessageSubscribers: params.sessionMessageSubscribers,
+          getSessionRowProjection: params.getSessionRowProjection,
+          loadGatewaySessionLifecycleSnapshotForEvent: (key, options) => {
+            // Tool progress must not wait for optional row enrichment before reply capture.
+            if (!options?.ownerEvent && params.getSessionRowProjection?.()?.needsMaterialization) {
+              return { row: null };
+            }
+            const owner = options?.ownerEvent ? eventRowOwners.get(options.ownerEvent) : undefined;
+            if (
+              options?.ownerEvent &&
+              (!owner?.record || !owner.projection.isCurrent(owner.record))
+            ) {
+              return { row: null };
+            }
+            const scope = resolveSessionEventAgentScope(getRuntimeConfig(), key, options?.agentId);
+            const read = options?.sessionRows;
+            const prepared = scope?.[1] ? read?.describe({ key, agentId: scope[1] }) : undefined;
+            const snapshot = scope?.[1]
+              ? read
+                ? prepared
+                  ? { row: read.present(prepared), lifecycleRunId: prepared.entry.lifecycleRunId }
+                  : { row: null }
+                : (params.getSessionRowProjection?.()?.snapshot({ key, agentId: scope[1] }) ?? {
+                    row: null,
+                  })
+              : { row: null };
+            return options?.ownerEvent?.sessionId &&
+              snapshot.row?.sessionId !== options.ownerEvent.sessionId
+              ? { row: null }
+              : snapshot;
+          },
+          persistGatewaySessionLifecycleEventForEvent: sessionLifecyclePersistence.persist,
+          updateRunToolErrorSummary: ({ runId, clientRunId, summary }) => {
+            for (const candidateRunId of trackedRunIds(runId, clientRunId)) {
+              const entry = params.chatAbortControllers.get(candidateRunId);
+              if (entry) {
+                entry.toolErrorSummary = summary;
               }
-              const owner = options?.ownerEvent
-                ? eventRowOwners.get(options.ownerEvent)
-                : undefined;
-              if (
-                options?.ownerEvent &&
-                (!owner?.record || !owner.projection.isCurrent(owner.record))
-              ) {
-                return { row: null };
-              }
-              const scope = resolveSessionEventAgentScope(
+            }
+          },
+          clearTrackedActiveRun,
+          settleTrackedTerminal,
+          trackTrackedRunTerminalPersistence,
+          isChatSendRunActive: (runId) => {
+            const entry = params.chatAbortControllers.get(runId);
+            return entry !== undefined && entry.kind !== "agent";
+          },
+          resolveActiveLifecycleGenerationForRun: (runId) =>
+            params.chatAbortControllers.get(runId)?.lifecycleGeneration,
+          resolveSessionActiveRunState: (session) =>
+            resolveVisibleActiveSessionRunState({
+              context: params,
+              ...session,
+              projectedAgentRunIndex:
+                params.getSessionRowProjection?.()?.state.rowContext.projectedAgentRuns,
+              defaultAgentId: tryResolveSessionCompatibilityOwnerAgentId(
                 getRuntimeConfig(),
-                key,
-                options?.agentId,
-              );
-              const read = options?.sessionRows;
-              const prepared = scope?.[1] ? read?.describe({ key, agentId: scope[1] }) : undefined;
-              const snapshot = scope?.[1]
-                ? read
-                  ? prepared
-                    ? { row: read.present(prepared), lifecycleRunId: prepared.entry.lifecycleRunId }
-                    : { row: null }
-                  : (params.getSessionRowProjection?.()?.snapshot({ key, agentId: scope[1] }) ?? {
-                      row: null,
-                    })
-                : { row: null };
-              return options?.ownerEvent?.sessionId &&
-                snapshot.row?.sessionId !== options.ownerEvent.sessionId
-                ? { row: null }
-                : snapshot;
-            },
-            persistGatewaySessionLifecycleEventForEvent: sessionLifecyclePersistence.persist,
-            updateRunToolErrorSummary: ({ runId, clientRunId, summary }) => {
-              for (const candidateRunId of trackedRunIds(runId, clientRunId)) {
-                const entry = params.chatAbortControllers.get(candidateRunId);
-                if (entry) {
-                  entry.toolErrorSummary = summary;
-                }
-              }
-            },
-            clearTrackedActiveRun,
-            settleTrackedTerminal,
-            trackTrackedRunTerminalPersistence,
-            isChatSendRunActive: (runId) => {
-              const entry = params.chatAbortControllers.get(runId);
-              return entry !== undefined && entry.kind !== "agent";
-            },
-            resolveActiveLifecycleGenerationForRun: (runId) =>
-              params.chatAbortControllers.get(runId)?.lifecycleGeneration,
-            resolveSessionActiveRunState: (session) =>
-              resolveVisibleActiveSessionRunState({
-                context: params,
-                ...session,
-                projectedAgentRunIndex:
-                  params.getSessionRowProjection?.()?.state.rowContext.projectedAgentRuns,
-                defaultAgentId: tryResolveSessionCompatibilityOwnerAgentId(
-                  getRuntimeConfig(),
-                  session.requestedKey,
-                ),
-              }),
-          }),
+                session.requestedKey,
+              ),
+            }),
+        }),
       );
     },
     { cacheRejections: true },
@@ -543,7 +531,7 @@ export function startGatewayEventSubscriptions(params: {
         } else {
           // Context cleanup can precede a terminal event. Resolve its persisted
           // run mapping before the lazy chat handler consumes the same event.
-          terminalPreparation = getSessionKeyModule().then(async ({ resolveSessionKeyForRun }) => {
+          terminalPreparation = Promise.resolve().then(async () => {
             const sessionKey = resolveSessionKeyForRun(evt.runId, {
               agentId: sessionAgentId,
               projection: params.getSessionRowProjection?.(),

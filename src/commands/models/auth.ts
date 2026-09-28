@@ -67,8 +67,6 @@ import { normalizeSecretInput } from "../../utils/normalize-secret-input.js";
 import { createClackPrompter } from "../../wizard/clack-prompter.js";
 import type { WizardPrompter } from "../../wizard/prompts.js";
 import { validateAnthropicSetupToken } from "../auth-token.js";
-import { repairCodexRuntimePluginInstallForModelSelection } from "../codex-runtime-plugin-install.js";
-import { repairCopilotRuntimePluginInstallForModelSelection } from "../copilot-runtime-plugin-install.js";
 import { saveModelProviderApiKey } from "./auth-api-key.js";
 import { tryImportProviderCredential } from "./auth-credential-import.js";
 import {
@@ -487,15 +485,13 @@ async function persistProviderAuthResult(params: {
         },
       });
       if (defaultModel) {
-        const repaired = await repairCodexRuntimePluginInstallForModelSelection({
+        const { repairModelSelectionRuntimePlugins } = await import("../runtime-plugin-install.js");
+        const repaired = await repairModelSelectionRuntimePlugins({
           cfg: updated,
           model: defaultModel,
         });
-        const copilotRepaired = await repairCopilotRuntimePluginInstallForModelSelection({
-          cfg: updated,
-          model: defaultModel,
-        });
-        for (const warning of [...repaired.warnings, ...copilotRepaired.warnings]) {
+
+        for (const warning of repaired.warnings) {
           params.runtime.error?.(warning);
         }
       }

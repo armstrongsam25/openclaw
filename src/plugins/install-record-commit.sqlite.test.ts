@@ -5,7 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import { expectDefined } from "@openclaw/normalization-core";
 import { afterEach, describe, expect, it } from "vitest";
-import { replaceConfigFile, type OpenClawConfig } from "../config/config.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { closeOpenClawStateDatabaseForTest } from "../state/openclaw-state-db.js";
 import { withEnvAsync } from "../test-utils/env.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
@@ -13,10 +13,7 @@ import { resolvePluginArtifactDeclaredSurface } from "./capability-artifact.js";
 import { resolvePluginCapabilityConsent } from "./capability-consent.js";
 import { computeDeclaredSurfaceHash } from "./capability-summary.js";
 import { enablePluginWithCapabilityConsent } from "./enable.js";
-import {
-  commitConfigWithPendingPluginInstalls,
-  commitConfigWriteWithPendingPluginInstalls,
-} from "./install-record-commit.js";
+import { commitConfigWithPendingPluginInstalls } from "./install-record-commit.js";
 import { writePersistedInstalledPluginIndexInstallRecordsWithLease } from "./installed-plugin-index-records.js";
 import { readPersistedInstalledPluginIndex } from "./installed-plugin-index-store.js";
 import { resolveInstalledPluginIndexPolicyHash } from "./installed-plugin-index.js";
@@ -138,9 +135,8 @@ describe("plugin install record commit rollback", () => {
           const enabled = await enablePluginWithCapabilityConsent(config, pluginId);
           expect(enabled.enabled).toBe(true);
           if (legacy) {
-            let commits = 0;
-            await commitConfigWriteWithPendingPluginInstalls({
-              nextConfig: {
+            const committed = await commitConfigWithPendingPluginInstalls({
+              sourceConfig: {
                 plugins: {
                   ...config.plugins,
                   installs: {
@@ -148,12 +144,8 @@ describe("plugin install record commit rollback", () => {
                   },
                 },
               },
-              commit: async (nextConfig) => {
-                commits += 1;
-                return await replaceConfigFile({ sourceConfig: nextConfig });
-              },
             });
-            expect(commits).toBe(1);
+            expect(committed.nextConfig.plugins?.entries?.[pluginId]?.enabled).toBe(true);
             return;
           }
           await withPluginLifecycleLease({}, async (lease) => {
@@ -166,23 +158,18 @@ describe("plugin install record commit rollback", () => {
               { config, lease },
             );
           });
-          let commits = 0;
-          const commit = async (nextConfig: OpenClawConfig) => {
-            commits += 1;
-            return await replaceConfigFile({ sourceConfig: nextConfig });
-          };
+          const beforeConfig = await fs.promises.readFile(state.configPath, "utf8");
           await expect(
-            commitConfigWriteWithPendingPluginInstalls({
-              nextConfig: pendingRecords
+            commitConfigWithPendingPluginInstalls({
+              sourceConfig: pendingRecords
                 ? {
                     ...enabled.config,
                     plugins: { ...enabled.config.plugins, installs: { [pluginId]: oldRecord } },
                   }
                 : enabled.config,
-              commit,
             }),
           ).rejects.toMatchObject({ capabilityConsent: { pluginId } });
-          expect(commits).toBe(0);
+          expect(await fs.promises.readFile(state.configPath, "utf8")).toBe(beforeConfig);
           expect(
             (await readPersistedInstalledPluginIndex({ env: state.env }))?.installRecords[pluginId]
               ?.acceptedSurface,
@@ -196,8 +183,10 @@ describe("plugin install record commit rollback", () => {
               ),
             },
           });
-          await commitConfigWriteWithPendingPluginInstalls({ nextConfig: enabled.config, commit });
-          expect(commits).toBe(1);
+          const committed = await commitConfigWithPendingPluginInstalls({
+            sourceConfig: enabled.config,
+          });
+          expect(committed.nextConfig.plugins?.entries?.[pluginId]?.enabled).toBe(true);
         });
       });
     },
@@ -213,13 +202,13 @@ describe("plugin install record commit rollback", () => {
         `
           import fs from "node:fs";
           import { setTimeout as delay } from "node:timers/promises";
-          import { commitConfigWriteWithPendingPluginInstalls } from ${JSON.stringify(commitModuleUrl)};
+          import { commitConfigWithPendingPluginInstalls } from ${JSON.stringify(commitModuleUrl)};
           const [stateDir, pluginId, enteredPath, releasePath] = process.argv.slice(2);
           process.env.OPENCLAW_STATE_DIR = stateDir;
           process.send?.("ready");
           process.disconnect?.();
           try {
-            await commitConfigWriteWithPendingPluginInstalls({
+            await commitConfigWithPendingPluginInstalls({
               nextConfig: {
                 plugins: {
                   installs: {
@@ -232,20 +221,22 @@ describe("plugin install record commit rollback", () => {
                   },
                 },
               },
-              commit: async () => {
-                await fs.promises.writeFile(enteredPath, "entered");
-                while (true) {
-                  try {
-                    await fs.promises.access(releasePath);
-                    break;
-                  } catch (error) {
-                    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-                      throw error;
+              writeOptions: {
+                preCommitRuntimePreflight: async () => {
+                  await fs.promises.writeFile(enteredPath, "entered");
+                  while (true) {
+                    try {
+                      await fs.promises.access(releasePath);
+                      break;
+                    } catch (error) {
+                      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+                        throw error;
+                      }
                     }
+                    await delay(10);
                   }
-                  await delay(10);
-                }
-                throw new Error("config failed " + pluginId);
+                  throw new Error("config failed " + pluginId);
+                },
               },
             });
             throw new Error("config commit unexpectedly succeeded");

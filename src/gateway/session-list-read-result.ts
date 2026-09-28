@@ -3,6 +3,7 @@ import { withReadySessionRows } from "./session-row-prepared-read.js";
 import { prepareProjectedSessionPresentation } from "./session-row-presentation.js";
 import type { MaterializedRow } from "./session-row-projection-record.js";
 import type { SessionRowProjection } from "./session-row-projection.js";
+import { readSessionTitleFieldsFromTranscriptAsync } from "./session-transcript-title-reader.js";
 
 type SessionListRead = {
   projection: WeakRef<SessionRowProjection>;
@@ -53,8 +54,6 @@ export async function readSessionListRowTitleFields(row: object, requireOwner: b
   if (!visible) {
     return null;
   }
-  const { readSessionTitleFieldsFromTranscriptAsync } =
-    await import("./session-transcript-title-reader.js");
   return await readSessionTitleFieldsFromTranscriptAsync({
     agentId: selected.storeAgentId,
     sessionKey: selected.key,

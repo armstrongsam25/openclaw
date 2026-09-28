@@ -27,7 +27,6 @@ import { createSandboxBackend, getSandboxBackendWorkdirResolver } from "./backen
 import { ensureSandboxBrowser } from "./browser.js";
 import { resolveSandboxConfigForAgent } from "./config.js";
 import { resolveSandboxDockerUser } from "./docker-user.js";
-import { createSandboxFsBridge } from "./fs-bridge.js";
 import { hashTextSha256 } from "./hash.js";
 import { toSandboxProvisioningError } from "./provisioning-error.js";
 import { readRegisteredSandboxRuntimeIds } from "./registry.js";
@@ -286,6 +285,7 @@ async function resolveProvisionedSandboxContext(
   params: ResolveSandboxContextParams,
   resolved: ResolvedSandboxSession,
 ): Promise<SandboxContext> {
+  const { createSandboxFsBridge } = await import("./fs-bridge.js");
   const selected = await prepareSandboxWorkspaceSelection(params, resolved);
   const { rawSessionKey, runtime, cfg, localWorkspace } = selected;
   if (cfg.prune.idleHours !== 0 || cfg.prune.maxAgeDays !== 0) {

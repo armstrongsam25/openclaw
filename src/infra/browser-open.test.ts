@@ -45,7 +45,7 @@ vi.mock("node:fs/promises", async () => {
   };
 });
 
-import { detectBrowserOpenSupport, openUrl, resolveBrowserOpenCommand } from "./browser-open.js";
+import { detectBrowserOpenSupport, openUrl } from "./browser-open.js";
 import { resetWSLStateForTests } from "./wsl.js";
 
 afterEach(() => {
@@ -107,7 +107,7 @@ describe("openUrl", () => {
   });
 });
 
-describe("resolveBrowserOpenCommand", () => {
+describe("detectBrowserOpenSupport", () => {
   it("retains process-level WSL detection caching through the resolver", async () => {
     mockProcessPlatform("linux");
     vi.stubEnv("DISPLAY", "");
@@ -119,12 +119,12 @@ describe("resolveBrowserOpenCommand", () => {
     vi.stubEnv("SSH_CONNECTION", "");
     vi.stubEnv("SSH_TTY", "");
 
-    await expect(resolveBrowserOpenCommand()).resolves.toEqual({
-      argv: null,
+    await expect(detectBrowserOpenSupport()).resolves.toEqual({
+      ok: false,
       reason: "no-display",
     });
-    await expect(resolveBrowserOpenCommand()).resolves.toEqual({
-      argv: null,
+    await expect(detectBrowserOpenSupport()).resolves.toEqual({
+      ok: false,
       reason: "no-display",
     });
 
@@ -152,7 +152,7 @@ describe("resolveBrowserOpenCommand", () => {
 
   it("prefers the registry-backed Windows system root over process env", async () => {
     vi.resetModules();
-    const { resolveBrowserOpenCommand: resolveCommand } = await import("./browser-open.js");
+    const { detectBrowserOpenSupport, openUrl } = await import("./browser-open.js");
     vi.spyOn(fs, "accessSync").mockImplementation(() => undefined);
     execFileSyncMock.mockImplementation((_file: string, args: readonly string[]) =>
       args[3] === "SystemRoot" ? "SystemRoot    REG_SZ    D:\\Windows\r\n" : "",
@@ -160,11 +160,15 @@ describe("resolveBrowserOpenCommand", () => {
     mockProcessPlatform("win32");
     vi.stubEnv("SystemRoot", "C:\\PoisonedWindows");
 
-    const resolved = await resolveCommand();
-
     const rundll32 = path.win32.join("D:\\Windows", "System32", "rundll32.exe");
-    expect(resolved.argv).toEqual([rundll32, "url.dll,FileProtocolHandler"]);
-    expect(resolved.command).toBe(rundll32);
+    await expect(detectBrowserOpenSupport()).resolves.toEqual({ ok: true, command: rundll32 });
+    vi.stubEnv("VITEST", "");
+    vi.stubEnv("NODE_ENV", "development");
+    await expect(openUrl("https://example.com/")).resolves.toBe(true);
+    expect(runCommandWithTimeoutMock).toHaveBeenCalledWith(
+      [rundll32, "url.dll,FileProtocolHandler", "https://example.com/"],
+      { timeoutMs: 5_000 },
+    );
   });
 
   it("resolves macOS open even when SSH environment variables are present", async () => {
@@ -172,25 +176,25 @@ describe("resolveBrowserOpenCommand", () => {
     vi.stubEnv("SSH_CONNECTION", "192.0.2.1 12345 192.0.2.2 22");
     detectBinaryMock.mockResolvedValueOnce(true);
 
-    const resolved = await resolveBrowserOpenCommand();
+    const resolved = await detectBrowserOpenSupport();
 
     expect(detectBinaryMock).toHaveBeenCalledWith("open");
-    expect(resolved).toEqual({ argv: ["open"], command: "open" });
+    expect(resolved).toEqual({ ok: true, command: "open" });
   });
 
   it("still refuses browser launch over Linux SSH without a display", async () => {
     mockProcessPlatform("linux");
     vi.stubEnv("SSH_CONNECTION", "192.0.2.1 12345 192.0.2.2 22");
 
-    const resolved = await resolveBrowserOpenCommand();
+    const resolved = await detectBrowserOpenSupport();
 
-    expect(resolved).toEqual({ argv: null, reason: "ssh-no-display" });
+    expect(resolved).toEqual({ ok: false, reason: "ssh-no-display" });
   });
 
   it("resolves xdg-open over Linux SSH with a forwarded display", async () => {
     detectBinaryMock.mockImplementation(async (binary) => binary === "xdg-open");
 
-    const resolved = await resolveBrowserOpenCommand({
+    const resolved = await detectBrowserOpenSupport({
       platform: "linux",
       env: {
         DISPLAY: "localhost:10.0",
@@ -198,6 +202,6 @@ describe("resolveBrowserOpenCommand", () => {
       },
     });
 
-    expect(resolved).toEqual({ argv: ["xdg-open"], command: "xdg-open" });
+    expect(resolved).toEqual({ ok: true, command: "xdg-open" });
   });
 });

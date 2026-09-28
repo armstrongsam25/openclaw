@@ -1,4 +1,8 @@
 import { formatCliCommand } from "../cli/command-format.js";
+import {
+  formatDaemonServiceInstallCommand,
+  formatGatewayServiceInstallationDrift,
+} from "../cli/daemon-cli/shared.js";
 import type { PreManagedServiceStop } from "../cli/update-cli/update-command-service-maintenance.js";
 import { isDefaultInstallIdentity } from "../config/paths.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
@@ -171,18 +175,12 @@ export async function beginDoctorMaintenance(
           root,
         );
         if (drift) {
-          const { formatGatewayServiceInstallationDrift } =
-            await import("../cli/daemon-cli/shared.js");
-          const message = formatGatewayServiceInstallationDrift(
-            drift,
-            undefined,
-            before.serviceEnv,
-            {
+          warn(
+            formatGatewayServiceInstallationDrift(drift, undefined, before.serviceEnv, {
               stopped: true,
               port: before.servicePort,
-            },
+            }),
           );
-          warn(message);
           return;
         }
       }
@@ -268,7 +266,6 @@ export async function beginDoctorMaintenance(
         throw error;
       }
       if (error instanceof GatewayServiceAuthorityError) {
-        const { formatDaemonServiceInstallCommand } = await import("../cli/daemon-cli/shared.js");
         const serviceEnv = before.serviceEnv;
         const outcome = error.outcome ?? "recovery-pending";
         const recovery =

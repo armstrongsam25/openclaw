@@ -1,4 +1,3 @@
-// Reads transcript artifacts; live store acquisition stays with the caller.
 import fs from "node:fs";
 import { readFileWindowFully } from "@openclaw/fs-safe/advanced";
 import {
@@ -7,6 +6,12 @@ import {
 } from "@openclaw/normalization-core/number-coercion";
 import { materializeSessionArchiveForRead } from "../config/sessions/archive-compression.js";
 import type { TranscriptEvent } from "../config/sessions/session-accessor.sqlite-contract.js";
+// Reads transcript artifacts; live store acquisition stays with the caller.
+import type {
+  ReadRecentSessionMessagesOptions,
+  ReadSessionMessagesAsyncOptions,
+  ReadSessionMessagesResult,
+} from "../config/sessions/session-history-types.js";
 import { jsonUtf8Bytes } from "../infra/json-utf8-bytes.js";
 import {
   resolveHistoryAnchorPageRange,
@@ -30,27 +35,12 @@ import {
   parseTranscriptRecord,
 } from "./session-transcript-record-parser.js";
 
-export type ReadRecentSessionMessagesOptions = {
-  maxMessages: number;
-  maxBytes?: number;
-  maxLines?: number;
-};
-
 type ReadSessionMessagesPageOptions = {
   offset: number;
   maxMessages: number;
   beforeSeq?: number;
   recentAtHead?: TranscriptRecentReadLimits;
 };
-
-export type ReadSessionMessagesAsyncOptions =
-  | {
-      mode: "full";
-      reason: string;
-    }
-  | ({
-      mode: "recent";
-    } & ReadRecentSessionMessagesOptions);
 
 type ReadRecentSessionMessagesResult = {
   displaySource?: string;
@@ -60,11 +50,6 @@ type ReadRecentSessionMessagesResult = {
   transcriptEvents?: TranscriptEvent[];
   transcriptPath?: string;
   transcriptSource?: "reset-archive";
-};
-
-type ReadSessionMessagesResult = {
-  messages: unknown[];
-  transcriptPath?: string;
 };
 
 const RECENT_SESSION_MESSAGES_DEFAULT_MAX_BYTES = 8 * 1024 * 1024;

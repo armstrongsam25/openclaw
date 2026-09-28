@@ -4,7 +4,7 @@ import { expect, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { createPluginStateKeyedStore } from "../../plugin-state/plugin-state-store.js";
 import { activatePluginRegistry } from "../../plugins/loader-shared.js";
-import { clearActivePluginRegistry } from "../../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../../plugins/runtime.test-support.js";
 import { startPluginServices, type PluginServicesHandle } from "../../plugins/services.js";
 import type { OpenClawTestState } from "../../test-utils/openclaw-test-state.js";
 import {

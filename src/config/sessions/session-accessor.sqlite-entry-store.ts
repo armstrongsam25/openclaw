@@ -20,6 +20,7 @@ import {
   publishSessionEntryCacheInvalidation,
   trackSessionEntryCacheWrite,
 } from "./session-accessor.sqlite-entry-cache.js";
+import type { ResolvedSessionEntryRow } from "./session-accessor.sqlite-entry-cache.types.js";
 import {
   sqliteSessionEntriesEqual,
   type SqliteLifecycleTargetSnapshot,
@@ -28,7 +29,6 @@ import {
   readExactSessionEntryRow,
   readSessionEntryTargetRow,
   readSessionEntryRowScan,
-  type ResolvedSessionEntryRow,
 } from "./session-accessor.sqlite-entry-read.js";
 import { getSessionEntryWriteQueries } from "./session-accessor.sqlite-entry-write-queries.js";
 import { advanceSessionEntryMaintenanceAgeFact } from "./session-accessor.sqlite-maintenance-age.js";
@@ -80,7 +80,6 @@ export {
   readExactSessionEntryRow,
   readExactSessionEntryRowValidated,
   readSessionEntryRow,
-  type ResolvedSessionEntryRow,
 } from "./session-accessor.sqlite-entry-read.js";
 export {
   iterateSessionEntryKeys,

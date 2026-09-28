@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { appendCurrentInboundContext } from "../../agents/embedded-agent-runner/run/runtime-context-prompt.js";
+import { loadAgentRunnerMemoryRuntime } from "../../agents/command/runtime-loaders.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import { withBeforeAgentReplyObserver } from "../../plugins/before-agent-reply.js";
@@ -17,7 +18,6 @@ import {
 } from "./agent-runner-core.js";
 import { executeAgentTurn } from "./agent-runner-execution.js";
 import { markPostCompactionModelFailurePayload } from "./agent-runner-failure-reply.js";
-import { runMemoryFlushIfNeeded, runSessionCompactionIfNeeded } from "./agent-runner-memory.js";
 import { accountAgentTurnCompaction } from "./agent-runner-result-accounting.js";
 import { finalizeReplyAgentRun } from "./agent-runner-result.js";
 import type { FinalizeReplyAgentRunInput } from "./agent-runner-result.types.js";
@@ -126,6 +126,8 @@ export async function executePreparedReplyAgentRun(
 ): Promise<ReplyPayload | ReplyPayload[] | undefined> {
   // Preserve the invocation snapshot across preparation; live session state uses its getters.
   const context = { ...input };
+  const { runMemoryFlushIfNeeded, runSessionCompactionIfNeeded } =
+    await loadAgentRunnerMemoryRuntime();
   const {
     activeSessionStore,
     admitUserTurn,
@@ -153,6 +155,8 @@ export async function executePreparedReplyAgentRun(
     typingMode,
     typingSignals,
   } = context;
+  replyOperation.abortSignal.throwIfAborted();
+  followupRun.operatorAuthority?.assertCurrent();
   let activeSessionEntry = getActiveSessionEntry();
 
   await typingSignals.signalRunStart();

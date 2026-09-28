@@ -23,7 +23,7 @@ export {
 } from "./tts-provider-helpers.js";
 
 type SummarizeTextDeps = {
-  completeWithPreparedSimpleCompletionModel: typeof import("../agents/simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel;
+  completeWithPreparedSimpleCompletionModel: typeof import("../agents/simple-completion-execution.js").completeWithPreparedSimpleCompletionModel;
   prepareSimpleCompletionModel: (
     params: import("../agents/simple-completion-runtime.js").PrepareSimpleCompletionModelParams,
   ) => ReturnType<
@@ -37,21 +37,6 @@ type DefaultSummarizeTextDeps = Omit<SummarizeTextDeps, "prepareSimpleCompletion
 };
 
 let defaultSummarizeTextDepsPromise: Promise<DefaultSummarizeTextDeps> | undefined;
-
-function loadDefaultSummarizeTextDeps(): Promise<DefaultSummarizeTextDeps> {
-  // Speech provider imports should not initialize the LLM stack. Load it only
-  // when synthesis actually needs summarization, then reuse the module bindings.
-  return (defaultSummarizeTextDepsPromise ??= Promise.all([
-    import("../agents/simple-completion-runtime.js"),
-    import("../agents/model-auth.js"),
-  ]).then(([completionRuntime, { requireApiKey }]) => ({
-    completeWithPreparedSimpleCompletionModel:
-      completionRuntime.completeWithPreparedSimpleCompletionModel,
-    acquireSimpleCompletionModelWithSelection:
-      completionRuntime.acquireSimpleCompletionModelWithSelection,
-    requireApiKey,
-  })));
-}
 
 type SummarizeResult = {
   summary: string;
@@ -198,7 +183,10 @@ export async function summarizeText(
     return await completeSummary(prepared, selection.provider, deps);
   }
 
-  const resolvedDeps = await loadDefaultSummarizeTextDeps();
+  const resolvedDeps = await (defaultSummarizeTextDepsPromise ??=
+    import("./tts-summary.runtime.js").then(({ loadDefaultSummarizeTextDeps }) =>
+      loadDefaultSummarizeTextDeps(),
+    ));
   return await runWithAsyncWorkResources(async (onAcquired) => {
     // Preparation precedes the request timer; the completion and its cleanup own the model.
     const prepared = await resolvedDeps.acquireSimpleCompletionModelWithSelection(

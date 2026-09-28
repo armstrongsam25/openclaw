@@ -1,16 +1,13 @@
 import { requestHeartbeat } from "../../infra/heartbeat-wake.js";
 import { runCommandWithTimeout } from "../../process/exec.js";
-import { createLazyRuntimeMethod, createLazyRuntimeModule } from "../../shared/lazy-runtime.js";
+import { createLazyRuntimeMethod } from "../../shared/lazy-runtime.js";
 import { formatNativeDependencyHint } from "./native-deps.js";
 import { enqueueSystemEventFromSdk } from "./system-events.js";
 import type { RunHeartbeatOnceOptions } from "./types-core.js";
 import type { PluginRuntime } from "./types.js";
 
-const loadHeartbeatRunnerRuntime = createLazyRuntimeModule(
-  () => import("../../infra/heartbeat-runner.js"),
-);
 const runHeartbeatOnceInternal = createLazyRuntimeMethod(
-  loadHeartbeatRunnerRuntime,
+  () => import("../../infra/heartbeat-runner-run.js"),
   (runtime) => runtime.runHeartbeatOnce,
 );
 

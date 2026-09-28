@@ -13,10 +13,8 @@ import type {
   WorkerInferenceOptions,
   WorkerInferenceStartParams,
 } from "../../packages/gateway-protocol/src/schema/worker-inference.js";
-import {
-  invalidateComputerFrameIfMissing,
-  type ComputerContextEpoch,
-} from "../agents/tools/computer-tool.js";
+import { invalidateComputerFrameIfMissing } from "../agents/tools/computer-tool-result.js";
+import type { ComputerContextEpoch } from "../agents/tools/computer-tool-shared.js";
 import { makeZeroUsageSnapshot } from "../agents/usage.js";
 import type {
   AssistantMessage,

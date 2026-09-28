@@ -4,7 +4,7 @@ import { getRuntimeConfig } from "../../config/config.js";
 import { extractTextFromChatContent } from "../../shared/chat-content.js";
 import { REMINDER_CONTEXT_MESSAGES_MAX } from "./cron-tool-schema.js";
 import type { ChatMessage, GatewayToolCaller } from "./cron-tool.types.js";
-import type { GatewayCallOptions } from "./gateway.js";
+import type { GatewayCallOptions } from "./gateway-options.js";
 import { resolveInternalSessionKey, resolveMainSessionAlias } from "./sessions-helpers.js";
 
 const REMINDER_CONTEXT_PER_MESSAGE_MAX = 220;

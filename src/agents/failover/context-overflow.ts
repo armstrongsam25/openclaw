@@ -11,10 +11,8 @@ import {
   isProviderRequestSizeCeilingError,
   isRateLimitErrorMessage,
 } from "./message-patterns.js";
-import {
-  classifyProviderPluginError,
-  type PreparedProviderFailoverOwner,
-} from "./provider-patterns.js";
+import { classifyProviderPluginError } from "./provider-patterns.js";
+import type { PreparedProviderFailoverOwner } from "./signal.js";
 
 export function isContextOverflowError(
   errorMessage?: string,

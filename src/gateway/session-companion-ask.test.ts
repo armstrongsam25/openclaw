@@ -82,7 +82,7 @@ vi.mock("../agents/sessions/index.js", () => ({
     openAsync: async () => ({ appendMessage, getSessionTarget: () => preparedTarget }),
   },
 }));
-vi.mock("../agents/simple-completion-runtime.js", () => ({
+vi.mock("../agents/simple-completion-selection.js", () => ({
   resolveSimpleCompletionSelectionForAgent: resolveSelection,
 }));
 vi.mock("../agents/cli-runner/prepare.runtime.js", () => ({ prepareCliRunContext }));

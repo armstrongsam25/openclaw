@@ -14,7 +14,7 @@ import {
   parseApiErrorInfo,
   type ProviderRuntimeFailureKind,
 } from "./embedded-agent-helpers.js";
-import type { PreparedProviderFailoverOwner } from "./failover/provider-patterns.js";
+import type { PreparedProviderFailoverOwner } from "./failover/signal.js";
 
 const MAX_OBSERVATION_INPUT_CHARS = 64_000;
 const MAX_FINGERPRINT_MESSAGE_CHARS = 8_000;

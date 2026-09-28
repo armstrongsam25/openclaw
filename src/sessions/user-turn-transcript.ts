@@ -15,6 +15,7 @@ import {
   type SessionTranscriptTurnPersistOptions,
 } from "../config/sessions/session-accessor.js";
 import { waitForSessionTranscriptProjection } from "../config/sessions/session-transcript-reconcile.js";
+import { logVerbose } from "../globals.js";
 import { createUserTurnAdmissionWrite } from "./user-turn-transcript-admission-write.js";
 import {
   registerUserTurnTranscriptAdmissionOwner,
@@ -270,8 +271,8 @@ export function createUserTurnTranscriptRecorder(
       }
       return;
     }
-    void import("../globals.js")
-      .then(({ logVerbose }) => {
+    void Promise.resolve()
+      .then(() => {
         logVerbose(
           `failed to persist ${params.errorContext ?? "user turn transcript"}: ${String(error)}`,
         );

@@ -11,6 +11,7 @@ import type {
   GatewayServiceRestartResult,
   SystemdServiceReadTarget,
 } from "./service-types.js";
+import { assertNoSystemGatewayOwnershipForActivation } from "./systemd-definition-mutation.js";
 import {
   assertSystemdAvailable,
   disableSystemdUserUnitForRemoval,
@@ -20,10 +21,7 @@ import {
   isSystemctlAvailable,
   reloadSystemdUserManager,
 } from "./systemd-exec.js";
-import {
-  assertNoSystemGatewayOwnershipForActivation,
-  findInstalledSystemdGatewayScope,
-} from "./systemd-scope.js";
+import { findInstalledSystemdGatewayScope } from "./systemd-scope.js";
 import {
   resolveSystemdServiceName,
   resolveSystemdUnitPath,

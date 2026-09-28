@@ -1,5 +1,10 @@
 import type { SqliteWalHealth } from "../../infra/sqlite-wal-checkpoint.js";
-import type { SessionEntrySummary } from "./session-accessor.types.js";
+import type { SessionTranscriptWatermark } from "./session-accessor.sqlite-transcript-watermark-read.js";
+import type {
+  SessionBranchSummary,
+  SessionEntrySummary,
+  TranscriptEvent,
+} from "./session-accessor.types.js";
 import type { InternalSessionEntry as SessionEntry } from "./types.js";
 export type {
   DeletedAgentSessionEntryPurgeParams,
@@ -21,6 +26,102 @@ export type SessionTranscriptContextVersion = {
   generation: string | null;
   rawSeq: number | null;
   updatedAt: number | null;
+};
+
+export type ResolvedSqliteScope = {
+  agentId: string;
+  databaseAgentId?: string;
+  env?: NodeJS.ProcessEnv;
+  ownerStorePath?: string;
+  path?: string;
+  sessionKey: string;
+};
+
+export type ResolvedSqliteReadScope = Omit<ResolvedSqliteScope, "sessionKey"> & {
+  sessionKey?: string;
+};
+
+export type ResolvedTranscriptScope = ResolvedSqliteScope & {
+  sessionId: string;
+};
+
+export type ResolvedTranscriptReadScope = ResolvedSqliteReadScope & {
+  sessionId: string;
+};
+
+export type SessionModelContextLimits = {
+  maxBytes: number;
+  maxEvents: number;
+  /** Detached model views may omit result bodies; evidence and fork readers remain strict. */
+  toolResultOverflow?: "omit";
+};
+
+export type SessionTranscriptModelContext = {
+  events: TranscriptEvent[];
+  version?: SessionTranscriptContextVersion;
+};
+
+export type SessionTranscriptReadSnapshot = {
+  events: TranscriptEvent[];
+  version: SessionTranscriptContextVersion;
+};
+
+export type SessionPendingInputReceipt =
+  | { runId: string; state: "pending"; cancelled?: true }
+  | { runId: string; state: "consumed"; consumedByEventId: string };
+
+export type SessionIdentityEvidenceIdentity = {
+  sessionId: string;
+  sessionKey?: string;
+};
+
+export type SessionIdentityEvidenceResult =
+  | { status: "current"; sessionKey: string }
+  | { status: "absent" }
+  | {
+      status: "unknown";
+      reason: "ambiguous" | "read-failed" | "row-invalid" | "schema-missing";
+    };
+
+export type SessionTranscriptBoundedActiveContext = {
+  activeLeafEntryId: string | null;
+  version: SessionTranscriptContextVersion;
+  opaqueParents: Map<string, string | null>;
+  parents: Map<string, string | null>;
+  firstKeptRanges: Map<string, { startIndex: number; endIndex: number }>;
+  persistedSuffixStartSeq: number;
+  boundaryCount: number;
+  events: TranscriptEvent[];
+  serializedBytes: number;
+  totalEvents: number;
+  transcriptMutationAt: number | null;
+  truncated: boolean;
+};
+
+export type SessionBranchSummaryReadRequest = {
+  database: { agentId: string; path: string };
+  databaseIdentity: string;
+  sessionKey: string;
+  sessionId: string;
+  lifecycleRevision?: string;
+};
+export type SessionBranchSummaryReadResult =
+  | ({ status: "ok"; branches: SessionBranchSummary[] } & SessionTranscriptWatermark)
+  | { status: "missing-session" | "failed" };
+
+/** SQLite database target resolved from a legacy session store path. */
+export type ResolvedSqliteStoreTarget = {
+  agentId?: string;
+  ownerSource?:
+    | "database-registry"
+    | "database-path"
+    | "registered-suffixed"
+    | "occupied-unsuffixed"
+    | "configured-default"
+    | "ambiguous-registry";
+  path: string;
+  shared?: boolean;
+  unsuffixedOwnerAgentId?: string;
 };
 
 export type CanonicalSessionValidationResult = {

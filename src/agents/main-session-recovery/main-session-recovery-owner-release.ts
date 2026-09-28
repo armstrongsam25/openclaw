@@ -1,6 +1,6 @@
 import { getRuntimeConfig } from "../../config/io.js";
 import { getGatewayRecoveryRuntime } from "../../gateway/server-recovery-runtime-context.js";
-import type { MainSessionRecoveryPendingTarget } from "./main-session-recovery-store.js";
+import type { MainSessionRecoveryPendingTarget } from "./main-session-recovery-types.js";
 
 /** Schedules exact-row recovery only after the caller releases its lifecycle admission. */
 export function scheduleMainSessionRecoveryPendingTarget(

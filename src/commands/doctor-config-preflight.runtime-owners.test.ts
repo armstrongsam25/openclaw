@@ -2,10 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import {
   readDeferredPluginMigrations,
   recordDeferredPluginMigrations,
-  type DeferredPluginMigration,
 } from "../infra/deferred-plugin-migrations.js";
 import { withEnvAsync } from "../test-utils/env.js";
 import { readConfigPreflightSnapshot } from "./config-preflight-snapshot.js";

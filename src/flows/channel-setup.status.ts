@@ -3,7 +3,6 @@ import { sanitizeTerminalText } from "../../packages/terminal-core/src/safe-text
 import { resolveAgentWorkspaceDir, resolveAmbientOwnerAgentId } from "../agents/agent-scope.js";
 import { listChatChannels } from "../channels/chat-meta.js";
 import type { ChannelPluginCatalogEntry } from "../channels/plugins/catalog.js";
-import { listChannelSetupPlugins } from "../channels/plugins/setup-registry.js";
 import type {
   ChannelSetupPlugin,
   ChannelSetupStatus,
@@ -302,7 +301,9 @@ export async function collectChannelStatus(params: {
   installedPlugins?: ChannelSetupPlugin[];
   resolveAdapter?: (channel: ChannelChoice) => ChannelSetupWizardAdapter | undefined;
 }): Promise<ChannelStatusSummary> {
-  const installedPlugins = params.installedPlugins ?? listChannelSetupPlugins();
+  const installedPlugins =
+    params.installedPlugins ??
+    (await import("../channels/plugins/setup-registry.js")).listChannelSetupPlugins();
   const workspaceDir = params.workspaceDir ?? resolveChannelSetupWorkspaceDir(params.cfg);
   const { installedCatalogEntries, installableCatalogEntries } = resolveChannelSetupEntries({
     cfg: params.cfg,

@@ -4,6 +4,7 @@ import {
   FILE_TYPE_SNIFF_MAX_BYTES,
   normalizeMimeType,
 } from "@openclaw/media-core/mime";
+import { convertImageToJpeg, convertImageToPng } from "./image-ops.js";
 
 const ANTHROPIC_SUPPORTED_IMAGE_MIMES = [
   "image/jpeg",
@@ -55,7 +56,6 @@ async function normalizeAnthropicInlineImage(block: AnthropicInlineImageBlock): 
   const convertToPng = detectedMime === "image/bmp";
   const conversionBuffer = sniffData.length === data.length ? buffer : Buffer.from(data, "base64");
   // Metadata and supported images never need the native image worker.
-  const { convertImageToJpeg, convertImageToPng } = await import("./image-ops.js");
   const normalizedBuffer = convertToPng
     ? await convertImageToPng(conversionBuffer)
     : await convertImageToJpeg(conversionBuffer);

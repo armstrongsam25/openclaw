@@ -3,10 +3,8 @@ import path from "node:path";
 import { expect, it } from "vitest";
 import type { GatewayServer } from "../../../src/gateway/server-public.ts";
 import { createEmptyPluginRegistry } from "../../../src/plugins/registry.ts";
-import {
-  clearActivePluginRegistry,
-  setActivePluginRegistry,
-} from "../../../src/plugins/runtime.ts";
+import { clearActivePluginRegistry } from "../../../src/plugins/runtime.test-support.ts";
+import { setActivePluginRegistry } from "../../../src/plugins/runtime.ts";
 import type { SessionCatalogProvider } from "../../../src/plugins/session-catalog.ts";
 import { createOpenClawTestState } from "../../../src/test-utils/openclaw-test-state.ts";
 import { getFreePort } from "../../../src/test-utils/ports.ts";

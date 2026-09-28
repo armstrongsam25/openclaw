@@ -8,13 +8,11 @@ import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 import { createHeartbeatToolResponsePayload } from "../auto-reply/heartbeat-tool-response.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { getLastHeartbeatEvent, resetHeartbeatEventsForTest } from "../infra/heartbeat-events.js";
-import {
-  runHeartbeatOnce,
-  startHeartbeatRunner,
-  type HeartbeatDeps,
-} from "../infra/heartbeat-runner.js";
+import { runHeartbeatOnce } from "../infra/heartbeat-runner-run.js";
+import { startHeartbeatRunner } from "../infra/heartbeat-runner-scheduler.js";
 import { installHeartbeatRunnerTestRuntime } from "../infra/heartbeat-runner.test-harness.js";
 import {
+  type HeartbeatDeps,
   seedMainSessionStore,
   setHeartbeatAgentTurnStatus,
 } from "../infra/heartbeat-runner.test-utils.js";

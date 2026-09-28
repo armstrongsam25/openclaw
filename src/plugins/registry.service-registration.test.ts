@@ -3,11 +3,8 @@ import { createPluginRuntimeStore } from "../plugin-sdk/runtime-store.js";
 import { createPluginRecord } from "./loader-records.js";
 import { PluginInstance } from "./plugin-instance.js";
 import { createTestPluginRegistry } from "./registry-runtime.test-helpers.js";
-import {
-  clearActivePluginRegistry,
-  disposePluginRegistryInstances,
-  setActivePluginRegistry,
-} from "./runtime.js";
+import { disposePluginRegistryInstances, setActivePluginRegistry } from "./runtime.js";
+import { clearActivePluginRegistry } from "./runtime.test-support.js";
 import { startPluginServices } from "./services.js";
 
 const registries: ReturnType<typeof createTestPluginRegistry>["registry"][] = [];

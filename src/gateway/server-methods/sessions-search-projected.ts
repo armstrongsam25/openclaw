@@ -3,8 +3,8 @@ import type {
   SessionsSearchResult,
 } from "../../../packages/gateway-protocol/src/index.js";
 import { withAgentRosterFactsBatch } from "../../agents/agent-scope-config.js";
+import type { SessionStoreTarget } from "../../config/sessions/session-store-target.types.js";
 import { searchSessionTranscripts } from "../../config/sessions/session-transcript-search.js";
-import type { SessionStoreTarget } from "../../config/sessions/targets.js";
 import { runSynchronousWork } from "../../shared/synchronous-work.js";
 import { filterSessionEntries } from "../session-list-filters.js";
 import { withReadySessionRows } from "../session-row-prepared-read.js";

@@ -1,17 +1,20 @@
 import { afterEach, expect, it, vi } from "vitest";
+import * as nativeModule from "../plugins/native-module-require.js";
 import {
+  listImportedBundledPluginFacadeIds,
   loadActivatedBundledPluginPublicSurfaceModule,
   resetFacadeRuntimeStateForTest,
 } from "./facade-runtime.js";
 
 afterEach(() => {
-  vi.doUnmock("./facade-activation-check.runtime.js");
+  vi.restoreAllMocks();
   resetFacadeRuntimeStateForTest();
 });
 
 it("preserves the unavailable activation error without loading a public artifact", async () => {
   resetFacadeRuntimeStateForTest();
-  vi.doMock("./facade-activation-check.runtime.js", () => {
+  vi.spyOn(nativeModule, "tryNativeRequireModule").mockImplementation((specifier) => {
+    expect(specifier).toMatch(/facade-activation-check\.runtime\.[jt]s$/u);
     throw new Error("activation dependency unavailable");
   });
   await expect(
@@ -20,4 +23,5 @@ it("preserves the unavailable activation error without loading a public artifact
       artifactBasename: "api.js",
     }),
   ).rejects.toThrow("Unable to load facade activation check runtime");
+  expect(listImportedBundledPluginFacadeIds()).toEqual([]);
 });

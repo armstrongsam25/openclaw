@@ -41,6 +41,7 @@ import {
 } from "./server-http-plugin-auth.js";
 import type { GatewayRequestContext } from "./server-methods/types.js";
 import { rejectGatewayUpgradeServiceUnavailable } from "./server/http-work-admission.js";
+import { resolvePluginRouteRuntimeOperatorScopes } from "./server/plugin-route-runtime-scopes.js";
 import type { PluginHttpUpgradeHandler } from "./server/plugins-http.js";
 import { resolvePluginRoutePathContext } from "./server/plugins-http/path-context.js";
 import type { PluginRoutePathContext } from "./server/plugins-http/path-context.js";
@@ -56,9 +57,6 @@ const getPluginNodeCapabilityAuthModule = createLazyRuntimeModule(
   () => import("./server/plugin-node-capability-auth.js"),
 );
 const getHttpAuthUtilsModule = createLazyRuntimeModule(() => import("./http-auth-utils.js"));
-const getPluginRouteRuntimeScopesModule = createLazyRuntimeModule(
-  () => import("./server/plugin-route-runtime-scopes.js"),
-);
 
 function rejectUpgradeAuth(socket: Pick<Duplex, "end" | "destroy">, auth: GatewayAuthResult) {
   if (auth.rateLimited) {
@@ -354,8 +352,6 @@ export function attachGatewayUpgradeHandler(opts: {
           }
           pluginGatewayAuthSatisfied = true;
           pluginGatewayRequestAuth = authCheck.requestAuth;
-          const { resolvePluginRouteRuntimeOperatorScopes } =
-            await getPluginRouteRuntimeScopesModule();
           pluginGatewayRequestOperatorScopes = resolvePluginRouteRuntimeOperatorScopes(
             req,
             authCheck.requestAuth,

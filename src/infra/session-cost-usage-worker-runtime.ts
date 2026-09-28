@@ -19,7 +19,6 @@ import {
   toDatabaseOptions,
 } from "../config/sessions/session-accessor.sqlite-scope.js";
 import { readTranscriptStatsBatchFromDatabase } from "../config/sessions/session-accessor.sqlite-transcript-stats.js";
-import { restoreSessionColdTranscript } from "../config/sessions/session-cold-storage.js";
 import { listDurableSqliteTargetPathsForSessionStorePath } from "../config/sessions/session-sqlite-target.js";
 import { resolveSessionStorePathForScope } from "../config/sessions/session-store-path.js";
 import { createMemoryTranscriptProjectionSource } from "../config/sessions/session-transcript-reconcile-memory.js";
@@ -372,6 +371,9 @@ export async function runUsageCostWorker(
                   break;
                 case "restore": {
                   const binding = resolveBinding(request.input);
+                  const { restoreSessionColdTranscript } =
+                    await import("../config/sessions/session-cold-storage.js");
+                  assertRequestCurrent();
                   await restoreSessionColdTranscript(
                     { ...request.input, storePath: binding.options.path, env: location.env },
                     assertRequestCurrent,

@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { expect, it } from "vitest";
-import { resolveModelWithRegistry } from "../../agents/embedded-agent-runner/model.registry-resolution.js";
+import {
+  createEmptyAgentDiscoveryStores,
+  resolveModelAsync,
+} from "../../agents/embedded-agent-runner/model.js";
 import { resolveModelProviderAuthConfig } from "../../agents/model-auth-provider-route.js";
 import { createConfiguredModelCatalogOverridesResolver } from "../../agents/model-catalog-route.js";
 import type { ModelCatalogEntry } from "../../agents/model-catalog.types.js";
-import { AuthStorage } from "../../agents/sessions/auth-storage.js";
-import { ModelRegistry } from "../../agents/sessions/model-registry.js";
 import { findConfiguredProviderModel } from "../../config/model-provider-config.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { createProviderModelCatalogIdNormalizer } from "../../plugins/provider-model-routes.js";
@@ -137,13 +138,13 @@ it("materializes a catalog selection from its authored provider wire row", async
         id: "trinity-large-thinking",
         contextWindow: 32768,
       });
-      const model = await resolveModelWithRegistry({
+      const { model } = await resolveModelAsync(
+        selected.provider,
+        selected.id,
+        state.agentDir(),
         cfg,
-        provider: selected.provider,
-        modelId: selected.id,
-        agentDir: state.agentDir(),
-        modelRegistry: ModelRegistry.inMemory(AuthStorage.inMemory()),
-      });
+        createEmptyAgentDiscoveryStores(),
+      );
       const authConfig = resolveModelProviderAuthConfig({
         config: cfg,
         provider: selected.provider,

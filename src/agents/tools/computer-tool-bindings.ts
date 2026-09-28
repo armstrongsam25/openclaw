@@ -20,11 +20,8 @@ import {
   captureGatewayToolCallerAssertion,
   getGatewayToolCallerIdentity,
 } from "./gateway-caller-context.js";
-import {
-  callGatewayTool,
-  shouldUseInProcessGatewayTool,
-  type GatewayCallOptions,
-} from "./gateway.js";
+import type { GatewayCallOptions } from "./gateway-options.js";
+import { callGatewayTool, shouldUseInProcessGatewayTool } from "./gateway.js";
 import { getInProcessGatewayToolContext } from "./in-process-gateway.js";
 import { invokeAgentNodeCommand, listNodes, type NodeListNode } from "./nodes-utils.js";
 

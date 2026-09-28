@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../config/types.js";
 import { withPluginMetadataSnapshotScope } from "../plugins/current-plugin-metadata-snapshot.js";
-import { finalizePluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
+import { restorePluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
 import { createPluginMetadataSnapshotFixture } from "../plugins/plugin-metadata.test-support.js";
 import {
   providerSupportsNativePdfDocument,
@@ -11,7 +11,7 @@ import {
 } from "./defaults.js";
 
 function createMediaSnapshot(generation: string, nativePdf: boolean) {
-  return finalizePluginMetadataSnapshot(
+  return restorePluginMetadataSnapshot(
     createPluginMetadataSnapshotFixture({
       plugins: [
         {

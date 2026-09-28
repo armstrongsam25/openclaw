@@ -21,6 +21,7 @@ import type { SessionLifecycleRevisionExpectation } from "../../config/sessions/
 import { applyAssistantDeliveryDirectives } from "../../config/sessions/transcript-assistant-delivery.js";
 import { resolveMirroredTranscriptText } from "../../config/sessions/transcript-mirror.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
+import { formatErrorMessage } from "../../infra/errors.js";
 import { normalizeMediaReferenceForComparison } from "../../media/media-reference-comparison.js";
 import { splitMediaFromOutput } from "../../media/parse.js";
 import {
@@ -31,19 +32,18 @@ import {
   extractAssistantPhaseText,
   readAssistantTextBlocksForPhase,
 } from "../../shared/chat-message-content.js";
-import {
-  ABORTED_PARTIAL_PERSISTENCE_WARNING,
-  abortedPartialPersistenceError,
-  type AbortedPartialSnapshot,
-} from "./chat-aborted-partial.js";
+import { SessionMutationAuthorizationChangedError } from "../session-mutation-authorization-error.js";
+import type { AbortedPartialSnapshot } from "./chat-aborted-partial.js";
 import {
   sanitizeAssistantDisplayText,
   type AssistantDisplayContentBlock,
 } from "./chat-assistant-content.js";
+import { broadcastChatError } from "./chat-broadcast.js";
 import {
   appendInjectedAssistantMessageToTranscript,
   type GatewayInjectedTranscriptAppendResult,
 } from "./chat-transcript-inject.js";
+import type { GatewayRequestContext } from "./types.js";
 
 type AssistantTranscriptScopeParams = {
   sessionId: string;
@@ -51,6 +51,23 @@ type AssistantTranscriptScopeParams = {
   sessionKey: string;
   agentId?: string;
 };
+
+const ABORTED_PARTIAL_PERSISTENCE_WARNING =
+  "Stopped, but a reply could not be saved to history. Copy any visible text before leaving this chat.";
+
+/** Retain a failed save when a later cancellation or terminal write also fails. */
+export function abortedPartialPersistenceError(
+  error: unknown,
+  warning: string | undefined,
+): unknown {
+  if (!warning) {
+    return error;
+  }
+  const message = `${formatErrorMessage(error)} ${warning}`;
+  return error instanceof SessionMutationAuthorizationChangedError
+    ? new SessionMutationAuthorizationChangedError({ ...error.error, message })
+    : new Error(message, { cause: error });
+}
 
 type ResolvedAssistantTranscriptScope = SessionTranscriptWriteScope & { sessionId: string };
 
@@ -375,6 +392,59 @@ export async function appendAssistantTranscriptMessage(
   });
 }
 
+/** Transfer the fallback before cancellation can clear the producer's session slot. */
+export function deferAbortedPartialPersistence(
+  snapshot: AbortedPartialSnapshot | undefined,
+  context: Pick<
+    GatewayRequestContext,
+    | "trackExecution"
+    | "logGateway"
+    | "broadcast"
+    | "nodeSendToSession"
+    | "agentRunSeq"
+    | "getRuntimeConfig"
+  >,
+): void {
+  if (!snapshot?.ok || snapshot.settlement.deferred || !snapshot.settlement.producer) {
+    return;
+  }
+  try {
+    snapshot.settlement.deferred = snapshot.settlement.producer.handoff((producerCompleted) =>
+      context.trackExecution(async () => {
+        await producerCompleted;
+        let warning: string | undefined;
+        try {
+          warning = await persistAbortedPartial({ context, snapshot, producerSettled: true });
+        } catch (error) {
+          context.logGateway.warn(
+            `chat.abort deferred transcript append failed: ${formatErrorMessage(error)}`,
+          );
+          warning = ABORTED_PARTIAL_PERSISTENCE_WARNING;
+        }
+        if (warning) {
+          try {
+            broadcastChatError({
+              context,
+              runId: snapshot.runId,
+              sessionKey: snapshot.value.sessionKey,
+              agentId: snapshot.value.agentId,
+              errorMessage: warning,
+            });
+          } catch (error) {
+            // Delivery failure cannot retain a finished producer's successor fence.
+            context.logGateway.warn(
+              `chat.abort persistence warning delivery failed: ${formatErrorMessage(error)}`,
+            );
+          }
+        }
+      }),
+    );
+  } catch (error) {
+    // No handoff was accepted; the caller keeps its synchronous persistence path.
+    context.logGateway.warn(`chat.abort producer handoff failed: ${formatErrorMessage(error)}`);
+  }
+}
+
 export async function persistAbortedPartials(params: {
   context: { logGateway: { warn: (message: string) => void } };
   snapshots: AbortedPartialSnapshot[];
@@ -393,7 +463,7 @@ export async function persistAbortedPartials(params: {
   return warning;
 }
 
-export async function persistAbortedPartial(params: {
+async function persistAbortedPartial(params: {
   context: { logGateway: { warn: (message: string) => void } };
   snapshot: AbortedPartialSnapshot;
   producerSettled?: true;

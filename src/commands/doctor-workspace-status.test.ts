@@ -29,9 +29,11 @@ vi.mock("../agents/agent-scope.js", () => ({
   tryResolveDefaultAgentId: (...args: unknown[]) => mocks.resolveDefaultAgentId(...args),
 }));
 
-vi.mock("../plugins/status.js", () => ({
+vi.mock("../plugins/status-snapshot.js", () => ({
   buildPluginRegistrySnapshotReport: (...args: unknown[]) =>
     mocks.buildPluginRegistrySnapshotReport(...args),
+}));
+vi.mock("../plugins/status-compatibility.js", () => ({
   buildPluginCompatibilityWarnings: (...args: unknown[]) =>
     mocks.buildPluginCompatibilityWarnings(...args),
 }));

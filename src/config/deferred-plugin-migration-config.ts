@@ -1,9 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
-import {
-  formatDeferredPluginMigration,
-  type DeferredPluginMigration,
-} from "../infra/deferred-plugin-migrations.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
+import { formatDeferredPluginMigration } from "../infra/deferred-plugin-migrations.js";
 import { isBlockedObjectKey } from "../infra/prototype-keys.js";
 import { collectPluginConfigContractMatches } from "../plugins/config-contract-matches.js";
 import { parseConcreteConfigPath, toDotPath } from "../shared/dot-path.js";

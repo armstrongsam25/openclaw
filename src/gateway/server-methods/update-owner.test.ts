@@ -26,10 +26,15 @@ import {
 } from "./update.test-harness.js";
 
 const host = vi.hoisted(() => ({ context: undefined as GatewayRequestContext | undefined }));
-vi.mock("../../agents/tools/gateway.js", () => ({
-  callGatewayTool: vi.fn(),
-  readGatewayCallOptions: vi.fn(),
-}));
+vi.mock("../../agents/tools/gateway.js", async (importOriginal) => {
+  const { callInProcessGatewayTool } =
+    await importOriginal<typeof import("../../agents/tools/gateway.js")>();
+  return {
+    callGatewayTool: vi.fn(),
+    callInProcessGatewayTool,
+    readGatewayCallOptions: vi.fn(),
+  };
+});
 vi.mock("../server-plugin-in-process-dispatch.js", () => ({
   getInProcessGatewayRequestContext: () => host.context,
   dispatchGatewayMethodInProcess: async (

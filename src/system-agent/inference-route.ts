@@ -10,6 +10,7 @@ import {
   cliBackendAcceptsAuthProfileForwarding,
   resolveCliExecutionAuthProfileId,
 } from "../agents/cli-execution-auth.js";
+import { resolveSimpleCompletionSelectionForAgent } from "../agents/simple-completion-selection.js";
 import { resolveConfiguredSetupModelForAgent } from "../agents/utility-model.js";
 import { copyConfigResolutionFacts } from "../config/resolution-facts.js";
 import { createRuntimeConfigReader } from "../config/runtime-snapshot.js";
@@ -114,10 +115,9 @@ export async function resolveSystemAgentConfiguredRouteFromConfig(
       : runConfig;
   const prepared = createRuntimeConfigReader(source)();
   const preparedConfig = prepared === source ? runConfig : prepared;
-  const [modelSelection, modelRuntimeAliases, simpleCompletion, harnessPolicy] = await Promise.all([
+  const [modelSelection, modelRuntimeAliases, harnessPolicy] = await Promise.all([
     import("../agents/model-selection.js"),
     import("../agents/model-runtime-aliases.js"),
-    import("../agents/simple-completion-runtime.js"),
     import("../agents/harness/policy.js"),
   ]);
   const modelOwnerAgentId = resolveAmbientOwnerAgentId(runConfig, requestedAgentId);
@@ -129,7 +129,7 @@ export async function resolveSystemAgentConfiguredRouteFromConfig(
   if (!configuredSelection) {
     return null;
   }
-  const selection = simpleCompletion.resolveSimpleCompletionSelectionForAgent({
+  const selection = resolveSimpleCompletionSelectionForAgent({
     cfg: runConfig,
     agentId: modelOwnerAgentId,
     // Catalog IDs can contain @ without naming an auth profile. Keep implicit

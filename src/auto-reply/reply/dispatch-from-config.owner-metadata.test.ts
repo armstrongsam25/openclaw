@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { buildAcpDatabaseSessionKey } from "../../acp/runtime/session-meta-keys.js";
 import * as sessionMeta from "../../acp/runtime/session-meta.js";
+import * as preparedRuntime from "../../agents/prepared-model-runtime.js";
 import { replaceSessionEntrySync } from "../../config/sessions/session-accessor.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import {
@@ -9,7 +10,6 @@ import {
 } from "../../test-utils/openclaw-test-state.js";
 import { gatherDispatchRequest } from "./dispatch-from-config.gather.js";
 import { prepareDispatchDelivery } from "./dispatch-from-config.prepare-delivery.js";
-import * as runtimeLoaders from "./dispatch-from-config.runtime-loaders.js";
 import * as dispatchRuntime from "./dispatch-from-config.runtime.js";
 import { createReplyDispatcher } from "./reply-dispatcher.js";
 
@@ -67,34 +67,36 @@ it.each([
       throw new Error("synthetic initial read failure");
     });
   }
-  const loadRuntimePlugins = runtimeLoaders.loadRuntimePlugins;
-  vi.spyOn(runtimeLoaders, "loadRuntimePlugins").mockImplementationOnce(async () => {
-    await Promise.resolve();
-    if (scenario === "lifecycle-change") {
-      replaceSessionEntrySync(scope, { ...entry, lifecycleRevision: "after-gather" });
-    }
-    if (scenario === "replacement-parent") {
-      replaceSessionEntrySync(scope, {
-        ...entry,
-        sessionId: "replacement-child",
-        lifecycleRevision: "after-gather",
-        spawnedBy: "agent:work:new-parent",
-      });
-      sessionMeta.writeAcpSessionMetaForMigration({
-        sessionKey: buildAcpDatabaseSessionKey("global", "work"),
-        lifecycleRevision: "after-gather",
-        meta: { ...meta, runtimeSessionName: "replacement-child" },
-      });
-    }
-    if (scenario === "owner-error") {
-      cfg.session = { ...cfg.session, store: scope.storePath };
-      cfg.agents!.defaults = { ...cfg.agents!.defaults, sessionStore: { agentId: "main" } };
-    }
-    if (scenario === "parent-change") {
-      replaceSessionEntrySync(scope, { ...entry, spawnedBy: undefined });
-    }
-    return await loadRuntimePlugins();
-  });
+  const loadPreparedRuntime = preparedRuntime.loadPublishedGatewayReplyDispatchRuntime;
+  vi.spyOn(preparedRuntime, "loadPublishedGatewayReplyDispatchRuntime").mockImplementationOnce(
+    async (params) => {
+      await Promise.resolve();
+      if (scenario === "lifecycle-change") {
+        replaceSessionEntrySync(scope, { ...entry, lifecycleRevision: "after-gather" });
+      }
+      if (scenario === "replacement-parent") {
+        replaceSessionEntrySync(scope, {
+          ...entry,
+          sessionId: "replacement-child",
+          lifecycleRevision: "after-gather",
+          spawnedBy: "agent:work:new-parent",
+        });
+        sessionMeta.writeAcpSessionMetaForMigration({
+          sessionKey: buildAcpDatabaseSessionKey("global", "work"),
+          lifecycleRevision: "after-gather",
+          meta: { ...meta, runtimeSessionName: "replacement-child" },
+        });
+      }
+      if (scenario === "owner-error") {
+        cfg.session = { ...cfg.session, store: scope.storePath };
+        cfg.agents!.defaults = { ...cfg.agents!.defaults, sessionStore: { agentId: "main" } };
+      }
+      if (scenario === "parent-change") {
+        replaceSessionEntrySync(scope, { ...entry, spawnedBy: undefined });
+      }
+      return await loadPreparedRuntime(params);
+    },
+  );
   const dispatcher = createReplyDispatcher({ deliver: async () => undefined });
   try {
     const gathered = await gatherDispatchRequest(

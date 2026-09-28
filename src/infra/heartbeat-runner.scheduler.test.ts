@@ -16,9 +16,9 @@ import {
   HEARTBEAT_SKIP_PREEMPTED,
   HEARTBEAT_SKIP_REQUESTS_IN_FLIGHT,
   requestHeartbeat,
-  setHeartbeatsEnabled,
   setHeartbeatWakeHandler,
 } from "./heartbeat-wake.js";
+import { setSessionEventWakesEnabled } from "./session-event-wake.js";
 
 type RunnerOptions = Parameters<typeof startHeartbeatRunner>[0];
 type RunOnce = NonNullable<RunnerOptions["runOnce"]>;
@@ -93,7 +93,7 @@ afterEach(async () => {
   const dispose = setHeartbeatWakeHandler(async () => ({ status: "skipped", reason: "disabled" }));
   await vi.runAllTimersAsync();
   dispose();
-  setHeartbeatsEnabled(true);
+  setSessionEventWakesEnabled(true);
   resetConfigRuntimeState();
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -403,7 +403,7 @@ describe("targeted unscheduled wake dispatch", () => {
   });
 
   it("keeps targeted cron wakes globally disabled", async () => {
-    setHeartbeatsEnabled(false);
+    setSessionEventWakesEnabled(false);
     start(config("0m", [{ id: "main" }]));
     await wake(cronWake);
     expect(runSpy).not.toHaveBeenCalled();

@@ -24,8 +24,8 @@ import {
   parseOpaqueLeafEntry,
   parseParentLinkedOpaqueEntry,
 } from "../config/sessions/session-entry-codec.js";
+import type { SessionStoreTarget as ResolvedSessionStoreTarget } from "../config/sessions/session-store-target.types.js";
 import { transcriptEventReadBytesSql } from "../config/sessions/session-transcript-read-bytes.js";
-import type { SessionStoreTarget as ResolvedSessionStoreTarget } from "../config/sessions/targets.js";
 import {
   resolveAllAgentSessionStoreCandidateTargetsSync,
   resolveConfiguredAgentDatabaseTargets,

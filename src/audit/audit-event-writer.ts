@@ -5,6 +5,7 @@ import type { GatewayScheduler } from "../infra/gateway-scheduler.js";
 import type { SqliteWorkerCommand } from "../infra/sqlite-worker-contract.js";
 import { OPENCLAW_SQLITE_BUSY_TIMEOUT_MS } from "../state/openclaw-state-db.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
+import { runOpenClawStateWorkerOperation } from "../state/openclaw-state-worker-store.js";
 import type { AuditEventInput } from "./audit-event-types.js";
 import {
   formatAuditWriterError,
@@ -83,8 +84,6 @@ export function createAuditEventWriter(options: {
     command: SqliteWorkerCommand<AuditWriterOperations>,
   ): Promise<AuditWriterResult> => {
     const context = captureOpenClawStateWorkerContext(database);
-    const { runOpenClawStateWorkerOperation } =
-      await import("../state/openclaw-state-worker-store.js");
     if (shutdownExpired) {
       return { status: "settled" };
     }

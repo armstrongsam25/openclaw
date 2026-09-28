@@ -229,6 +229,15 @@ describe("subcommand help cold imports", () => {
     expect(loaded.modules).not.toContain("cli-progress-runtime");
   });
 
+  it("keeps gateway health routing out of RPC and presentation runtimes", async () => {
+    await import("./gateway-cli/health-route.js");
+
+    expect(loaded.modules).not.toContain("gateway-call-runtime");
+    expect(loaded.modules).not.toContain("gateway-transport-runtime");
+    expect(loaded.modules).not.toContain("cli-progress-runtime");
+    expect(loaded.modules).not.toContain("health-command");
+  });
+
   it("keeps maintenance help out of command action modules", async () => {
     const { registerMaintenanceCommands } = await import("./program/register.maintenance.js");
     const program = makeProgram();

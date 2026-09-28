@@ -13,16 +13,10 @@ import { prepareProviderRuntimeAuth } from "../plugins/provider-runtime.runtime.
 import { withPluginRuntimeGenerationScope } from "../plugins/runtime/generation-scope.js";
 import { runWithAsyncWorkResources } from "../shared/async-work-resources.js";
 import { createDeferredCore } from "../shared/deferred.js";
-import {
-  resolveAgentDir,
-  resolveNativeModelPrimary,
-  resolveAgentWorkspaceDir,
-  resolveDefaultAgentId,
-} from "./agent-scope.js";
+import { resolveAgentDir, resolveAgentWorkspaceDir, resolveDefaultAgentId } from "./agent-scope.js";
 import { ensureAuthProfileStore } from "./auth-profiles/store-runtime.js";
 import type { AuthProfileStore } from "./auth-profiles/types.js";
 import { reconcileAuthProfileQuotaBlocks } from "./auth-profiles/usage.js";
-import { DEFAULT_PROVIDER } from "./defaults.js";
 import {
   fingerprintAuthProfileCredential,
   fingerprintResolvedProviderAuth,
@@ -39,13 +33,8 @@ import {
   getApiKeyForModelCore,
   type ResolvedProviderAuth,
 } from "./model-auth.js";
-import { splitTrailingAuthProfile } from "./model-ref-profile.js";
 import { resolveModelRouteIntent } from "./model-runtime-policy.js";
-import {
-  buildModelAliasIndex,
-  resolveDefaultModelForAgent,
-  resolveModelRefFromString,
-} from "./model-selection.js";
+import { resolveDefaultModelForAgent } from "./model-selection.js";
 import { resolveOpenAIModelRoutes } from "./openai-model-routes.js";
 import {
   acquireAgentRunPreparedModelRuntime,
@@ -66,103 +55,15 @@ import {
   type PreparedSimpleCompletionResolverContext,
   type SimpleCompletionModelResolver,
 } from "./simple-completion-scope.js";
+import { resolveSimpleCompletionSelectionRequest } from "./simple-completion-selection.js";
 import type {
   AgentSimpleCompletionSelection,
   PreparedSimpleCompletionModel,
   PreparedSimpleCompletionModelForAgent,
   PrepareSimpleCompletionModelForAgentParams,
 } from "./simple-completion.types.js";
-import { resolveUtilityModelRefForAgent } from "./utility-model.js";
 
 type AllowedMissingApiKeyMode = ResolvedProviderAuth["mode"];
-
-type SimpleCompletionSelectionParams = {
-  cfg: OpenClawConfig;
-  agentId: string;
-  agentDir?: string;
-  modelRef?: string;
-  useUtilityModel?: boolean | "required";
-  manifestPlugins?:
-    | PluginMetadataSnapshot["plugins"]
-    | Pick<PluginMetadataSnapshot, "plugins" | "owners">;
-};
-
-type SimpleCompletionSelectionRequest = {
-  selection: AgentSimpleCompletionSelection;
-  shorthandModelId?: string;
-};
-
-function resolveSimpleCompletionSelectionRequest(
-  params: SimpleCompletionSelectionParams,
-): SimpleCompletionSelectionRequest | null {
-  const fallbackRef = resolveDefaultModelForAgent({
-    cfg: params.cfg,
-    agentId: params.agentId,
-    manifestPlugins: params.manifestPlugins,
-  });
-  // Utility routing derives a provider-declared small model when unset and
-  // optional routing treats an empty utilityModel as "use the primary" (disabled).
-  const modelRef =
-    params.modelRef?.trim() ||
-    (params.useUtilityModel
-      ? resolveUtilityModelRefForAgent({
-          cfg: params.cfg,
-          agentId: params.agentId,
-          primaryProvider: fallbackRef.provider,
-          ...(params.manifestPlugins
-            ? {
-                metadataSnapshot:
-                  "plugins" in params.manifestPlugins
-                    ? params.manifestPlugins
-                    : { plugins: params.manifestPlugins },
-              }
-            : {}),
-        })
-      : undefined) ||
-    (params.useUtilityModel === "required"
-      ? undefined
-      : resolveNativeModelPrimary(params.cfg, params.agentId));
-  const split = modelRef ? splitTrailingAuthProfile(modelRef) : null;
-  const aliasIndex = buildModelAliasIndex({
-    cfg: params.cfg,
-    agentId: params.agentId,
-    defaultProvider: fallbackRef.provider || DEFAULT_PROVIDER,
-    manifestPlugins: params.manifestPlugins,
-  });
-  const resolved = split
-    ? resolveModelRefFromString({
-        cfg: params.cfg,
-        agentId: params.agentId,
-        raw: split.model,
-        defaultProvider: fallbackRef.provider || DEFAULT_PROVIDER,
-        aliasIndex,
-        manifestPlugins: params.manifestPlugins,
-      })
-    : null;
-  if (params.useUtilityModel === "required" && !resolved) {
-    return null;
-  }
-  const provider = resolved?.ref.provider ?? fallbackRef.provider;
-  const modelId = resolved?.ref.model ?? fallbackRef.model;
-  if (!provider || !modelId) {
-    return null;
-  }
-  return {
-    selection: {
-      provider,
-      modelId,
-      profileId: split?.profile || undefined,
-      agentDir: params.agentDir?.trim() || resolveAgentDir(params.cfg, params.agentId),
-    },
-    ...(split && !split.model.includes("/") ? { shorthandModelId: split.model } : {}),
-  };
-}
-
-export function resolveSimpleCompletionSelectionForAgent(
-  params: SimpleCompletionSelectionParams,
-): AgentSimpleCompletionSelection | null {
-  return resolveSimpleCompletionSelectionRequest(params)?.selection ?? null;
-}
 
 export type PrepareSimpleCompletionModelParams = {
   cfg: OpenClawConfig | undefined;
@@ -701,5 +602,3 @@ async function acquirePreparedSimpleCompletionModel(
     };
   });
 }
-
-export { completeWithPreparedSimpleCompletionModel } from "./simple-completion-execution.js";

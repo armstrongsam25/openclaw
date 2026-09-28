@@ -45,7 +45,7 @@ vi.mock("node:os", async (importOriginal) => ({
   availableParallelism: () => 2,
 }));
 vi.mock("./runtime-worker-url.js", () => ({ resolveRuntimeWorkerThreadExecArgv: () => [] }));
-vi.mock("./temp-artifact-cleanup.js", () => ({ removeTemporaryArtifacts: cleanup }));
+vi.mock("./temp-artifact-removal.js", () => ({ removeTemporaryArtifacts: cleanup }));
 
 const pools: WorkerTaskPool<string, string>[] = [];
 function createPool(validateResult?: (value: string) => void) {

@@ -8,6 +8,7 @@
  * bootstrap behavior.
  */
 import { resolveAcpSessionCwd } from "@openclaw/acp-core/runtime/session-identifiers";
+import { resolveConfiguredAcpBindingSpecBySessionKey } from "../acp/persistent-bindings.resolve.js";
 import type { SessionAcpMeta } from "../config/sessions/types.js";
 import type { OpenClawConfig } from "../config/types.js";
 import {
@@ -49,8 +50,6 @@ export async function resolveAcpAgentWorkspaceProvisioningForTurn(params: {
   // Configured conversation bindings are conversation-scoped: resolve the one
   // binding that owns this session key rather than scanning every binding.
   if (params.sessionKey) {
-    const { resolveConfiguredAcpBindingSpecBySessionKey } =
-      await import("../acp/persistent-bindings.resolve.js");
     const bindingCwd = resolveConfiguredAcpBindingSpecBySessionKey({
       cfg: params.cfg,
       sessionKey: params.sessionKey,

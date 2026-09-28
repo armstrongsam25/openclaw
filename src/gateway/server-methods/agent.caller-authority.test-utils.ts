@@ -8,7 +8,7 @@ import {
   createAdmittedGatewayToolCallerIdentity,
   withGatewayToolCallerIdentity,
 } from "../../agents/tools/gateway-caller-context.js";
-import { callInProcessGatewayTool } from "../../agents/tools/in-process-gateway.js";
+import { callInProcessGatewayTool } from "../../agents/tools/gateway.js";
 import {
   withPluginRuntimeGatewayContextResolver,
   withPluginRuntimeGatewayRequestScope,

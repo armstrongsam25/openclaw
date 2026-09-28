@@ -3,13 +3,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { getRuntimeConfig } from "../config/config.js";
 import { resolveStateDir } from "../config/paths.js";
+import type { SessionStoreTarget as ResolvedSessionStoreTarget } from "../config/sessions/session-store-target.types.js";
 import {
   resolveAgentSessionStoreTargetsSync,
   resolveAllAgentSessionStoreCandidateTargetsSync,
   resolveAllAgentSessionStoreTargetsSync,
   resolveConfiguredAgentDatabaseTargets,
   resolveSessionStoreTargets,
-  type SessionStoreTarget as ResolvedSessionStoreTarget,
 } from "../config/sessions/targets.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { isPathInside } from "../infra/path-guards.js";

@@ -3,6 +3,40 @@ import { useAutoCleanupTempDirTracker } from "../../../test/helpers/temp-dir.js"
 import { detectWorktreeFilesystemBackend } from "./filesystem-backend.js";
 import { nativeWorktreeFilesystem } from "./filesystem-native.js";
 
+it("declines native cloning in sealed artifacts without bypassing allocation authority", async () => {
+  vi.stubGlobal("SEALED_RUNTIME_BUILD", true);
+  const probe = vi
+    .spyOn(nativeWorktreeFilesystem, "probe")
+    .mockRejectedValue(new Error("native cloning is unavailable"));
+  const commitGuard = vi.fn();
+  try {
+    await expect(
+      detectWorktreeFilesystemBackend("/sealed/checkout", { commitGuard }),
+    ).resolves.toBeNull();
+    expect(probe).not.toHaveBeenCalled();
+    expect(commitGuard).toHaveBeenCalledOnce();
+
+    const lost = new Error("allocation lease lost");
+    commitGuard.mockImplementation(() => {
+      throw lost;
+    });
+    await expect(detectWorktreeFilesystemBackend("/sealed/checkout", { commitGuard })).rejects.toBe(
+      lost,
+    );
+
+    const cancelled = new Error("allocation canceled");
+    await expect(
+      detectWorktreeFilesystemBackend("/sealed/checkout", {
+        commitGuard,
+        signal: AbortSignal.abort(cancelled),
+      }),
+    ).rejects.toBe(cancelled);
+  } finally {
+    vi.unstubAllGlobals();
+    probe.mockRestore();
+  }
+});
+
 describe.skipIf(process.platform === "win32")("worktree filesystem backend", () => {
   const tempDirs = useAutoCleanupTempDirTracker(afterEach);
   const options = { commitGuard: () => {} };

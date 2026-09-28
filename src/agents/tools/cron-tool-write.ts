@@ -14,7 +14,7 @@ import type {
   CronToolsAllowCaptureRef,
   GatewayToolCaller,
 } from "./cron-tool.types.js";
-import type { GatewayCallOptions } from "./gateway.js";
+import type { GatewayCallOptions } from "./gateway-options.js";
 
 export function assertNoCronShellExecution(value: unknown): void {
   if (!isRecord(value)) {

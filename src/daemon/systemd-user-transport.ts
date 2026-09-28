@@ -13,7 +13,6 @@ import type { GatewayServiceEnv } from "./service-types.js";
 import { assertGatewayServiceUpdateCurrent } from "./service-update-authority.js";
 import { decodeLegacyBusctlOutput } from "./systemd-busctl-legacy.js";
 import { openSystemdUserManager } from "./systemd-peer-native.js";
-import { resolveUnavailableSystemdInspectionReason } from "./systemd-unavailable.js";
 
 // Reachability is a process-local routing fact, never a connection or mutation grant.
 type Selection = { transport: SystemdUserTransport; timedOut: boolean };
@@ -202,6 +201,31 @@ export async function resolveSystemdUserTransport(
     }
     throw timedOut ? SYSTEMD_TRANSPORT_DEADLINE : new ServiceInspectionError(reason);
   }
+}
+
+/** Failed user routes alone cannot distinguish a missing manager from a missing session bus. */
+export async function resolveUnavailableSystemdInspectionReason(
+  reason: "systemd-user-bus-unavailable" | "systemd-busctl-unavailable",
+  env: GatewayServiceEnv,
+  deadline: number,
+): Promise<ServiceInspectionReason> {
+  const timeout = Math.floor(deadline - performance.now());
+  if (timeout <= 0) {
+    return reason;
+  }
+  const result = await execFileUtf8("systemctl", ["--system", "is-system-running"], {
+    env: { ...process.env, ...env },
+    timeout,
+    killSignal: "SIGKILL",
+  });
+  return (reason === "systemd-busctl-unavailable" &&
+    result.termination === "error" &&
+    result.errorCode === "ENOENT") ||
+    (result.termination === "exit" &&
+      (result.stdout.trim() === "offline" ||
+        result.stderr.includes("System has not been booted with systemd")))
+    ? "service-manager-unavailable"
+    : reason;
 }
 
 function readSystemctlEffectiveUser(): string | null {

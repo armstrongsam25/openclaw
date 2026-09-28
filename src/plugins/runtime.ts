@@ -1,27 +1,14 @@
 import { getRuntimeConfigSnapshot } from "../config/runtime-snapshot.js";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { onAgentEvent } from "../infra/agent-events.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
-import {
-  AsyncWorkScope,
-  isAsyncWorkScopeActiveHere,
-  trackAsyncWork,
-} from "../shared/async-work-scope.js";
+import { AsyncWorkScope, isAsyncWorkScopeActiveHere } from "../shared/async-work-scope.js";
 import { createDeferredCore } from "../shared/deferred.js";
 import {
   drainGlobalSingletonLifecycleState,
   resolveGlobalSingleton,
 } from "../shared/global-singleton.js";
 import { createLazyRuntimeModule } from "../shared/lazy-runtime.js";
-import {
-  isPluginCommandExecutionActiveHere,
-  waitForPluginCommandExecutions,
-} from "./command-execution-lock.js";
-import type {
-  PluginHostCleanupResult,
-  PluginHostRegistryRetirement,
-  PluginHostRetirementOptions,
-} from "./host-hook-cleanup.types.js";
+import type { PluginHostCleanupResult } from "./host-hook-cleanup.types.js";
 import {
   clearPluginHostRuntimeState,
   dispatchPluginAgentEventSubscriptions,
@@ -29,14 +16,19 @@ import {
   publishPluginSessionSchedulerJobs,
 } from "./host-hook-runtime.js";
 import { notifyPluginHttpRoutesChanged } from "./http-route-owner.js";
-import { pluginInstanceInvocation } from "./plugin-instance-invocation.js";
 import { clearPluginMetadataLifecycleCaches } from "./plugin-metadata-lifecycle.js";
 import { settlePreparedMessageToolCatalog } from "./prepared-message-tool-catalog.js";
 import { createEmptyPluginRegistry } from "./registry-empty.js";
 import {
   adoptPluginRegistryRecords,
+  clearPluginRegistryRetirement,
+  disposePluginRegistryInstances,
+  isRegistryLive,
+  isPluginCommandExecutionActiveHere,
+  loadPluginHostCleanupRuntime,
+  waitForPluginCommandExecutions,
+  waitForPluginRegistryRetirement,
   bindPluginRegistryGatewayOwner,
-  getPluginRegistryResourceOwner,
   markPluginRegistryActive,
   markPluginRegistryRetired,
   preparePluginRegistryCacheShutdown,
@@ -46,31 +38,22 @@ import {
 import type { PluginRegistry } from "./registry-types.js";
 import { getActivePluginChannelRegistrySnapshotFromState } from "./runtime-channel-state.js";
 import { PluginRuntimeCloseRetainedError } from "./runtime-close-error.js";
-import { PLUGIN_REGISTRY_STATE, type RegistryState } from "./runtime-state.js";
+import {
+  PLUGIN_REGISTRY_STATE,
+  registryOwners,
+  type PluginRegistrySnapshot,
+  type RegistryOwner,
+  type RegistryOwnerClose,
+  type RegistryState,
+} from "./runtime-state.js";
 import { getPluginRegistryForContext } from "./runtime/gateway-request-scope.js";
 export { getPluginRegistryForContext } from "./runtime/gateway-request-scope.js";
+export {
+  disposePluginRegistryInstances,
+  waitForPluginRegistryRetirement,
+} from "./registry-lifecycle.js";
 
 const log = createSubsystemLogger("plugins/runtime");
-const retirements = resolveGlobalSingleton(
-  Symbol.for("openclaw.pluginRegistryRetirements"),
-  () => new WeakMap<PluginRegistry, PluginHostRegistryRetirement>(),
-);
-type PluginRegistrySnapshot = ReturnType<typeof captureActivePluginRegistrySnapshot>;
-type RegistryOwnerClose = {
-  promise: Promise<{
-    memoryErrors: readonly unknown[];
-    pluginFailures: PluginHostCleanupResult["failures"];
-  }>;
-  failure?: PluginRuntimeCloseRetainedError;
-};
-type RegistryOwner = PluginRegistrySnapshot & {
-  activeRegistry: PluginRegistry;
-  closing?: RegistryOwnerClose;
-};
-const registryOwners = resolveGlobalSingleton(
-  Symbol.for("openclaw.pluginRegistryOwners"),
-  () => new Set<RegistryOwner>(),
-);
 const loadMemoryRuntime = createLazyRuntimeModule(() => import("./memory-runtime.js"));
 
 const state = resolveGlobalSingleton<RegistryState>(PLUGIN_REGISTRY_STATE, () => ({
@@ -92,87 +75,6 @@ function registryHasPluginHostCleanupWork(registry: PluginRegistry): boolean {
     registry.agentEventSubscriptions.length > 0 ||
     registry.sessionSchedulerJobs.length > 0
   );
-}
-
-function isRegistryLive(registry: PluginRegistry): boolean {
-  return (
-    state.activeRegistry === registry ||
-    [...registryOwners].some((owner) => owner.activeRegistry === registry)
-  );
-}
-
-const loadPluginHostCleanupRuntime = createLazyRuntimeModule(
-  () => import("./host-hook-cleanup.js"),
-);
-
-// Completed observations must not retain the retiring or successor registry's scope.
-function completedPluginRegistryRetirement(
-  result: PluginHostCleanupResult,
-): PluginHostRegistryRetirement {
-  return async () => ({ ...result, failures: [...result.failures] });
-}
-
-/** Candidate retirement releases resources without changing committed session state. */
-export function disposePluginRegistryInstances(
-  registryView: PluginRegistry,
-  retained?: PluginRegistry | (() => PluginRegistry | null),
-  options?: {
-    cleanupPersistentState?: boolean;
-    beforeDispose?: () => Promise<void>;
-    cfg?: OpenClawConfig;
-    runContextCleanup?: ReturnType<typeof preparePluginRunContextCleanup>;
-  },
-): Promise<PluginHostCleanupResult> {
-  const registry = getPluginRegistryResourceOwner(registryView);
-  let wait = retirements.get(registry);
-  if (!wait) {
-    // Revocation and admitted-work drains may overlap a successor config publication.
-    const cfg = options?.cfg ?? getRuntimeConfigSnapshot() ?? undefined;
-    const runContextCleanup = options?.runContextCleanup ?? preparePluginRunContextCleanup();
-    // Admit initialization before its first await so the caller drains through instance cleanup.
-    const initialized = trackAsyncWork(() =>
-      runContextCleanup(() =>
-        Promise.resolve()
-          .then(() => waitForPluginCommandExecutions(registry))
-          .then(() => options?.beforeDispose?.())
-          .then(loadPluginHostCleanupRuntime)
-          .then(({ createPluginHostRegistryRetirement }) => {
-            if (retirements.get(registry) !== wait) {
-              return undefined;
-            }
-            if (options?.cleanupPersistentState && isRegistryLive(registry)) {
-              retirements.delete(registry);
-              return undefined;
-            }
-            markPluginRegistryRetired(registry);
-            return createPluginHostRegistryRetirement({
-              cfg,
-              previousRegistry: registry,
-              nextRegistry: typeof retained === "function" ? retained() : retained,
-              skipPersistentSessionState: options?.cleanupPersistentState !== true,
-              shouldCleanup: options?.cleanupPersistentState
-                ? () => !isRegistryLive(registry)
-                : undefined,
-            });
-          }),
-      ),
-    );
-    // Cache initialization, not one caller's self-retirement acknowledgment.
-    wait = async (observation) =>
-      (await (await initialized)?.(observation)) ?? { cleanupCount: 0, failures: [] };
-    retirements.set(registry, wait);
-    // Epoch abort observers can reenter retirement and must receive this same completion.
-    quiescePluginRegistry(registry);
-    void pluginInstanceInvocation
-      .exit(wait)
-      .then((result) => {
-        if (retirements.get(registry) === wait) {
-          retirements.set(registry, completedPluginRegistryRetirement(result));
-        }
-      })
-      .catch((error: unknown) => log.warn(`plugin host registry cleanup failed: ${String(error)}`));
-  }
-  return wait();
 }
 
 function preparePluginRegistryRetirement(
@@ -235,19 +137,6 @@ function retirePluginRegistryIfUnused(
   retained: () => PluginRegistry | null = () => state.activeRegistry,
 ): void {
   preparePluginRegistryRetirement(registry, retained)?.retireIfUnused();
-}
-
-/** Lifecycle callers observe the same teardown that publication started. */
-export async function waitForPluginRegistryRetirement(
-  registry: PluginRegistry,
-  options?: PluginHostRetirementOptions,
-): Promise<PluginHostCleanupResult> {
-  return (
-    (await retirements.get(getPluginRegistryResourceOwner(registry))?.(options)) ?? {
-      cleanupCount: 0,
-      failures: [],
-    }
-  );
 }
 
 function syncPluginAgentEventBridge(): void {
@@ -372,7 +261,7 @@ function installActivePluginRegistry(
   state.runtimeSubagentMode = params.runtimeSubagentMode;
   if (registry && previousSnapshot.activeRegistry !== registry) {
     // Retained instances can return with this registry; its old retirement selection cannot.
-    retirements.delete(registry);
+    clearPluginRegistryRetirement(registry);
   }
   const isCurrent = () =>
     state.activeRegistry === registry && state.activeVersion === installedVersion;
@@ -636,7 +525,7 @@ function clearActivePluginRegistryState(): PluginRegistry | null {
   return previousRegistry;
 }
 
-export async function clearActivePluginRegistry(
+async function clearActivePluginRegistry(
   previousRegistry: PluginRegistry | null = state.activeRegistry,
 ): Promise<void> {
   const cfg = getRuntimeConfigSnapshot() ?? undefined;
@@ -712,6 +601,12 @@ export async function clearActivePluginRegistry(
     return;
   }
   await completion;
+}
+
+if (process.env.VITEST || process.env.NODE_ENV === "test") {
+  Object.assign(globalThis, {
+    [Symbol.for("openclaw.pluginRuntimeTestApi")]: { clearActivePluginRegistry },
+  });
 }
 
 export async function prepareActivePluginRegistryShutdown(): Promise<void> {

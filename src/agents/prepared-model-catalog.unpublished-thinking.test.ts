@@ -6,6 +6,9 @@ const discovery = vi.hoisted(() => vi.fn(() => []));
 vi.mock("../plugins/provider-discovery.runtime.js", () => ({
   resolvePluginDiscoveryProvidersRuntime: discovery,
 }));
+vi.mock("../plugins/provider-discovery-plan.runtime.js", () => ({
+  planPluginDiscoveryRuntime: () => ({ kind: "entries", providers: discovery() }),
+}));
 
 it.each([
   { provider: "anthropic", model: "claude-sonnet-5" },

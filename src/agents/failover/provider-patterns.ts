@@ -1,19 +1,5 @@
 import { classifyProviderFailoverSignalWithPlugin } from "../../plugins/provider-failover.js";
-import type { FailoverReason } from "./signal.js";
-type ProviderSpecificErrorContext = {
-  provider?: string;
-  modelId?: string;
-  errorMessage: string;
-  status?: number;
-  code?: string;
-  errorType?: string;
-  providerPlugin?: PreparedProviderFailoverOwner | null;
-};
-export type PreparedProviderFailoverOwner = {
-  id: string;
-  matchesContextOverflowError?: (ctx: ProviderSpecificErrorContext) => boolean | undefined;
-  classifyFailoverReason?: (ctx: ProviderSpecificErrorContext) => FailoverReason | null | undefined;
-};
+import type { FailoverReason, ProviderSpecificErrorContext } from "./signal.js";
 
 export function classifyProviderPluginError(
   context: ProviderSpecificErrorContext,

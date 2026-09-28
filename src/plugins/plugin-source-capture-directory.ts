@@ -16,7 +16,7 @@ import {
   SQLITE_STAGING_TOKEN_FILES,
   type SqliteStagingToken,
 } from "../infra/sqlite-staging-token.js";
-import { removeTemporaryArtifacts } from "../infra/temp-artifact-cleanup.js";
+import { removeTemporaryArtifacts } from "../infra/temp-artifact-removal.js";
 import { resolveGlobalSingleton } from "../shared/global-singleton.js";
 import type { PluginSourceCaptureStorage } from "./plugin-instance-invocation.types.js";
 import {

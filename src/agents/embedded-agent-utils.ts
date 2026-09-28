@@ -1,4 +1,4 @@
-import { stripCompactionReplayCheckpointInPlace } from "@openclaw/ai/transports";
+import { stripCompactionReplayCheckpointInPlace } from "@openclaw/ai/internal/shared";
 /**
  * Embedded-agent message text utilities.
  * Extracts visible assistant text, reasoning summaries, thinking-tag blocks,

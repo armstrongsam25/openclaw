@@ -43,6 +43,7 @@ import { resolveHookClientIpConfig } from "./server/hook-client-ip-config.js";
 import { createPresencePublisher } from "./server/presence-events.js";
 import { createReadinessChecker, createStartupChecker } from "./server/readiness.js";
 import { resolveSharedGatewaySessionGeneration } from "./server/ws-shared-generation.js";
+import { createTerminalLaunchPolicy } from "./terminal/launch.js";
 
 type GatewayBootstrap = Awaited<ReturnType<typeof prepareGatewayServerBootstrap>>;
 type GatewayLogger = ReturnType<typeof createSubsystemLogger>;
@@ -383,11 +384,9 @@ export async function prepareGatewayKernelState(params: {
       log,
     }),
   );
-  const { createTerminalLaunchPolicy } = await startupTrace.measure(
-    "terminal.launch-import",
-    () => import("./terminal/launch.js"),
+  const terminalLaunchPolicy = await startupTrace.measure("terminal.launch-policy", () =>
+    createTerminalLaunchPolicy(cfgAtStart),
   );
-  const terminalLaunchPolicy = createTerminalLaunchPolicy(cfgAtStart);
 
   const { runDefaultChannelSetupWizard, runDefaultSetupWizard } = await startupTrace.measure(
     "gateway.wizard-imports",

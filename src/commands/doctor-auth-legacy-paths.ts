@@ -5,7 +5,7 @@ import { listAgentIds, resolveAgentDir } from "../agents/agent-scope.js";
 import { resolveSharedMainAuthAgentDir } from "../agents/auth-profiles/shared-main-dir.js";
 import { resolveLegacyInheritedAuthAgentDir } from "../agents/legacy-inherited-auth-dir.js";
 import { resolveStateDir } from "../config/paths.js";
-import { resolveConfiguredAgentDatabaseCandidatePaths } from "../config/sessions/targets.js";
+import { resolveConfiguredAgentDatabaseCandidatePaths } from "../config/sessions/targets-configured-agents.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { hasErrnoCode } from "../infra/errno.js";
 import { createRetainedAgentDatabaseMatcher } from "../state/agent-deletion-discovery.js";

@@ -18,6 +18,7 @@ import { resolveSessionTranscriptReadTarget } from "../config/sessions/session-a
 import { SessionTranscriptColdError } from "../config/sessions/session-cold-storage-state.js";
 import { resolveSessionTranscriptReadFence } from "../config/sessions/session-transcript-read-fence.js";
 import { startSessionTranscriptIndexReconcile } from "../config/sessions/session-transcript-reconcile.js";
+import { withSessionHistoryWorkerDatabase } from "../config/sessions/session-transcript-worker-runtime.js";
 import { pruneMapToMaxSize } from "../infra/map-size.js";
 import { hasInterSessionUserProvenance } from "../sessions/input-provenance.js";
 import {
@@ -290,8 +291,6 @@ export async function readSessionTitleFieldsFromTranscriptAsync(
     return readSessionTitleFieldsFromTranscript(readScope, opts);
   }
   const admission = resolveSessionTranscriptReadFence(resolved);
-  const { withSessionHistoryWorkerDatabase } =
-    await import("../config/sessions/session-transcript-worker-runtime.js");
   try {
     return await withSessionHistoryWorkerDatabase(options, (owner) =>
       owner.readTitleFields({

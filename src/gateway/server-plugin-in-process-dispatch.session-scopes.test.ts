@@ -6,7 +6,7 @@ import {
   createAdmittedGatewayToolCallerIdentity,
   withGatewayToolCallerIdentity,
 } from "../agents/tools/gateway-caller-context.js";
-import { callInProcessGatewayToolWithCreation } from "../agents/tools/in-process-gateway.js";
+import { callInProcessGatewayToolWithCreation } from "../agents/tools/gateway.js";
 import { maybeSpawnVisibleSession } from "../agents/tools/sessions-spawn-visible.js";
 import { setRuntimeConfigSnapshot } from "../config/config.js";
 import { loadSessionEntry, upsertSessionEntryCore } from "../config/sessions/session-accessor.js";

@@ -19,12 +19,12 @@ import type {
   TranscriptMessageAppendResult,
 } from "./session-accessor.sqlite-contract.js";
 import { runSqliteSessionDeletionTransaction as runOpenClawAgentWriteTransaction } from "./session-accessor.sqlite-deletion.js";
+import type { ResolvedSessionEntryRow } from "./session-accessor.sqlite-entry-cache.types.js";
 import { readQualifiedSessionEntryRow } from "./session-accessor.sqlite-entry-read.js";
 import {
   readSessionEntryRow,
   readSessionIdentitySnapshot,
   writeSessionEntry,
-  type ResolvedSessionEntryRow,
 } from "./session-accessor.sqlite-entry-store.js";
 import { prepareSessionIdentityPublication } from "./session-accessor.sqlite-identity.js";
 import {

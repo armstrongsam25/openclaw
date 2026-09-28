@@ -1,10 +1,11 @@
 // First-run onboarding welcome: state findings, propose setup, wait for "yes".
 import type { SystemAgentChatQuestion } from "../../packages/gateway-protocol/src/index.js";
+import { DEFAULT_AGENT_WORKSPACE_DIR } from "../agents/workspace-default.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { isSecretRef, normalizeSecretInputString } from "../config/types.secrets.js";
 import { resolveUserPath, shortenHomePath } from "../utils.js";
 import type { SystemAgentChatEngine } from "./chat-engine.js";
-import { formatSystemAgentOnboardingWelcome } from "./overview.js";
+import { formatSystemAgentOnboardingWelcome } from "./overview-format.js";
 
 /**
  * Card-client questions for the two welcome variants. Replies are texts the
@@ -138,11 +139,13 @@ export async function buildOnboardingWelcome(params: {
     );
   }
 
-  const { DEFAULT_WORKSPACE } = await import("../commands/onboard-helpers.js");
   // A durable receipt owns recovery even after partial config writes; using its
   // workspace prevents the fallback chat from resuming a different installation.
   const workspace = resolveUserPath(
-    pendingSetup?.workspace || requestedWorkspace || authoredWorkspace || DEFAULT_WORKSPACE,
+    pendingSetup?.workspace ||
+      requestedWorkspace ||
+      authoredWorkspace ||
+      DEFAULT_AGENT_WORKSPACE_DIR,
   );
 
   params.engine.propose({

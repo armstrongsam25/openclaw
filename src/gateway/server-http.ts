@@ -86,7 +86,6 @@ import {
   getDevicePairingJoinHttpModule,
   getPluginNodeCapabilityAuthModule,
   getHttpAuthUtilsModule,
-  getPluginRouteRuntimeScopesModule,
 } from "./server-http-modules.js";
 import {
   getCachedPluginGatewayAuthBypassPaths,
@@ -97,6 +96,7 @@ import { handleGatewayProbeRequest } from "./server-http-probes.js";
 import type { GatewayRequestContext } from "./server-methods/types.js";
 import type { HooksRequestHandler } from "./server/hooks-request-handler.js";
 import { runWithGatewayHttpWorkAdmission } from "./server/http-work-admission.js";
+import { resolvePluginRouteRuntimeOperatorScopes } from "./server/plugin-route-runtime-scopes.js";
 import type { PluginHttpRequestHandler } from "./server/plugins-http.js";
 import {
   resolvePluginRoutePathContext,
@@ -643,8 +643,6 @@ export function createGatewayHttpServer(opts: {
             // Bypass paths come only from activated channel plugins; every other protected
             // route must authorize before runtime scopes are derived.
             const { authorizePluginGatewayHttpRequestOrReply } = await getHttpAuthUtilsModule();
-            const { resolvePluginRouteRuntimeOperatorScopes } =
-              await getPluginRouteRuntimeScopesModule();
             const authResult = await authorizePluginGatewayHttpRequestOrReply({
               req,
               res,

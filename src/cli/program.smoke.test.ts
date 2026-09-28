@@ -18,7 +18,6 @@ vi.mock("./config-cli.js", () => ({
   }) => {
     program.command("config").action(() => configureCommand({}, runtime));
   },
-  runConfigGet: vi.fn(),
   runConfigUnset: vi.fn(),
 }));
 

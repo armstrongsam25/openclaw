@@ -1,6 +1,5 @@
 import { formatDocsLink } from "../../packages/terminal-core/src/links.js";
 import { resolveChannelDefaultAccountId } from "../channels/plugins/helpers.js";
-import { getChannelSetupPlugin } from "../channels/plugins/setup-registry.js";
 import type {
   ChannelSetupPlugin,
   ChannelSetupWizardAdapter,
@@ -128,8 +127,10 @@ export async function promptRemovalAccountId(params: {
   channel: ChannelChoice;
   plugin?: ChannelSetupPlugin;
 }): Promise<string> {
-  const { cfg, prompter, label, channel } = params;
-  const plugin = params.plugin ?? getChannelSetupPlugin(channel);
+  const plugin =
+    params.plugin ??
+    (await import("../channels/plugins/setup-registry.js")).getChannelSetupPlugin(params.channel);
+  const { cfg, prompter, label } = params;
   if (!plugin) {
     return DEFAULT_ACCOUNT_ID;
   }

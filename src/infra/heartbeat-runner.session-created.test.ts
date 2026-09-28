@@ -10,7 +10,7 @@ import {
   createOpenClawTestState,
   type OpenClawTestState,
 } from "../test-utils/openclaw-test-state.js";
-import { runHeartbeatOnce } from "./heartbeat-runner.js";
+import { runHeartbeatOnce } from "./heartbeat-runner-run.js";
 import {
   seedMainSessionStore,
   setupTelegramHeartbeatPluginRuntimeForTests,

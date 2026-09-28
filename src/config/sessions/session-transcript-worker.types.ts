@@ -23,31 +23,26 @@ import type {
   SessionActivitySummaryBatchResult,
 } from "./activity-summary-source.types.js";
 import type { SessionLifecycleTimestamps } from "./lifecycle.types.js";
-import type { SessionTranscriptBoundedActiveContext } from "./session-accessor.sqlite-active-context.js";
 import type { TranscriptArchivePresenceRead } from "./session-accessor.sqlite-archive-types.js";
 import type {
   SessionBranchSummaryReadRequest,
   SessionBranchSummaryReadResult,
-} from "./session-accessor.sqlite-branches.js";
-import type {
+  SessionTranscriptBoundedActiveContext,
+  ResolvedSqliteStoreTarget,
   SessionTranscriptContextVersion,
   TranscriptEvent,
-} from "./session-accessor.sqlite-contract.js";
-import type {
+  ResolvedTranscriptReadScope,
+  SessionModelContextLimits,
   SessionIdentityEvidenceIdentity,
   SessionIdentityEvidenceResult,
-} from "./session-accessor.sqlite-entry-availability.js";
-import type {
-  readSessionTranscriptModelContext,
-  SessionModelContextLimits,
-} from "./session-accessor.sqlite-model-context.js";
-import type { listSessionPendingInputReceipts } from "./session-accessor.sqlite-pending-input-receipts.js";
-import type { loadTranscriptReadSnapshotSync } from "./session-accessor.sqlite-read.js";
+  SessionTranscriptModelContext,
+  SessionTranscriptReadSnapshot,
+  SessionPendingInputReceipt,
+} from "./session-accessor.sqlite-contract.js";
 import type {
   SessionEntryReplacementSelection,
   SessionEntryReplacementState,
-} from "./session-accessor.sqlite-replacement-read.js";
-import type { ResolvedTranscriptReadScope } from "./session-accessor.sqlite-scope.js";
+} from "./session-accessor.sqlite-replacement-types.js";
 import type { SessionTranscriptWatermark } from "./session-accessor.sqlite-transcript-watermark-read.js";
 import type {
   SessionAccessScope,
@@ -72,13 +67,12 @@ import type {
 } from "./session-history-types.js";
 import type { SessionMembershipFacts } from "./session-membership-facts.types.js";
 import type { SessionMember } from "./session-sharing-store.kernel.js";
-import type { ResolvedSqliteStoreTarget } from "./session-sqlite-target.js";
 import type {
   SessionStoreTargetInventoryRequest,
   SessionStoreTargetInventoryResult,
   SessionStoreTargetReadRequest,
   SessionStoreTargetReadResult,
-} from "./session-store-target-inventory.js";
+} from "./session-store-target.types.js";
 import type {
   SessionTranscriptSearchParams,
   SessionTranscriptSearchResult,
@@ -99,13 +93,13 @@ type SessionTranscriptSearchWorkerInput = {
 };
 
 export type PreparedSessionTranscriptHydration =
-  | { kind: "full"; snapshot: ReturnType<typeof loadTranscriptReadSnapshotSync> }
+  | { kind: "full"; snapshot: SessionTranscriptReadSnapshot }
   | { kind: "bounded"; snapshot: SessionTranscriptBoundedActiveContext };
 
 export type SessionTranscriptHydrationWorkerResult =
   | {
       kind: "full";
-      version: ReturnType<typeof loadTranscriptReadSnapshotSync>["version"];
+      version: SessionTranscriptReadSnapshot["version"];
       eventCount: number;
     }
   | Extract<PreparedSessionTranscriptHydration, { kind: "bounded" }>;
@@ -540,7 +534,7 @@ export type SessionTranscriptWorkerValues = {
   "session-progress-card": { kind: "session-progress-card"; card: ProgressCard | null };
   "session-pending-input-receipts": {
     kind: "session-pending-input-receipts";
-    receipts: ReturnType<typeof listSessionPendingInputReceipts>;
+    receipts: SessionPendingInputReceipt[];
   };
   "session-entry-list": { kind: "session-entry-list"; entries: SessionEntrySummary[] };
   "session-entry-read": SessionEntryReadWorkerResult;
@@ -564,7 +558,7 @@ export type SessionTranscriptWorkerValues = {
     evidence: SessionIdentityEvidenceResult[];
   };
   "usage-cache": SessionCostUsageCacheReadResult;
-  "model-context": ReturnType<typeof readSessionTranscriptModelContext>;
+  "model-context": SessionTranscriptModelContext;
   "session-reset-recall": {
     cutoff: import("../../../packages/memory-host-sdk/src/host/session-reset-recall.js").SessionResetRecallCutoff;
   };
@@ -669,7 +663,7 @@ export type SessionHistoryWorkerDatabase = {
   readProgressCard: SessionHistoryReader<SessionProgressCardWorkerInput, ProgressCard | null>;
   readPendingInputReceipts: SessionHistoryReader<
     SessionPendingInputReceiptsWorkerInput,
-    ReturnType<typeof listSessionPendingInputReceipts>
+    SessionPendingInputReceipt[]
   >;
   readUsageCache: SessionHistoryReader<SessionUsageCacheWorkerInput>;
 };

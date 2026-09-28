@@ -1,3 +1,5 @@
+import { prepareActivePluginRegistryShutdown } from "../plugins/runtime.js";
+
 export async function prepareGatewayShutdownRuntime() {
   const [
     {
@@ -17,7 +19,6 @@ export async function prepareGatewayShutdownRuntime() {
     { stopCronMaintenance },
     { disposeAllCodeModeRuns },
     { closeProviderTransportDispatcherPool },
-    { prepareActivePluginRegistryShutdown },
     { waitForPluginCacheRetirement },
   ] = await Promise.all([
     import("./server-close.runtime.js"),
@@ -32,7 +33,6 @@ export async function prepareGatewayShutdownRuntime() {
     import("../cron/maintenance.js"),
     import("../agents/code-mode-state.js"),
     import("../agents/provider-transport-dispatcher-pool.js"),
-    import("../plugins/runtime.js"),
     import("../plugins/plugin-cache.js"),
   ]);
   await prepareActivePluginRegistryShutdown();

@@ -5,7 +5,10 @@ import fs from "node:fs";
 import module from "node:module";
 import path from "node:path";
 import type { Node as AcornNode } from "acorn";
-import { WORKER_BUNDLE_ARTIFACT_PATHS } from "../src/shared/worker-bundle-hash.js";
+import {
+  WORKER_BUNDLE_ARTIFACT_PATHS,
+  isWorkerBundleChunkPath,
+} from "../src/shared/worker-bundle-hash.js";
 import { reportLimitViolations, type LimitViolation } from "./lib/check-limits.mts";
 import { isDirectRunUrl } from "./lib/direct-run.mjs";
 import { readGatewayRunChunks } from "./lib/gateway-run-chunk-metadata.mts";
@@ -48,6 +51,7 @@ type CliBootstrapCheckParams = {
   rootDir?: string;
   entrypoints?: string[];
   workerDeployEntrypoints?: readonly string[];
+  allowWorkerDeployChunks?: boolean;
   distDir?: string;
   gatewayRunChunkMaxBytes?: number;
   legacyGatewayChunkDiscovery?: boolean;
@@ -465,24 +469,33 @@ export function collectWorkerDeployArtifactErrors(params: CliBootstrapCheckParam
   );
   const errors: string[] = [];
   const sources: Array<{ relativeEntrypoint: string; source: string }> = [];
-  for (const entrypoint of entrypoints) {
+  const readArtifact = (entrypoint: string) => {
     const relativeEntrypoint = path.relative(rootDir, entrypoint) || entrypoint;
     try {
       const stats = fsImpl.lstatSync(entrypoint);
       if (stats.isSymbolicLink() || !stats.isFile()) {
-        return [`Worker deploy artifact ${relativeEntrypoint} must be a regular file.`];
+        errors.push(`Worker deploy artifact ${relativeEntrypoint} must be a regular file.`);
+        return;
       }
       sources.push({
         relativeEntrypoint,
         source: fsImpl.readFileSync(entrypoint, "utf8"),
       });
     } catch {
-      return [`Worker deploy artifact ${relativeEntrypoint} is missing. Run pnpm build first.`];
+      errors.push(`Worker deploy artifact ${relativeEntrypoint} is missing. Run pnpm build first.`);
     }
+  };
+  for (const entrypoint of entrypoints) {
+    readArtifact(entrypoint);
   }
   try {
     for (const entry of fsImpl.readdirSync(artifactDir, { withFileTypes: true })) {
       if (artifactNames.has(entry.name)) {
+        continue;
+      }
+      if (params.allowWorkerDeployChunks !== false && isWorkerBundleChunkPath(entry.name)) {
+        artifactNames.add(entry.name);
+        readArtifact(path.join(artifactDir, entry.name));
         continue;
       }
       if (entry.name === "package.json") {
@@ -491,7 +504,13 @@ export function collectWorkerDeployArtifactErrors(params: CliBootstrapCheckParam
         );
       } else if (entry.name === "node_modules") {
         errors.push("Worker deploy artifact must not contain materialized dependencies.");
-      } else if (isUnstagedWorkerDeployRuntimeArtifact(entry.name, artifactNames)) {
+      } else if (
+        isUnstagedWorkerDeployRuntimeArtifact(
+          entry.name,
+          artifactNames,
+          params.allowWorkerDeployChunks !== false,
+        )
+      ) {
         errors.push(
           `Worker deploy artifact emits unstaged runtime asset ${path.relative(
             rootDir,
@@ -512,6 +531,13 @@ export function collectWorkerDeployArtifactErrors(params: CliBootstrapCheckParam
     try {
       for (const specifier of listRuntimeImportSpecifiers(source)) {
         if (isBuiltinSpecifier(specifier)) {
+          continue;
+        }
+        if (
+          params.allowWorkerDeployChunks !== false &&
+          specifier.startsWith("./") &&
+          artifactNames.has(specifier.slice(2))
+        ) {
           continue;
         }
         errors.push(

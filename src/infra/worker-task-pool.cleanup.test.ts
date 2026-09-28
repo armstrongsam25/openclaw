@@ -9,7 +9,7 @@ import { WorkerTaskPool, type WorkerTaskResponse } from "./worker-task-pool.js";
 import type { PoolFixtureInput, PoolFixtureResult } from "./worker-task-pool.test-support.js";
 
 const cleanup = vi.hoisted(() => vi.fn<() => Promise<void>>());
-vi.mock("./temp-artifact-cleanup.js", () => ({ removeTemporaryArtifacts: cleanup }));
+vi.mock("./temp-artifact-removal.js", () => ({ removeTemporaryArtifacts: cleanup }));
 
 const workerUrl = new URL("./worker-task-pool.test-support.ts", import.meta.url);
 
@@ -54,7 +54,7 @@ describe("worker task artifact lifetime", () => {
         Worker: MockWorker,
       }));
       let retiring = false;
-      vi.doMock("./temp-artifact-cleanup.js", () => {
+      vi.doMock("./temp-artifact-removal.js", () => {
         if (retiring) {
           throw new Error("cleanup module loaded during retirement");
         }
@@ -161,7 +161,7 @@ describe("worker task artifact lifetime", () => {
         await pool.close().catch(() => undefined);
         cleanup.mockReset();
         vi.doUnmock("node:worker_threads");
-        vi.doMock("./temp-artifact-cleanup.js", () => ({ removeTemporaryArtifacts: cleanup }));
+        vi.doMock("./temp-artifact-removal.js", () => ({ removeTemporaryArtifacts: cleanup }));
         vi.resetModules();
       }
     },

@@ -65,7 +65,7 @@ import type {
 } from "./command/types.js";
 import { createInternalSessionEffectsCleanup } from "./internal-session-effects.js";
 import { AGENT_LANE_SUBAGENT } from "./lanes.js";
-import type { MainSessionRecoveryPendingTarget } from "./main-session-recovery/main-session-recovery-store.js";
+import type { MainSessionRecoveryPendingTarget } from "./main-session-recovery/main-session-recovery-types.js";
 import { createAgentRunRestartAbortError, isAgentRunDirectAbortReason } from "./run-termination.js";
 import { withAgentPluginRegistry } from "./runtime-plugins.js";
 import { beginForegroundSessionMaintenance } from "./session-maintenance/coordinator.js";

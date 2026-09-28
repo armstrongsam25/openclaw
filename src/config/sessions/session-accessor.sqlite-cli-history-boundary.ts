@@ -4,8 +4,8 @@ import {
   isKnownCliHistoryBoundary,
   type CliHistoryWriter,
 } from "./cli-history-boundary.js";
+import type { ResolvedTranscriptScope } from "./session-accessor.sqlite-contract.js";
 import { readSessionEntryRow, writeSessionEntry } from "./session-accessor.sqlite-entry-store.js";
-import type { ResolvedTranscriptScope } from "./session-accessor.sqlite-scope.js";
 import { readTranscriptGenerationInTransaction } from "./session-accessor.sqlite-transcript-state.js";
 import type { InternalSessionEntry } from "./types.js";
 

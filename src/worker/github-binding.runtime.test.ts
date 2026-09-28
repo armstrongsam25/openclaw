@@ -13,6 +13,9 @@ const { warn, inspectPathPermissions } = vi.hoisted(() => ({
   warn: vi.fn(),
   inspectPathPermissions: vi.fn(),
 }));
+vi.mock("../agents/github-tool-identity.js", () => {
+  throw new Error("Worker GitHub profiles must not load Gateway identity selection");
+});
 vi.mock("@openclaw/fs-safe/permissions", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@openclaw/fs-safe/permissions")>();
   inspectPathPermissions.mockImplementation(actual.inspectPathPermissions);

@@ -14,7 +14,10 @@ import {
 } from "./openai-completions.test-support.js";
 import { buildOpenAISdkRequestOptions } from "./openai-transport-params.js";
 
-async function captureTransportRequest(model: Model<"openai-completions">) {
+async function captureTransportRequest(
+  model: Model<"openai-completions">,
+  options?: Parameters<ReturnType<typeof createOpenAICompletionsTransportStreamFn>>[2],
+) {
   const previousHost = getAiTransportHost();
   let captured: Request | undefined;
   configureAiTransportHost({
@@ -31,7 +34,7 @@ async function captureTransportRequest(model: Model<"openai-completions">) {
     const stream = createOpenAICompletionsTransportStreamFn()(
       model,
       { messages: [{ role: "user", content: "hello", timestamp: 1 }], tools: [] } as never,
-      { apiKey: "test-key" } as never,
+      { apiKey: "test-key", ...options },
     );
     if (stream instanceof Promise) {
       throw new Error("OpenAI Chat transport must return its event stream synchronously");
@@ -50,6 +53,20 @@ async function captureTransportRequest(model: Model<"openai-completions">) {
 }
 
 describe("openai completions transport", () => {
+  it("preserves provider-defined payload fields and bearer authentication", async () => {
+    const payload = {
+      model: "compatible-model",
+      messages: [{ role: "assistant", content: "answer", reasoning_content: "reason" }],
+      stream: true,
+      provider_options: { enabled: true },
+    };
+    const request = await captureTransportRequest(makeCompletionsModel(), {
+      onPayload: () => payload,
+    });
+    expect(await request.json()).toEqual(payload);
+    expect(request.headers.get("authorization")).toBe("Bearer test-key");
+  });
+
   it("passes provider request timeouts to OpenAI SDK per-request options", () => {
     const signal = new AbortController().signal;
     const model = {

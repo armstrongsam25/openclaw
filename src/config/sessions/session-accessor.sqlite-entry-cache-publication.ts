@@ -20,6 +20,7 @@ import {
   type SessionEntryCacheDatabase,
   type SessionEntryCreationOperation,
   type SessionEntryPlaceholder,
+  type SessionEntryReplacementPublication,
   type SessionTranscriptInitializationPublication,
   type SessionSharingEntry,
 } from "./session-accessor.sqlite-entry-cache.types.js";
@@ -66,15 +67,6 @@ type PlaceholderReceipt = {
   sessionKey: string;
   placeholder: SessionEntryPlaceholder;
   committed: boolean;
-};
-
-export type SessionEntryReplacementPublication = {
-  kind: "session-entry-replacements";
-  pendingArchiveRecovery: boolean;
-  previous: Map<string, Pick<SessionEntry, "sessionId" | "lifecycleRevision">>;
-  current: Map<string, SessionSharingEntry>;
-  changedKeys: string[];
-  membershipInvalidatedKeys: string[];
 };
 
 const preparedSharingReads = resolveGlobalSingleton(

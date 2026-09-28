@@ -1,5 +1,5 @@
-import type { Api, AssistantMessage, Model } from "@openclaw/llm-core";
-import { createEmptyTransportUsage } from "./transport-stream-shared.js";
+import type { Api, AssistantMessage, Model, Usage } from "@openclaw/llm-core";
+import { createZeroUsage } from "../utils/usage.js";
 
 export function createAssistantOutput(
   model: Pick<Model, "api" | "provider" | "id">,
@@ -15,4 +15,8 @@ export function createAssistantOutput(
     stopReason: "stop",
     timestamp: Date.now(),
   };
+}
+
+export function createEmptyTransportUsage(): Usage {
+  return createZeroUsage();
 }

@@ -11,6 +11,7 @@ import { root, type Root } from "../infra/fs-safe.js";
 import { withInstallWorkspace } from "../infra/install-source-utils.js";
 import { loadPluginManifest, resolvePackageExtensionEntries } from "../plugins/manifest.js";
 import { createPluginCache, withPluginCache } from "../plugins/plugin-cache.js";
+import { withPluginLifecycleLease } from "../plugins/plugin-lifecycle-lease.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type { SystemAgentOperation } from "./operation-types.js";
 import {
@@ -71,7 +72,6 @@ function artifactArchiveName(sha256: string): string {
 async function withArtifactImports<T>(
   run: (files: Root, assertOwned: () => void) => Promise<T>,
 ): Promise<T> {
-  const { withPluginLifecycleLease } = await import("../plugins/plugin-lifecycle-lease.js");
   return await withPluginLifecycleLease({}, async (lease) => {
     const stateDir = resolveStateDir();
     lease.assertOwned();

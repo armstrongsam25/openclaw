@@ -22,8 +22,8 @@ import { resetPreparedModelRuntimeSnapshotsForTest } from "./prepared-model-runt
 import { getModelProviderLocalServiceReconciler } from "./provider-local-service-reconcile.js";
 import { getModelProviderLocalService } from "./provider-local-service.js";
 import { AuthStorage, ModelRegistry } from "./sessions/index.js";
+import { completeWithPreparedSimpleCompletionModel } from "./simple-completion-execution.js";
 import {
-  completeWithPreparedSimpleCompletionModel,
   prepareSimpleCompletionModel,
   acquireSimpleCompletionModelWithSelection,
   acquireSimpleCompletionModelForAgent,

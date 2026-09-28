@@ -1,6 +1,5 @@
 // Lazy gateway RPC facade and shared Commander options for CLI subcommands.
 import type { Command } from "commander";
-import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { createLazyImportLoader } from "../shared/lazy-promise.js";
 import { inheritOptionFromParent } from "./command-options.js";
 import { resolveGatewayLocalPortOverride } from "./gateway-port-option.js";
@@ -61,6 +60,10 @@ export async function callGatewayFromCli(
   return await callGatewayFromCliWithTransport(method, opts, params, extra);
 }
 
+export async function formatGatewayErrorJsonFromCli(error: unknown) {
+  return (await gatewayRpcRuntimeLoader.load()).formatGatewayErrorJsonFromCliRuntime(error);
+}
+
 /** Resolve whether CLI Gateway options select the implicit local Gateway. */
 export async function isImplicitLocalGatewayTargetFromCli(opts: GatewayRpcOpts): Promise<boolean> {
   const runtime = await gatewayRpcRuntimeLoader.load();
@@ -68,30 +71,10 @@ export async function isImplicitLocalGatewayTargetFromCli(opts: GatewayRpcOpts):
 }
 
 /** Local fallback is safe only for unavailable or explicitly supported older local Gateways. */
-export async function canFallbackToImplicitLocalGateway(params: {
-  config: OpenClawConfig;
-  error: unknown;
-  legacyMethod?: string;
-  legacyAgentId?: boolean;
-}): Promise<boolean> {
-  const gateway = await import("../gateway/call.js");
-  const { isGatewayRpcUnavailableError } = await import("../gateway/transport-error.js");
-  const { config, error, legacyMethod, legacyAgentId } = params;
-  const isLegacyError =
-    legacyMethod !== undefined &&
-    gateway.isGatewayClientRequestError(error) &&
-    error.gatewayCode === "INVALID_REQUEST" &&
-    (error.message === `unknown method: ${legacyMethod}` ||
-      (legacyAgentId === true &&
-        (error.message === `invalid ${legacyMethod} params: unexpected property agentId` ||
-          error.message ===
-            `invalid ${legacyMethod} params: at root: unexpected property 'agentId'`)));
-  return (
-    (gateway.isGatewayCredentialsRequiredError(error) ||
-      isGatewayRpcUnavailableError(error) ||
-      isLegacyError) &&
-    (await gateway.isImplicitLocalGatewayTarget({ config }))
-  );
+export async function canFallbackToImplicitLocalGateway(
+  params: Parameters<GatewayRpcRuntimeModule["canFallbackToImplicitLocalGateway"]>[0],
+): Promise<boolean> {
+  return (await gatewayRpcRuntimeLoader.load()).canFallbackToImplicitLocalGateway(params);
 }
 
 /** Internal CLI facade for callers that need transport or auth policy overrides. */

@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { clearActivePluginRegistry } from "../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../plugins/runtime.test-support.js";
 import { createChatRunState } from "./server-chat-state.js";
 import type {
   GatewayCloseParams as GatewayTeardownParams,

@@ -19,8 +19,8 @@ import {
   refreshMainSessionRecoveryOwner,
   releaseMainSessionRecoveryOwner,
   type MainSessionRecoveryOwnerLease,
-  type MainSessionRecoveryPendingTarget,
 } from "./main-session-recovery/main-session-recovery-store.js";
+import type { MainSessionRecoveryPendingTarget } from "./main-session-recovery/main-session-recovery-types.js";
 
 const log = createSubsystemLogger("agents/agent-command");
 

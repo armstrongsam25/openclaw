@@ -43,7 +43,9 @@ vi.mock("../state/local-onboarding-state.js", () => ({
   readLocalOnboardingStateForConfig: mocks.readLocalOnboardingState,
 }));
 
-vi.mock("../commands/onboard-helpers.js", () => ({ DEFAULT_WORKSPACE: "/default/workspace" }));
+vi.mock("../agents/workspace-default.js", () => ({
+  DEFAULT_AGENT_WORKSPACE_DIR: "/default/workspace",
+}));
 
 function createWelcomeEngine(
   defaultModel: string | undefined,

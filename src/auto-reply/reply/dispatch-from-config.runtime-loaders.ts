@@ -9,9 +9,3 @@ export const loadFastApproveRuntime = createLazyPromise(() => import("./fast-app
 export const loadReplyMediaPathsRuntime = createLazyPromise(
   () => import("./reply-media-paths.runtime.js"),
 );
-export const loadRuntimePlugins = createLazyPromise(
-  () => import("../../agents/runtime-plugins.js"),
-);
-export const loadPreparedModelRuntime = createLazyPromise(
-  () => import("../../agents/prepared-model-runtime.js"),
-);

@@ -20,6 +20,7 @@ vi.mock("./auth-choice.plugin-providers.runtime.js", () => ({
   },
 }));
 vi.mock("../../runtime-plugin-install.js", () => ({
+  CODEX_RUNTIME_PLUGIN_ID: "codex",
   ensureModelSelectionRuntimePlugins: async ({ cfg }: { cfg: OpenClawConfig }) => ({
     ok: true,
     cfg,

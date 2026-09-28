@@ -99,7 +99,7 @@ export const routedCommandDefinitions = {
   "config-get": defineRoutedCommand({
     parseArgs: parseConfigGetRouteArgs,
     runParsedArgs: async (args) => {
-      const { runConfigGet } = await loadConfigCli();
+      const { runConfigGet } = await import("../config-cli-read.js");
       await runConfigGet(args);
     },
   }),

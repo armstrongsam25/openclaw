@@ -12,6 +12,7 @@ import {
   isIncognitoOpenClawAgentSqlitePath,
 } from "../../state/openclaw-agent-db.js";
 import { createOpenClawAgentDatabasePathMatcher } from "../../state/openclaw-agent-db.paths.js";
+import type { ResolvedSqliteStoreTarget } from "./session-accessor.sqlite-contract.js";
 import {
   listSqliteTargetCandidatePathsForSessionStorePath,
   resolveUnsuffixedSqliteTargetFromSessionStorePath,
@@ -20,22 +21,9 @@ import {
   assertSessionStoreReadCandidate,
   type SessionStoreReadCandidate,
 } from "./session-store-read-candidates.js";
+import type { SessionStoreRegistryRead } from "./session-store-target.types.js";
+import { resolveSessionSqliteTargetInWorker } from "./session-transcript-read-worker-runtime.js";
 import { captureSessionTranscriptStorageEnvironment } from "./transcript-target-binding.js";
-
-/** SQLite database target resolved from a legacy session store path. */
-export type ResolvedSqliteStoreTarget = {
-  agentId?: string;
-  ownerSource?:
-    | "database-registry"
-    | "database-path"
-    | "registered-suffixed"
-    | "occupied-unsuffixed"
-    | "configured-default"
-    | "ambiguous-registry";
-  path: string;
-  shared?: boolean;
-  unsuffixedOwnerAgentId?: string;
-};
 
 type ResolveSqliteStoreTargetOptions = {
   agentId?: string;
@@ -47,10 +35,6 @@ type ResolveSqliteStoreTargetOptions = {
   /** Reports ordinary locator data failures, never candidate custody or native cleanup. */
   onReadError?: (error: unknown) => never;
 };
-
-export type SessionStoreRegistryRead =
-  | readonly Pick<OpenClawRegisteredAgentDatabase, "agentId" | "path">[]
-  | { status: "deferred" | "unavailable" };
 
 export class SessionStoreRegistryReadRequired extends Error {}
 
@@ -91,8 +75,6 @@ export async function prepareSqliteTargetFromSessionStorePath(
     defaultAgentId: options.defaultAgentId,
     env,
   };
-  const { resolveSessionSqliteTargetInWorker } =
-    await import("./session-transcript-read-worker-runtime.js");
   let refreshed = false;
   for (;;) {
     signal?.throwIfAborted();

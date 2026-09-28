@@ -1,7 +1,7 @@
 import { note } from "../../packages/terminal-core/src/note.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { HealthFinding } from "../flows/health-checks.js";
-import { inspectHostDesktop } from "../gateway/desktop/host-source.js";
+import type { HostDesktopStatus } from "../gateway/desktop/host-source.js";
 import { runCommandWithTimeout } from "../process/exec-runner.js";
 import type { DoctorPrompter } from "./doctor-prompter.js";
 
@@ -10,9 +10,7 @@ const SCREEN_SHARING_COMMAND =
   "sudo launchctl enable system/com.apple.screensharing && sudo launchctl kickstart -k system/com.apple.screensharing";
 const SCREEN_SHARING_SETTINGS = "System Settings → General → Sharing → Screen Sharing";
 
-function hostDesktopSeverity(
-  status: Awaited<ReturnType<typeof inspectHostDesktop>>["status"],
-): HealthFinding["severity"] {
+function hostDesktopSeverity(status: HostDesktopStatus): HealthFinding["severity"] {
   return status.state === "unavailable" ||
     (status.state === "managed" && status.managedState === "failed")
     ? "warning"
@@ -23,6 +21,7 @@ function hostDesktopSeverity(
 export async function collectHostDesktopHealthFindings(
   cfg: OpenClawConfig,
 ): Promise<readonly HealthFinding[]> {
+  const { inspectHostDesktop } = await import("../gateway/desktop/host-source.js");
   const inspection = await inspectHostDesktop({ config: cfg.desktop?.host });
   return [
     {
@@ -43,6 +42,7 @@ export async function noteHostDesktopHealth(
     runCommand?: typeof runCommandWithTimeout;
   } = {},
 ): Promise<void> {
+  const { inspectHostDesktop } = await import("../gateway/desktop/host-source.js");
   const platform = deps.platform ?? process.platform;
   const inspection = await inspectHostDesktop({ config: cfg.desktop?.host, platform });
   note(inspection.detail, "Host desktop");

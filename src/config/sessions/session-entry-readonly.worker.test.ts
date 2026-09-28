@@ -13,11 +13,11 @@ import { SessionMetadataUnavailableError } from "../../state/session-metadata-un
 import { withOpenClawTestState } from "../../test-utils/openclaw-test-state.js";
 import * as entryReads from "./session-accessor.sqlite-entry-read.js";
 import { writeSessionEntry } from "./session-accessor.sqlite-entry-store.js";
+import { replaceSessionEntrySync } from "./session-accessor.sqlite-entry.js";
 import {
   loadSessionEntryReadOnlyInScope,
   loadSessionEntryReadOnlyResultInScope,
-  replaceSessionEntrySync,
-} from "./session-accessor.sqlite-entry.js";
+} from "./session-accessor.sqlite-exact-read.js";
 import { captureCanonicalSessionReaderContinuation } from "./session-canonical-key.js";
 import { assertSessionEntryCurrentAdmission } from "./session-entry-current-admission.js";
 import { captureSessionEntryCurrentRead } from "./session-entry-current-runtime.js";

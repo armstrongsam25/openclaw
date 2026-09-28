@@ -1,6 +1,6 @@
+import { callInProcessGatewayTool } from "../../agents/tools/gateway.js";
 /** Cleanup helpers for failed ACP spawn flows. */
 import {
-  callInProcessGatewayTool,
   getInProcessGatewayToolContext,
   runWithGatewayToolCleanupContext,
 } from "../../agents/tools/in-process-gateway.js";

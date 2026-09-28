@@ -1,5 +1,3 @@
-// Gateway session reset/delete service.
-// Rotates transcripts and coordinates lifecycle cleanup across runtimes/hooks.
 import { randomUUID } from "node:crypto";
 import { cleanupSessionResources } from "@openclaw/ai/internal/runtime";
 import { type FastMode, normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
@@ -27,6 +25,7 @@ import { clearAllCliSessions } from "../agents/cli-session.js";
 import { resetRegisteredAgentHarnessSessions } from "../agents/harness/registry.js";
 import { acquireAgentRuntimeCleanupRegistries } from "../agents/prepared-model-runtime.js";
 import { resolveSessionModelRef } from "../agents/session-model-ref.js";
+import { prepareSubagentSessionCleanupRevocation } from "../agents/subagents/registry/subagent-registry.js";
 import { managedWorktrees } from "../agents/worktrees/service.js";
 import {
   clearSessionResetRuntimeState,
@@ -954,8 +953,6 @@ export async function performGatewaySessionReset(params: {
           })
         : undefined;
 
-      const { prepareSubagentSessionCleanupRevocation } =
-        await import("../agents/subagents/registry/subagent-registry.js");
       const revokeCleanup = await prepareSubagentSessionCleanupRevocation(target.canonicalKey);
       const commitGuard = () => {
         assertCompletionAuthorized?.();

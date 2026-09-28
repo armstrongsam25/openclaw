@@ -16,7 +16,6 @@ import {
 import type { PluginRegistry } from "./registry-types.js";
 import {
   captureActivePluginRegistrySnapshot,
-  clearActivePluginRegistry,
   disposePluginRegistryInstances,
   commitStagedPluginRegistry,
   resetPluginRuntimeStateForTest,
@@ -24,6 +23,7 @@ import {
   setActivePluginRegistry,
   stageActivePluginRegistry,
 } from "./runtime.js";
+import { clearActivePluginRegistry } from "./runtime.test-support.js";
 import {
   getPluginRuntimeGatewayRequestScope,
   withPluginRuntimeRegistryScope,

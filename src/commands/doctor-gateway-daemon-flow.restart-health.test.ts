@@ -23,7 +23,10 @@ vi.mock("../config/paths.js", async () => {
   const actual = await vi.importActual<typeof import("../config/paths.js")>("../config/paths.js");
   return { ...actual, isDefaultInstallIdentity: vi.fn(() => true) };
 });
-vi.mock("../daemon/constants.js", () => ({
+vi.mock("../daemon/constants.js", async (importOriginal) => ({
+  GATEWAY_SERVICE_SELECTOR_ENV_KEYS: (
+    await importOriginal<typeof import("../daemon/constants.js")>()
+  ).GATEWAY_SERVICE_SELECTOR_ENV_KEYS,
   resolveGatewayLaunchAgentLabel: vi.fn(() => "ai.openclaw.gateway"),
   resolveNodeLaunchAgentLabel: vi.fn(() => "ai.openclaw.node"),
 }));

@@ -35,7 +35,7 @@ import {
   readNonNegativeIntegerParam,
   readPositiveIntegerParam,
 } from "./common.js";
-import type { GatewayCallOptions } from "./gateway.js";
+import type { GatewayCallOptions } from "./gateway-options.js";
 import { callNodesToolNodeInvoke, resolveNodesToolInvokeTimeouts } from "./nodes-tool-invoke.js";
 import { resolveAgentNode, type NodeListNode } from "./nodes-utils.js";
 import { textResult } from "./tool-results.js";

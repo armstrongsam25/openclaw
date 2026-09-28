@@ -99,9 +99,11 @@ vi.mock("../infra/exec-approvals.js", async (importOriginal) => ({
   loadExecApprovalsReadOnly: () => ({ version: 1, agents: {} }),
 }));
 vi.mock("../skills/discovery/status.js", () => ({ buildWorkspaceSkillReadiness: () => null }));
-vi.mock("../plugins/status.js", async () => ({
-  ...(await import("../plugins/status-compatibility.js")),
+vi.mock("../plugins/status-compatibility.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../plugins/status-compatibility.js")>()),
   buildPluginCompatibilityNotices: () => [],
+}));
+vi.mock("../plugins/status.js", () => ({
   withPluginDiagnosticsReport: async <T>(
     _params: unknown,
     consume: (report: object) => T | Promise<T>,

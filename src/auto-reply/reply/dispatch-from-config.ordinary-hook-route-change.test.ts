@@ -1,5 +1,6 @@
 import { expect, it, vi } from "vitest";
 import { createDeferred } from "../../../test/helpers/promise.js";
+import * as preparedRuntime from "../../agents/prepared-model-runtime.js";
 import { readConversationBindingRouteFacts } from "../../channels/conversation-binding-route-facts.js";
 import type { SessionBindingRecord } from "../../infra/outbound/session-binding-service.js";
 import {
@@ -9,7 +10,6 @@ import {
   registerCurrentAdapter,
   releaseDedupeForRetry,
 } from "./dispatch-from-config.route-change.test-support.js";
-import * as runtimeLoaders from "./dispatch-from-config.runtime-loaders.js";
 import { claimInboundDedupe } from "./inbound-dedupe.js";
 
 const pluginId = "hook-owner";
@@ -67,12 +67,14 @@ it("refuses an early none-to-agent change before handled before_dispatch", async
 
   const entered = createDeferred();
   const release = createRouteChangeBarrier();
-  const loadRuntimePlugins = runtimeLoaders.loadRuntimePlugins;
-  vi.spyOn(runtimeLoaders, "loadRuntimePlugins").mockImplementationOnce(async () => {
-    entered.resolve();
-    await release.promise;
-    return await loadRuntimePlugins();
-  });
+  const loadPreparedRuntime = preparedRuntime.loadPublishedGatewayReplyDispatchRuntime;
+  vi.spyOn(preparedRuntime, "loadPublishedGatewayReplyDispatchRuntime").mockImplementationOnce(
+    async (params) => {
+      entered.resolve();
+      await release.promise;
+      return await loadPreparedRuntime(params);
+    },
+  );
   const first = harness.invoke(firstContext).then(
     () => ({ error: undefined }),
     (error: unknown) => ({ error }),

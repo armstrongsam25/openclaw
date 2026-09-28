@@ -3,8 +3,8 @@
  */
 import { expectDefined } from "@openclaw/normalization-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveProviderPluginChoice } from "../../plugins/provider-auth-choice.runtime.js";
 import {
+  resolveProviderPluginChoiceCore as resolveProviderPluginChoice,
   resolveProviderModelPickerEntries,
   setProviderWizardProvidersResolverForTest,
 } from "../../plugins/provider-wizard.js";

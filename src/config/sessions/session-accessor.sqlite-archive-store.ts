@@ -26,7 +26,10 @@ import {
   readPendingSqliteTranscriptArchivesInWorker,
   runSqliteTranscriptArchivePublishWorker,
 } from "./session-accessor.sqlite-archive.js";
-import type { SessionLifecycleArchivedTranscript } from "./session-accessor.sqlite-contract.js";
+import type {
+  SessionLifecycleArchivedTranscript,
+  ResolvedSqliteReadScope,
+} from "./session-accessor.sqlite-contract.js";
 import { hasPreparedNativeSessionDeletion } from "./session-accessor.sqlite-deletion.js";
 import { emitArchivedTranscriptUpdates } from "./session-accessor.sqlite-events.js";
 import { runSqliteSessionReclamation } from "./session-accessor.sqlite-reclamation-run.js";
@@ -36,7 +39,6 @@ import {
   resolveSqliteTranscriptArchiveDirectory,
   runExclusiveSqliteSessionWrite,
   toDatabaseOptions,
-  type ResolvedSqliteReadScope,
 } from "./session-accessor.sqlite-scope.js";
 import { withSqliteMutationWorkerLifetime } from "./session-accessor.sqlite-worker-request.js";
 

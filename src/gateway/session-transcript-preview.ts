@@ -12,6 +12,7 @@ import { resolveSessionTranscriptReadTarget } from "../config/sessions/session-a
 import { isSessionTranscriptProjectionUnavailableError } from "../config/sessions/session-transcript-projection-error.js";
 import { resolveSessionTranscriptReadFence } from "../config/sessions/session-transcript-read-fence.js";
 import { startSessionTranscriptIndexReconcile } from "../config/sessions/session-transcript-reconcile.js";
+import { withSessionHistoryWorkerDatabase } from "../config/sessions/session-transcript-worker-runtime.js";
 import { captureSessionTranscriptTargetBinding } from "../config/sessions/transcript-target-binding.js";
 import {
   isIncognitoOpenClawAgentSqlitePath,
@@ -88,8 +89,6 @@ export async function readSessionPreviewItemsFromTranscriptAsync(
       }).sessionKey
     : undefined;
   const admission = resolveSessionTranscriptReadFence(resolved);
-  const { withSessionHistoryWorkerDatabase } =
-    await import("../config/sessions/session-transcript-worker-runtime.js");
   try {
     return await withSessionHistoryWorkerDatabase(options, (owner) =>
       owner.readPreview({

@@ -1,9 +1,44 @@
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import { createPluginMetadataSnapshotFixture } from "../plugins/plugin-metadata.test-support.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
 import { prepareModelRuntimeOwner } from "./prepared-model-runtime.owner.js";
-import { listConfiguredRefreshInputs } from "./prepared-model-runtime.refresh-scope.js";
+import {
+  createPreparedModelRuntimeCatalogRecovery,
+  listConfiguredRefreshInputs,
+} from "./prepared-model-runtime.refresh-scope.js";
+
+it("recovers only the exact live catalog generation even when another owner shares its directory", async () => {
+  const isCurrent = vi.fn(() => true);
+  const otherCurrent = vi.fn(() => true);
+  const input = { config: {}, agentId: "main", agentDir: "/synthetic/shared-agent" };
+  const owner = {
+    ...prepareModelRuntimeOwner(input, "configured", "static"),
+    needsRefresh: false,
+    snapshot: { isCurrent, metadataSnapshot: createPluginMetadataSnapshotFixture() },
+  };
+  const publish = vi.fn(async () => {});
+  const recover = createPreparedModelRuntimeCatalogRecovery(new Map([["main", owner]]), publish);
+
+  await recover([{ agentDir: input.agentDir, isCurrent: otherCurrent }]);
+  expect(otherCurrent).toHaveBeenCalledOnce();
+  expect(publish).not.toHaveBeenCalled();
+
+  await recover([{ agentDir: input.agentDir, isCurrent }]);
+  expect(isCurrent).toHaveBeenCalledTimes(2);
+  expect(publish).toHaveBeenCalledExactlyOnceWith(
+    input.config,
+    expect.objectContaining({
+      agentIds: new Set(["main"]),
+      pluginMetadataSnapshot: owner.snapshot.metadataSnapshot,
+    }),
+  );
+
+  isCurrent.mockReturnValueOnce(true).mockReturnValue(false);
+  await recover([{ agentDir: input.agentDir, isCurrent }]);
+  expect(publish).toHaveBeenCalledTimes(1);
+});
 
 describe("configured model runtime refresh inputs", () => {
   it("prefers explicit workspaces over launch candidates on startup and replacement", async () => {

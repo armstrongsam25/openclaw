@@ -6,9 +6,9 @@ import {
 } from "../../agents/agent-tool-metadata.js";
 import { buildSubagentExecutionSessionSpawnContext } from "../../agents/subagents/spawn/subagent-spawn-execution-identity.js";
 import type { AnyAgentTool } from "../../agents/tools/common.js";
+import { callInProcessGatewayToolWithCreation } from "../../agents/tools/gateway.js";
 import {
   callAgentToolGatewayRequest,
-  callInProcessGatewayToolWithCreation,
   type InProcessGatewayCaller,
   runWithGatewayToolCleanupContext,
 } from "../../agents/tools/in-process-gateway.js";

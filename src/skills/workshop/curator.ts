@@ -12,6 +12,7 @@ import { AsyncWorkScope } from "../../shared/async-work-scope.js";
 import type { OpenClawStateDatabaseOptions } from "../../state/openclaw-state-db.js";
 import { captureOpenClawStateWorkerContext } from "../../state/openclaw-state-worker-context.js";
 import type { OpenClawStateWorkerContext } from "../../state/openclaw-state-worker-context.types.js";
+import { executeOpenClawStateWorker } from "../../state/openclaw-state-worker-store.js";
 import { normalizeSkillIndexName } from "../discovery/skill-index.js";
 import { parseSkillProposalRow } from "./store-sqlite-record.js";
 import {
@@ -47,7 +48,6 @@ export async function getSkillCuratorStatus(
       curatedByFile.set(skillFile, skill);
     }
   }
-  const { executeOpenClawStateWorker } = await import("../../state/openclaw-state-worker-store.js");
   const { proposalRows, usageRows, reviewStatus } = await executeOpenClawStateWorker(context, {
     type: "skills.curator.read",
     input: { skillFiles: [...curatedByFile.keys()] },
@@ -116,7 +116,6 @@ async function recordSkillUsage(
   }
   const skillFile = canonicalizePath(path.resolve(rawSkillFile));
   const skillKey = canonicalSkillKey(event.skillName);
-  const { executeOpenClawStateWorker } = await import("../../state/openclaw-state-worker-store.js");
   await executeOpenClawStateWorker(context, {
     type: "skills.usage.record",
     input: { ...event, skillFile, skillKey },

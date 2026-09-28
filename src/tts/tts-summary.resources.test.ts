@@ -7,10 +7,8 @@ import { getSessionMcpRequestSignal } from "../agents/agent-bundle-mcp-request-c
 import { requireApiKey } from "../agents/model-auth.js";
 import * as preparedRuntime from "../agents/prepared-model-runtime.js";
 import { closePreparedModelRuntimeSnapshots } from "../agents/prepared-model-runtime.lifecycle.js";
-import {
-  completeWithPreparedSimpleCompletionModel,
-  prepareSimpleCompletionModel,
-} from "../agents/simple-completion-runtime.js";
+import { completeWithPreparedSimpleCompletionModel } from "../agents/simple-completion-execution.js";
+import { prepareSimpleCompletionModel } from "../agents/simple-completion-runtime.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { Context, Model, ProviderStreamOptions } from "../llm/types.js";
 import { createAssistantMessageEventStream } from "../llm/utils/event-stream.js";

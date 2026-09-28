@@ -12,6 +12,7 @@ import {
   getNodeSqliteKysely,
 } from "../infra/kysely-sync.js";
 import { openNodeSqliteDatabase } from "../infra/node-sqlite.js";
+import { resolveSqliteInspectionBudget } from "../infra/sqlite-readonly-worker.js";
 import { prepareSqliteReadOnlyLocation } from "../infra/sqlite-snapshot-source.js";
 import type { UpdateDoctorWriteAuthority } from "../infra/update-doctor-result.js";
 import { POST_CORE_UPDATE_ENV } from "../infra/update-post-core-context.js";
@@ -451,7 +452,6 @@ async function rehearseDeferredUpdateDoctorSchemaForParent(
     { prepareUpdateCandidateRehearsal },
     { resolveGatewayInstallEntrypoint },
     { runUtf8CommandWithTimeout },
-    { resolveSqliteInspectionBudget },
   ] = await Promise.all([
     import("../config/io.js"),
     import("../infra/openclaw-root.js"),
@@ -459,7 +459,6 @@ async function rehearseDeferredUpdateDoctorSchemaForParent(
     import("../infra/update-candidate-rehearsal.js"),
     import("../daemon/gateway-entrypoint.js"),
     import("../process/exec.js"),
-    import("../infra/sqlite-readonly-worker.js"),
   ]);
   const root = await resolveOpenClawPackageRoot({
     moduleUrl: import.meta.url,

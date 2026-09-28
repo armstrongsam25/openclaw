@@ -36,11 +36,11 @@ import {
   findSessionRepositoryWorkspaces,
 } from "../../state/session-repository-workspaces.js";
 import { resolveSessionStorePathCore } from "./paths.js";
+import type { ResolvedSqliteReadScope } from "./session-accessor.sqlite-contract.js";
 import { readSessionEntryRow } from "./session-accessor.sqlite-entry-read.js";
 import {
   runExclusiveSqliteSessionWrite,
   toDatabaseOptions,
-  type ResolvedSqliteReadScope,
 } from "./session-accessor.sqlite-scope.js";
 import type { SqliteSessionWriteOperation } from "./session-accessor.sqlite-write-operation.js";
 import type { SessionEntryCreateWithTranscriptOptions } from "./session-accessor.types.js";

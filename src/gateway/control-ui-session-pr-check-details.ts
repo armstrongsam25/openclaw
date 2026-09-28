@@ -9,10 +9,7 @@ import {
   sessionPullRequestRepositoryApiUrl,
   type SessionPullRequestCheckTarget,
 } from "./control-ui-session-prs-checks.js";
-import {
-  parsePullListItem,
-  type ControlUiSessionPullRequestsParams,
-} from "./control-ui-session-prs.js";
+import type { ControlUiSessionPullRequestsParams } from "./control-ui-session-prs.js";
 import { gitHubPublicApi } from "./github-public-api.js";
 
 const checkDetailsCache = createRetainedCache<{
@@ -45,6 +42,7 @@ export async function loadControlUiSessionPullRequestChecks(
   params: ControlUiSessionPullRequestChecksParams,
   deps: LoadSessionCheckDetailsDeps,
 ): Promise<ControlUiSessionPullRequestCheckDetails> {
+  const { parsePullListItem } = await import("./control-ui-session-prs.js");
   const { owner, repo, number, headSha } = params;
   const target = { owner, repo, number, headSha };
   const unavailable = (error: string): ControlUiSessionPullRequestCheckDetails => ({

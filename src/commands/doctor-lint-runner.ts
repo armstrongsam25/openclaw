@@ -34,10 +34,8 @@ import {
   type HealthCheckContext,
   type HealthFinding,
 } from "../flows/health-checks.js";
-import {
-  readDeferredPluginMigrations,
-  type DeferredPluginMigration,
-} from "../infra/deferred-plugin-migrations.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
+import { readDeferredPluginMigrations } from "../infra/deferred-plugin-migrations.js";
 import { SqliteSnapshotCleanupError } from "../infra/sqlite-readonly-location-cleanup.js";
 import { prepareSqliteReadOnlyLocationSync } from "../infra/sqlite-snapshot-source.js";
 import { UPDATE_DOCTOR_DISPOSAL_WARNING_PREFIX } from "../infra/update-doctor-lint.js";

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { loadAgentRunnerMemoryRuntime } from "../../agents/command/runtime-loaders.js";
 import { normalizeChatType } from "../../channels/chat-type.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import { loadSessionEntry } from "../../config/sessions/session-accessor.js";
@@ -14,7 +15,6 @@ import type { ReplyPayload } from "../types.js";
 import { resolveRunAfterAutoFallbackPrimaryProbeRecheck } from "./agent-runner-auto-fallback.js";
 import { resolveAdmittedRunSessionFile } from "./agent-runner-core.js";
 import { buildPreflightCompactionFailureText } from "./agent-runner-failure-reply.js";
-import { runSessionCompactionIfNeeded } from "./agent-runner-memory.js";
 import {
   resolveQueuedReplyExecutionConfig,
   resolveQueuedReplyRuntimeConfig,
@@ -107,6 +107,7 @@ export async function admitFollowupTurn(params: {
   defaults: FollowupRunnerParams;
   onCompactionNoticePayload?: (payload: ReplyPayload, turn: AdmittedFollowupTurn) => Promise<void>;
 }): Promise<FollowupAdmissionResult> {
+  const { runSessionCompactionIfNeeded } = await loadAgentRunnerMemoryRuntime();
   const assertOperatorCurrent = () => {
     params.queued.operatorAuthority?.assertCurrent();
   };

@@ -1,4 +1,6 @@
 import { formatCliCommand } from "../cli/command-format.js";
+import { buildMigrationReportDir, createMigrationLogger } from "../commands/migrate/context.js";
+import * as onboardHelpers from "../commands/onboard-helpers.js";
 import type { OnboardOptions } from "../commands/onboard-types.js";
 import { resolveAgentModelPrimaryValue } from "../config/model-input.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
@@ -8,6 +10,7 @@ import {
   listAvailableManifestContractPlugins,
   loadManifestContractSnapshot,
 } from "../plugins/manifest-contract-eligibility.js";
+import { withPluginMigrationProviders } from "../plugins/migration-provider-runtime.js";
 import type {
   MigrationPlan,
   MigrationProviderContext,
@@ -57,14 +60,6 @@ type SetupMigrationProviderDescriptor = {
   label: string;
   description?: string;
 };
-const loadMigrationProviderRuntimeModule = createLazyRuntimeModule(
-  () => import("../plugins/migration-provider-runtime.js"),
-);
-
-const loadMigrationContextModule = createLazyRuntimeModule(
-  () => import("../commands/migrate/context.js"),
-);
-
 const loadConfigPathsModule = createLazyRuntimeModule(() => import("../config/paths.js"));
 
 async function detectSetupMigrationSource(
@@ -101,12 +96,7 @@ export async function detectSetupMigrationSources(params: {
   detections: SetupMigrationDetection[];
   providerDescriptors: SetupMigrationProviderDescriptor[];
 }> {
-  const [{ withPluginMigrationProviders }, { createMigrationLogger }, { resolveStateDir }] =
-    await Promise.all([
-      loadMigrationProviderRuntimeModule(),
-      loadMigrationContextModule(),
-      loadConfigPathsModule(),
-    ]);
+  const { resolveStateDir } = await loadConfigPathsModule();
   return await withPluginMigrationProviders(
     {
       cfg: params.config,
@@ -302,7 +292,6 @@ async function withSetupMigrationProvider<T>(
   params: { providerId: string; baseConfig: OpenClawConfig },
   run: (resolved: { provider: MigrationProviderPlugin; baseConfig: OpenClawConfig }) => Promise<T>,
 ): Promise<T> {
-  const { withPluginMigrationProviders } = await loadMigrationProviderRuntimeModule();
   return await withPluginMigrationProviders(
     { cfg: params.baseConfig, providerId: params.providerId },
     async (providers) => {
@@ -364,16 +353,12 @@ export async function runSetupMigrationImport(params: {
 }): Promise<{ kind: "back" } | Awaited<ReturnType<typeof finalizeSetupMigrationPromotion>>> {
   const [
     { applyLocalSetupWorkspaceConfig, applySkipBootstrapConfig },
-    { createMigrationLogger, buildMigrationReportDir },
     { assertApplySucceeded, assertConflictFreePlan, formatMigrationPreview, formatMigrationResult },
     { resolveStateDir },
-    onboardHelpers,
   ] = await Promise.all([
     import("../commands/onboard-config.js"),
-    loadMigrationContextModule(),
     import("../commands/migrate/output.js"),
     loadConfigPathsModule(),
-    import("../commands/onboard-helpers.js"),
   ]);
   const providerId = await selectSetupMigrationProvider({
     opts: params.opts,

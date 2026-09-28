@@ -8,6 +8,7 @@ import {
 } from "../config/model-provider-config.js";
 import type { SessionEntry } from "../config/sessions.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import { resolvePluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
 import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.types.js";
 import type { PluginRegistry } from "../plugins/registry-types.js";
 import { getActivePluginRegistry } from "../plugins/runtime.js";
@@ -25,6 +26,7 @@ import {
   buildProviderConfigModelCatalogForBrowse,
   type ModelCatalogBrowseView,
 } from "./model-catalog-browse.js";
+import { createPreparedModelCatalogProviderNormalizer } from "./model-catalog-provider-normalizer.js";
 import {
   projectModelCatalogEntryForRoute,
   createConfiguredModelCatalogOverridesResolver,
@@ -44,6 +46,7 @@ import {
   openAIModelCatalogRoutePolicy,
   resolveModelCatalogIdentityKey,
 } from "./openai-model-routes.js";
+import { resolveSessionRuntimeOverrideForProvider } from "./session-runtime-compat.js";
 
 /** Keep capability donors bound to one model and runtime without merging sibling metadata. */
 export function selectModelCatalogRuntimeEntry(params: {
@@ -459,8 +462,6 @@ export async function loadPreparedModelCatalogView(
     const { getPreparedModelRuntimeAuthLabels, getPreparedModelRuntimeAuthStore } =
       await import("./prepared-model-runtime-auth.js");
     const { formatModelCatalogAuthLabel } = await import("./model-catalog-auth-labels.js");
-    const { resolveSessionRuntimeOverrideForProvider } =
-      await import("./session-runtime-compat.js");
     const { buildAgentRuntimeAuthPlan } = await import("./runtime-plan/auth.js");
     const owner = materializePreparedModelCatalogOwner(
       getPublishedPreparedModelCatalogOwnerSnapshot(params) ??
@@ -593,10 +594,6 @@ async function acquirePickerModelCatalogView(
   if (params.preferredProvider) {
     if (params.preferLiveProviderCatalog) {
       const { resolveDefaultAgentDir } = await import("./agent-scope.js");
-      const { resolvePluginMetadataSnapshot } =
-        await import("../plugins/plugin-metadata-snapshot.js");
-      const { createPreparedModelCatalogProviderNormalizer } =
-        await import("./model-catalog-provider-normalizer.js");
       const requestedProvider = normalizeProviderId(params.preferredProvider);
       if (requestedProvider) {
         const env = params.env ?? process.env;

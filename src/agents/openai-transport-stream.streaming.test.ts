@@ -76,7 +76,7 @@ describe("openai transport stream", () => {
           requestTimeoutMs: 900_000,
         } satisfies Model & { requestTimeoutMs: number };
 
-        const stream = await transport.createStream()(
+        const stream = transport.createStream()(
           model,
           {
             messages: [{ role: "user", content: "Reply OK", timestamp: Date.now() }],

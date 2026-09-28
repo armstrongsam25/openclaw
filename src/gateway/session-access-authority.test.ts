@@ -3,7 +3,7 @@ import { setImmediate } from "node:timers/promises";
 import { expectDefined } from "@openclaw/normalization-core/expect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdmittedRunOperatorAuthority } from "../agents/admitted-run-context.js";
-import { callInProcessGatewayTool } from "../agents/tools/in-process-gateway.js";
+import { callInProcessGatewayTool } from "../agents/tools/gateway.js";
 import { setRuntimeConfigSnapshot } from "../config/config.js";
 import { replaceSessionEntrySync } from "../config/sessions/session-accessor.js";
 import type { SessionEntry } from "../config/sessions/types.js";

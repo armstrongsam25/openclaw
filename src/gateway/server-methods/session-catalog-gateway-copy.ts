@@ -19,7 +19,6 @@ import {
 } from "../../security/external-content.js";
 import { recordSessionStateEvent } from "../../sessions/session-state-events.js";
 import { createGatewaySession } from "../session-create-service.js";
-import { buildModelsListResult } from "./models-list-result.js";
 import { resolveOperatorSessionCreation } from "./session-creation-provenance.js";
 import type { GatewayClient, GatewayRequestContext } from "./types.js";
 
@@ -40,6 +39,7 @@ async function resolveGatewayCopyModel(params: {
   }
   const sourceModel = `${source.provider}/${source.model}`;
   try {
+    const { buildModelsListResult } = await import("./models-list-result.js");
     const result = await buildModelsListResult({
       source: { kind: "gateway", context: params.context },
       agentId: params.agentId,

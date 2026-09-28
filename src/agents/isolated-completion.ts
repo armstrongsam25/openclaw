@@ -60,7 +60,6 @@ import {
   type PreparedAgentRuntimeAuthAttempt,
 } from "./runtime-plan/prepare-auth.js";
 import { scopeAuthProfileStoreToPreparedPlan } from "./runtime-plan/resolve-auth.js";
-import { prepareSimpleCompletionModel } from "./simple-completion-runtime.js";
 import type { UsageLike } from "./usage.js";
 
 type RunIsolatedCompletionParams = {
@@ -460,6 +459,8 @@ async function runIsolatedCompletionOwned(
       const prepareHostAuthorization = async (
         authProfileId: string | undefined,
       ): Promise<Extract<AgentHarnessIsolatedCompletionAuthorization, { owner: "host" }>> => {
+        const { prepareSimpleCompletionModel } = await import("./simple-completion-runtime.js");
+        assertCurrent();
         const prepared = await prepareSimpleCompletionModel(
           {
             cfg: config,

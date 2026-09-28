@@ -6,7 +6,7 @@ import { extractPluginInstallRecordsFromInstalledPluginIndex } from "./installed
 import { createInstalledPluginIndexScopeLookup } from "./installed-plugin-index-scope-lookup.js";
 import { isInstalledPluginEnabled } from "./installed-plugin-index.js";
 import { createPluginCache, withPluginCache } from "./plugin-cache.js";
-import { finalizePluginMetadataSnapshot } from "./plugin-metadata-snapshot.js";
+import { restorePluginMetadataSnapshot } from "./plugin-metadata-snapshot.js";
 import { createPluginMetadataSnapshotFixture } from "./plugin-metadata.test-support.js";
 
 function createSnapshot(provider = "shared") {
@@ -47,7 +47,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("prepared installed-index readers", () => {
   it("prepares immutable ownership and install records once while preserving policy and caller copies", () => {
     withPluginCache(createPluginCache(), () => {
-      const snapshot = finalizePluginMetadataSnapshot(createSnapshot());
+      const snapshot = restorePluginMetadataSnapshot(createSnapshot());
       const compile = vi.spyOn(safeRegex, "compileSafeRegex");
       const parse = vi.spyOn(installRecordMap, "parsePluginInstallRecordMap");
       const first = createInstalledPluginIndexScopeLookup(snapshot.index);
@@ -99,7 +99,7 @@ describe("prepared installed-index readers", () => {
       skills: [],
       dangerousConfigFlags: [],
     };
-    finalizePluginMetadataSnapshot(snapshot);
+    restorePluginMetadataSnapshot(snapshot);
     withPluginCache(createPluginCache(), () => {
       const first = extractPluginInstallRecordsFromInstalledPluginIndex(snapshot.index);
       assert(first.alpha?.acceptedSurface);
@@ -141,7 +141,7 @@ describe("prepared installed-index readers", () => {
   });
 
   it("keeps operation caches independent and retained lookup callbacks on their original inventory", () => {
-    const snapshot = finalizePluginMetadataSnapshot(createSnapshot());
+    const snapshot = restorePluginMetadataSnapshot(createSnapshot());
     const cache = createPluginCache();
     const read = () => {
       extractPluginInstallRecordsFromInstalledPluginIndex(snapshot.index);
@@ -152,7 +152,7 @@ describe("prepared installed-index readers", () => {
     withPluginCache(createPluginCache(), read);
     withPluginCache(cache, read);
     expect(parse).toHaveBeenCalledTimes(2);
-    const replacement = finalizePluginMetadataSnapshot(createSnapshot("replacement"));
+    const replacement = restorePluginMetadataSnapshot(createSnapshot("replacement"));
     const current = withPluginCache(cache, () =>
       createInstalledPluginIndexScopeLookup(replacement.index),
     );

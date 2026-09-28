@@ -2,7 +2,7 @@ import { normalizeModelCatalogProviderRows } from "@openclaw/model-catalog-core/
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { planEffectiveModelCatalogRows } from "../model-catalog/index.js";
-import { finalizePluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
+import { restorePluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
 import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.types.js";
 import { createPluginMetadataSnapshotFixture } from "../plugins/plugin-metadata.test-support.js";
 import { withPluginRuntimeGenerationScope } from "../plugins/runtime/generation-scope.js";
@@ -17,7 +17,7 @@ vi.mock("../plugins/provider-runtime.runtime.js", () => ({
 }));
 
 function fixture(discovery: "static" | "runtime", ...modelIds: string[]) {
-  return finalizePluginMetadataSnapshot(
+  return restorePluginMetadataSnapshot(
     createPluginMetadataSnapshotFixture({
       plugins: [
         {

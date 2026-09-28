@@ -3,6 +3,7 @@ import type { OpenClawAgentDatabase } from "../../state/openclaw-agent-db.js";
 import { SessionEntryLifecycleUpsertConflictError } from "./session-accessor.lifecycle-types.js";
 import type { MaterializedSessionStateDeletePlan } from "./session-accessor.sqlite-archive-types.js";
 import { readExactSessionEntryRowForCanonicalRepair } from "./session-accessor.sqlite-canonical-repair.js";
+import type { ResolvedSqliteReadScope } from "./session-accessor.sqlite-contract.js";
 import { sqliteSessionEntriesEqual } from "./session-accessor.sqlite-entry-equality.js";
 import {
   deleteLegacySessionEntryRows,
@@ -28,7 +29,6 @@ import {
   emptySessionEntryMaintenancePlan,
 } from "./session-accessor.sqlite-maintenance-store.js";
 import { appendSessionResetBoundary } from "./session-accessor.sqlite-reset-boundary.js";
-import type { ResolvedSqliteReadScope } from "./session-accessor.sqlite-scope.js";
 import type { SessionEntry } from "./types.js";
 
 type ProjectedLifecycleCommitOptions = Omit<ProjectedLifecycleRemovalCommitInput, "maintenance"> & {

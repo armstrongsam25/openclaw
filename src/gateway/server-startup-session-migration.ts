@@ -6,10 +6,7 @@ import {
   hasSessionEntriesByStatus,
   readSessionEntriesByStatus,
 } from "../config/sessions/session-accessor.sqlite-status.js";
-import {
-  runSessionStartupMigration,
-  type SessionStartupMigrationLogger,
-} from "../config/sessions/startup-migration.js";
+import type { SessionStartupMigrationLogger } from "../config/sessions/startup-migration.js";
 import type { InternalSessionEntry } from "../config/sessions/types.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { readActiveGatewayLockIdentity } from "../infra/gateway-lock.js";
@@ -29,7 +26,9 @@ import {
 } from "../state/openclaw-agent-db.js";
 import { resolveOpenClawStateSqlitePath } from "../state/openclaw-state-db.paths.js";
 
-type SessionMigrationDeps = Parameters<typeof runSessionStartupMigration>[0]["deps"] & {
+type SessionMigrationDeps = Parameters<
+  typeof import("../config/sessions/startup-migration.js").runSessionStartupMigration
+>[0]["deps"] & {
   reconcileSessionTranscriptIndexes?: typeof import("../config/sessions/session-transcript-reconcile.js").reconcileSessionTranscriptIndexes;
 };
 
@@ -198,6 +197,8 @@ export async function runStartupSessionMigration(params: {
   let reconciledSessions = 0;
   let interruptedSubagents = 0;
   let retainedSubagents = 0;
+  params.assertCurrent?.();
+  const { runSessionStartupMigration } = await import("../config/sessions/startup-migration.js");
   await runSessionStartupMigration({
     ...params,
     handoffDatabase: async (database) => {

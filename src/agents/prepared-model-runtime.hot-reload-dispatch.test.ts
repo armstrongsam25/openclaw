@@ -36,8 +36,8 @@ import {
   loadPublishedGatewayReplyDispatchRuntime,
   markPreparedModelRuntimeSnapshotsStale,
   refreshPreparedModelRuntimeSnapshots,
-  registerPreparedModelRuntimePublicationListener,
 } from "./prepared-model-runtime.js";
+import { registerPreparedModelRuntimePublicationListener } from "./prepared-model-runtime.publication-events.js";
 import { getPreparedModelRuntimeStartupStatus } from "./prepared-model-runtime.startup-status.js";
 
 const fixture = usePreparedModelRuntimeHarness(

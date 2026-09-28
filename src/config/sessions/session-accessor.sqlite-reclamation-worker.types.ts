@@ -1,10 +1,10 @@
 import type { SqliteWalCheckpointSnapshot } from "../../infra/sqlite-wal-checkpoint.js";
 import type { DatabasePathIdentity } from "../../infra/sqlite-worker-identity.js";
+import type { OpenClawAgentDatabaseWorkerLeaseReceipt } from "../../state/openclaw-agent-db-contract.js";
 import type {
   OpenClawAgentDatabaseClaim,
   readOpenClawAgentDatabaseIdentity,
 } from "../../state/openclaw-agent-db-identity.js";
-import type { OpenClawAgentDatabaseWorkerLeaseReceipt } from "../../state/openclaw-agent-db-lease.js";
 import type { OpenClawAgentDatabaseValidation } from "../../state/openclaw-agent-db-validation-cache.js";
 import type {
   SqliteSessionReclamationPlan,

@@ -30,9 +30,11 @@ vi.mock("../plugins/status.js", async (importOriginal) => {
   return {
     ...actual,
     buildPluginSnapshotReport: vi.fn(() => emptyReport),
-    buildPluginCompatibilityNotices: vi.fn(() => []),
   } as typeof actual;
 });
+vi.mock("../plugins/status-compatibility.js", () => ({
+  buildPluginCompatibilityNotices: vi.fn(() => []),
+}));
 vi.mock("../plugins/gateway-startup-plugin-ids.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../plugins/gateway-startup-plugin-ids.js")>();
   return {

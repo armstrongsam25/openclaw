@@ -27,6 +27,11 @@ vi.mock("../../config/config.js", () => ({
   readSourceConfigBestEffort: async () => ({ gateway: { mode: "remote" } }),
 }));
 vi.mock("../../infra/update-run-status.js", () => ({ readUpdateRunStatus: async () => ({}) }));
+vi.mock("../../infra/update-managed-service-handoff.js", () => ({
+  isCurrentManagedServiceUpdateHandoffProcess: async () => {
+    throw new Error("Unexpected managed service handoff access");
+  },
+}));
 vi.mock("../../runtime.js", () => ({ defaultRuntime: mocks }));
 vi.mock("../../gateway/call.js", () => ({ callGateway: async () => ({}) }));
 vi.mock("../../infra/channels-status-issues.js", () => ({ collectChannelStatusIssues: () => [] }));

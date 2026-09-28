@@ -233,10 +233,8 @@ test.each([
         const { OpenClawSchema } = await import("../config/zod-schema.js");
         const { ensureAuthProfileStoreWithoutExternalProfiles } =
           await import("../agents/auth-profiles/store-runtime.js");
-        const { resolveModelWithRegistry } =
-          await import("../agents/embedded-agent-runner/model.registry-resolution.js");
-        const { AuthStorage } = await import("../agents/sessions/auth-storage.js");
-        const { ModelRegistry } = await import("../agents/sessions/model-registry.js");
+        const { createEmptyAgentDiscoveryStores, resolveModelAsync } =
+          await import("../agents/embedded-agent-runner/model.js");
         const { createModelAccountConnectService } = await import("./model-account-connect.js");
         const { storePath } = await createSessionStoreDir();
         const inputConfig: import("../config/types.openclaw.js").OpenClawConfig = {
@@ -330,13 +328,13 @@ test.each([
             expect(resolveProviderIdForAuth("arcee", { config: cfg, storedCredential: true })).toBe(
               "arcee",
             );
-            const model = await resolveModelWithRegistry({
-              cfg,
-              provider: "arcee",
+            const { model } = await resolveModelAsync(
+              "arcee",
               modelId,
-              agentDir: state.agentDir(),
-              modelRegistry: ModelRegistry.inMemory(AuthStorage.inMemory()),
-            });
+              state.agentDir(),
+              cfg,
+              createEmptyAgentDiscoveryStores(),
+            );
             expect(model?.baseUrl).toBe(baseUrl);
 
             const owner = ensureProfileForEmail("arcee-session-owner@example.test");

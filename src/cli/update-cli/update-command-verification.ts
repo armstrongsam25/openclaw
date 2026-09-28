@@ -28,6 +28,7 @@ import {
   type GatewayRestartSnapshot,
 } from "../daemon-cli/restart-health.js";
 import type { UpdateCommandOptions } from "./shared.js";
+import { readPackageUpdateIdentity } from "./update-command-package.js";
 import {
   createPluginUpdateWarning,
   type PluginUpdateWarning,
@@ -122,9 +123,7 @@ export async function verifyPreviousManagedGatewayForUpdate(
 ): Promise<void> {
   const verdict = params.service.serviceUpdateVerdict;
   const installationDrift = verdict?.kind === "owned" && verdict.requiresInstallRootRefresh;
-  const identity = installationDrift
-    ? await (await import("./update-command-package.js")).readPackageUpdateIdentity(params.root)
-    : undefined;
+  const identity = installationDrift ? await readPackageUpdateIdentity(params.root) : undefined;
   params.assertCurrent?.();
   let verified = false;
   params.onVerification(false);

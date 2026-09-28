@@ -8,7 +8,7 @@ import { resolveDefaultAgentId } from "../../agents/agent-scope.js";
 import { runIsolatedCompletion } from "../../agents/isolated-completion.js";
 import { splitTrailingAuthProfile } from "../../agents/model-ref-profile.js";
 import { resolveCompatibleAgentRuntimeForProvider } from "../../agents/session-runtime-compat.js";
-import { resolveSimpleCompletionSelectionForAgent } from "../../agents/simple-completion-runtime.js";
+import { resolveSimpleCompletionSelectionForAgent } from "../../agents/simple-completion-selection.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 
 const DEFAULT_MAX_LABEL_LENGTH = 128;

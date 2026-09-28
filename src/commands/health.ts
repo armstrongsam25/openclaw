@@ -3,7 +3,6 @@ import { styleHealthChannelLine } from "../../packages/terminal-core/src/health-
 import { isRich } from "../../packages/terminal-core/src/theme.js";
 import { resolveChannelDefaultAccountId } from "../channels/plugins/helpers.js";
 import { listReadOnlyChannelPluginsForConfig } from "../channels/plugins/read-only.js";
-import { probeGatewayStatus } from "../cli/daemon-cli/probe.js";
 import { DEFAULT_RESTART_HEALTH_TIMEOUT_MS } from "../cli/daemon-cli/restart-health.constants.js";
 import { withProgress } from "../cli/progress.js";
 import {
@@ -79,6 +78,7 @@ export async function emitReachableGatewayAuthDiagnostic(params: {
   }
   let rateLimited = directRateLimit;
   if (!directRateLimit) {
+    const { probeGatewayStatus } = await import("../cli/daemon-cli/probe.js");
     const details = await buildGatewayProbeConnectionDetails({
       config: params.config,
       token: params.token,

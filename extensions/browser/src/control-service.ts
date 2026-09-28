@@ -14,6 +14,7 @@ import {
   getExtensionRelayModule,
   getGatewayExtensionRelayModule,
 } from "./browser/extension-relay.runtime.js";
+import { ensureExtensionRelayToken } from "./browser/extension-relay/relay-auth.js";
 import { stopBrowserScreencasts } from "./browser/screencast/session.js";
 import type { BrowserServerState } from "./browser/server-context.js";
 import { resolveBrowserPluginEnableState } from "./plugin-enabled.js";
@@ -51,7 +52,6 @@ async function startBrowserControlServiceUnlocked(): Promise<BrowserServerState 
     (profile) => profile.driver === "extension",
   );
   if (hasExtensionProfiles) {
-    const { ensureExtensionRelayToken } = await import("./browser/extension-relay/relay-auth.js");
     await ensureExtensionRelayToken();
   }
 

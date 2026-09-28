@@ -6,7 +6,6 @@ import { resolveCommandConversationResolution } from "../channels/conversation-r
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { ADMIN_SCOPE, isOperatorScope } from "../gateway/operator-scopes.js";
 import { logVerbose } from "../globals.js";
-import { withPluginCommandExecution } from "./command-execution-lock.js";
 import { isReservedCommandName } from "./command-registration.js";
 import {
   canExposeSenderIsOwner,
@@ -20,6 +19,7 @@ import {
 } from "./conversation-binding.js";
 import { pluginCommandSupportsChannel } from "./plugin-command-metadata.js";
 import type { PluginCommandDispatchContext } from "./plugin-command-runtime.js";
+import { withPluginCommandExecution } from "./registry-lifecycle.js";
 import type { PluginRegistry } from "./registry-types.js";
 import type { PluginCommandContext, PluginCommandResult } from "./types.js";
 

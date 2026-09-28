@@ -29,6 +29,7 @@ import type {
   OpenClawAgentDatabase,
   OpenClawAgentDatabaseOptions,
   OpenClawAgentDatabaseOwnerInspection,
+  OpenClawAgentDatabaseWorkerLeaseReceipt,
 } from "./openclaw-agent-db-contract.js";
 import {
   readOpenClawAgentDatabaseIdentity,
@@ -38,7 +39,6 @@ import {
 import {
   readOpenClawAgentDatabaseWorkerLeaseReceiptFromClaim,
   releaseOpenClawAgentDatabaseLease,
-  type OpenClawAgentDatabaseWorkerLeaseReceipt,
 } from "./openclaw-agent-db-lease.js";
 import {
   drainAgentDatabaseResources,

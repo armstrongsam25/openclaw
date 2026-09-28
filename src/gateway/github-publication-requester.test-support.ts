@@ -276,16 +276,17 @@ export async function prepareVisitorPublicationFixture(f: {
     { startPluginServices },
     {
       captureActivePluginRegistrySnapshot,
-      clearActivePluginRegistry,
       restoreActivePluginRegistrySnapshot,
       stageActivePluginRegistry,
       rollbackStagedPluginRegistry,
     },
+    { clearActivePluginRegistry },
     { createEmptyPluginRegistry },
   ] = await Promise.all([
     import("../plugins/loader.js"),
     import("../plugins/services.js"),
     import("../plugins/runtime.js"),
+    import("../plugins/runtime.test-support.js"),
     import("../plugins/registry-empty.js"),
   ]);
   const config: OpenClawConfig = {

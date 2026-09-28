@@ -10,6 +10,7 @@ import {
   readCurrentBrowserState,
   type BrowserSessionTabAuthority,
 } from "../browser-runtime-state.js";
+import { browserCloseTabByRawTargetId } from "./client.js";
 import {
   type CleanupKind,
   type CloseParams,
@@ -28,7 +29,6 @@ import {
 import {
   readBrowserDashboardStopIntents,
   withBrowserSessionTabOperation,
-  type BrowserSessionTabRecord,
 } from "./session-tab-store.js";
 import {
   selectStaleTrackedTabs,
@@ -79,8 +79,8 @@ async function performVolatileCleanup(
       return 0;
     }
     params.authority?.assertCurrent?.();
-    const current = resolveCurrent();
-    if (!current) {
+    const tab = resolveCurrent();
+    if (!tab) {
       return 0;
     }
     const existing = inFlight.get(targetKey);
@@ -97,18 +97,9 @@ async function performVolatileCleanup(
     // Completion retires only the acquired registrations.
     const owner = { registrations: volatileRegistrationsForTarget(targetKey), promise: cleanup };
     const performClose = async () => {
-      let tab = current;
       let closeTab = params.closeTab;
       try {
         if (!closeTab && tab.route.kind === "browser-control") {
-          const { browserCloseTabByRawTargetId } = await import("./client.js");
-          const latest = resolveCurrent();
-          if (!latest) {
-            // No dispatch occurred: a lifecycle joiner may retry a touched sweep.
-            owner.registrations = [];
-            return 0;
-          }
-          tab = latest;
           closeTab = ({ baseUrl, targetId, profile }) =>
             browserCloseTabByRawTargetId(baseUrl, targetId, { profile });
         }
@@ -163,7 +154,7 @@ async function performVolatileCleanup(
   }
 }
 
-async function closeTrackedTabs(
+export async function closeTrackedTabs(
   tabs: TrackedTab[],
   params: CloseParams & { cleanupKind: CleanupKind; now?: number },
 ): Promise<number> {
@@ -320,24 +311,4 @@ export async function sweepTrackedBrowserTabs(
       ))
     );
   });
-}
-
-/** Browser dashboard lifetime changes reuse fingerprinted cleanup and its claim owner. */
-export async function closeBrowserDashboardTabs(
-  tabs: Array<BrowserSessionTabRecord & { storageKey: string }>,
-  params: CloseParams = {},
-): Promise<number> {
-  return await closeTrackedTabs(
-    tabs.map((tab) => ({ ...tab, kind: "durable" as const })),
-    {
-      ...params,
-      getResolvedBrowserConfig:
-        params.getResolvedBrowserConfig ??
-        (async () => {
-          const { getBrowserControlState } = await import("../browser-control-state.js");
-          return getBrowserControlState()?.resolved ?? null;
-        }),
-      cleanupKind: "lifecycle",
-    },
-  );
 }

@@ -11,7 +11,8 @@ import type { HealthSummary } from "../gateway/health/types.js";
 import { getHealthCache } from "../gateway/server/health-state.js";
 import { createSqliteAuditRecordStore } from "../infra/sqlite-audit-record-store.js";
 import { getUpdateAvailable, type UpdateAvailable } from "../infra/update-status-state.js";
-import { formatSystemAgentStartupMessage, type SystemAgentOverview } from "./overview.js";
+import { formatSystemAgentStartupMessage } from "./overview-format.js";
+import type { SystemAgentOverview } from "./overview.js";
 
 const SYSTEM_AGENT_GREETING_SCOPE = "system-agent-greeting";
 const SYSTEM_AGENT_GREETING_KEY = "latest";

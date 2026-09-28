@@ -64,8 +64,10 @@ vi.mock("../../infra/update-run-reader.js", () => ({
 vi.mock("../../infra/restart-sentinel.js", () => ({
   readRestartSentinelReadOnly: mocks.readRestartSentinelReadOnly,
 }));
-vi.mock("../../plugins/status.js", () => ({
+vi.mock("../../plugins/status-compatibility.js", () => ({
   buildPluginCompatibilityNotices: () => [],
+}));
+vi.mock("../../plugins/status.js", () => ({
   withPluginDiagnosticsReport: async <T>(
     _params: unknown,
     consume: (report: object) => T | Promise<T>,

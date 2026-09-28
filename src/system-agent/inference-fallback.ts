@@ -9,10 +9,9 @@ import {
   resolveSystemAgentConfiguredRouteFromConfig,
   type SystemAgentConfiguredRoute,
 } from "./inference-route.js";
-import {
-  verifySetupInference,
-  type BoundVerifySetupInferenceResult,
-  type VerifySetupInferenceResult,
+import type {
+  BoundVerifySetupInferenceResult,
+  VerifySetupInferenceResult,
 } from "./setup-inference.js";
 
 const RETRYABLE_INFERENCE_STATUSES = new Set([
@@ -129,7 +128,6 @@ export async function verifySystemAgentInferenceWithFallback(
       ).flat()
     : orderedOwners;
   const hasAuth = deps.hasAuth ?? hasAvailableAuthForProvider;
-  const verify = deps.verify ?? verifySetupInference;
   let lastFailure: Extract<VerifySetupInferenceResult, { ok: false }> | undefined;
   const failedProviders = new Set<string>();
   const attemptedOwners = new Set<string>();
@@ -173,6 +171,7 @@ export async function verifySystemAgentInferenceWithFallback(
       }
       lastFailure = result;
     } else {
+      const verify = deps.verify ?? (await import("./setup-inference.js")).verifySetupInference;
       const result = await verify({
         runtime: params.runtime,
         bindSession: true,

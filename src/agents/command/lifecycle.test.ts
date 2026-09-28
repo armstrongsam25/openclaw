@@ -1,22 +1,30 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { attachErrorDiagnostic } from "../../infra/error-diagnostics.js";
 import { buildAgentRunTerminalOutcome } from "../agent-run-terminal-outcome.js";
 import { createCliTimeoutError } from "../cli-runner/no-output-timeout-policy.js";
-import { FailoverError } from "../failover-error.js";
+import { FailoverError } from "../failover/error.js";
 import { renderFailoverCodeUserCopy } from "../failover/user-copy.js";
 import { createAgentCommandLifecycle } from "./lifecycle.js";
 
-const { emitAgentEvent, lifecycleLog } = vi.hoisted(() => ({
-  emitAgentEvent: vi.fn(),
-  lifecycleLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-}));
+const { classifyProviderFailoverSignalWithPlugin, emitAgentEvent, lifecycleLog } = vi.hoisted(
+  () => ({
+    classifyProviderFailoverSignalWithPlugin: vi.fn(() => {
+      throw new Error("Terminal presentation must not discover providers");
+    }),
+    emitAgentEvent: vi.fn(),
+    lifecycleLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  }),
+);
 
 vi.mock("../../infra/agent-events.js", () => ({ emitAgentEvent }));
+vi.mock("../../plugins/provider-failover.js", () => ({ classifyProviderFailoverSignalWithPlugin }));
 vi.mock("../../logging/subsystem.js", () => ({
   createSubsystemLogger: () => lifecycleLog,
 }));
+
+afterEach(() => expect(classifyProviderFailoverSignalWithPlugin).not.toHaveBeenCalled());
 
 function createLifecycle(runId: string) {
   return createAgentCommandLifecycle({

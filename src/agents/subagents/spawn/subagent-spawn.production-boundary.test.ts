@@ -45,7 +45,7 @@ import {
   createAdmittedGatewayToolCallerIdentity,
   withGatewayToolCallerIdentity,
 } from "../../tools/gateway-caller-context.js";
-import { callInProcessGatewayTool } from "../../tools/in-process-gateway.js";
+import { callInProcessGatewayTool } from "../../tools/gateway.js";
 import { runSubagentAnnounceFlow } from "../announce/subagent-announce.js";
 import { subagentRuns } from "../registry/subagent-registry-memory.js";
 import { observeRootWork } from "../registry/subagent-registry.browser-cleanup.test-support.js";
@@ -143,6 +143,7 @@ async function writeTestConfig() {
 }
 
 beforeEach(async () => {
+  settleRootWork = observeRootWork();
   state = await createOpenClawTestState({ label: "spawn-production-boundary" });
   await resetPreparedModelRuntimeHarness(state);
   runEmbeddedAgent.mockReset();
@@ -184,7 +185,6 @@ beforeEach(async () => {
       return { status: "pending" } as T;
     },
   );
-  settleRootWork = observeRootWork();
 });
 
 afterEach(async ({ task }) => {

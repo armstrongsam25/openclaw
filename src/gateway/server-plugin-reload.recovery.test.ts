@@ -9,7 +9,8 @@ import type { PluginHookGatewayContext } from "../plugins/hook-gateway.types.js"
 import { getPluginInstance } from "../plugins/plugin-instance-scope.js";
 import { clearPluginMetadataLifecycleCaches } from "../plugins/plugin-metadata-lifecycle.js";
 import { createPluginMetadataSnapshotFixture } from "../plugins/plugin-metadata.test-support.js";
-import { clearActivePluginRegistry, resetPluginRuntimeStateForTest } from "../plugins/runtime.js";
+import { resetPluginRuntimeStateForTest } from "../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../plugins/runtime.test-support.js";
 import { withPluginRuntimeRegistryScope } from "../plugins/runtime/gateway-request-scope.js";
 import { cleanupTrackedTempDirs, makeTrackedTempDir } from "../plugins/test-helpers/fs-fixtures.js";
 import type { OpenClawPluginApi, OpenClawPluginServiceContext } from "../plugins/types.js";

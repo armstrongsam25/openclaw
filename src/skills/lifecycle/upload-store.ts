@@ -12,6 +12,7 @@ import { resolvePreferredOpenClawTmpDir } from "../../infra/tmp-openclaw-dir.js"
 import { KeyedAsyncQueue } from "../../plugin-sdk/keyed-async-queue.js";
 import type { OpenClawStateDatabaseOptions } from "../../state/openclaw-state-db.js";
 import { captureOpenClawStateWorkerContext } from "../../state/openclaw-state-worker-context.js";
+import { runOpenClawStateWorkerOperation } from "../../state/openclaw-state-worker-store.js";
 import { validateRequestedSkillSlug } from "./install-paths.js";
 import { SkillUploadRequestError } from "./upload-store-error.js";
 import {
@@ -198,8 +199,6 @@ function createSkillUploadStore(options?: SkillUploadStoreOptions) {
       const context = captureOpenClawStateWorkerContext(stateOptions);
       const root = context.admission.databasePath;
       return await uploads.enqueue(`${root}:begin`, async () => {
-        const { runOpenClawStateWorkerOperation } =
-          await import("../../state/openclaw-state-worker-store.js");
         return runOpenClawStateWorkerOperation(
           context,
           async (scope) => {
@@ -237,8 +236,6 @@ function createSkillUploadStore(options?: SkillUploadStoreOptions) {
       const decoded = decodeBase64Chunk(params.dataBase64);
       const context = captureOpenClawStateWorkerContext(stateOptions);
       const root = context.admission.databasePath;
-      const { runOpenClawStateWorkerOperation } =
-        await import("../../state/openclaw-state-worker-store.js");
       return runOpenClawStateWorkerOperation(
         context,
         async (scope) => {
@@ -261,8 +258,6 @@ function createSkillUploadStore(options?: SkillUploadStoreOptions) {
       return await uploads.enqueue(
         `${context.admission.databasePath}:upload:${uploadId}`,
         async () => {
-          const { runOpenClawStateWorkerOperation } =
-            await import("../../state/openclaw-state-worker-store.js");
           const result = await runOpenClawStateWorkerOperation(
             context,
             (scope) =>
@@ -285,8 +280,6 @@ function createSkillUploadStore(options?: SkillUploadStoreOptions) {
       const uploadId = validateUploadId(uploadIdRaw);
       const context = captureOpenClawStateWorkerContext(stateOptions);
       return uploads.enqueue(`${context.admission.databasePath}:upload:${uploadId}`, async () => {
-        const { runOpenClawStateWorkerOperation } =
-          await import("../../state/openclaw-state-worker-store.js");
         const { withSkillUploadInstallOwner } = await import("./upload-store-install-owner.js");
         const owner = randomUUID();
         return withSkillUploadInstallOwner(context, { uploadId, owner }, (claimStarted) =>

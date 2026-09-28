@@ -6,6 +6,7 @@ import {
   retryMainSessionRecoveryMutation,
   scheduleMainSessionRecoveryMutation,
 } from "./main-session-recovery-lifecycle.js";
+import { scheduleMainSessionRecoveryPendingTarget } from "./main-session-recovery-owner-release.js";
 import {
   isMainRestartRecoveryCandidate,
   isMainSessionRecoveryPending,
@@ -15,12 +16,10 @@ import {
   type MainSessionRecoveryReservation,
   type MainSessionRecoveryTransitionResult,
 } from "./main-session-recovery-state.js";
-
-export type MainSessionRecoveryStoreTarget = {
-  agentId?: string;
-  sessionKey: string;
-  storePath: string;
-};
+import type {
+  MainSessionRecoveryPendingTarget,
+  MainSessionRecoveryStoreTarget,
+} from "./main-session-recovery-types.js";
 
 export type MainSessionRecoveryOwnerLease = MainSessionRecoveryOwnerClaim &
   MainSessionRecoveryStoreTarget;
@@ -29,11 +28,6 @@ type MainSessionRecoveryStoreResult = {
   entry?: SessionEntry;
   sessionKey?: string;
   transition: MainSessionRecoveryTransitionResult;
-};
-
-export type MainSessionRecoveryPendingTarget = MainSessionRecoveryStoreTarget & {
-  sessionId: string;
-  stateDir?: string;
 };
 
 function matchesReservation(entry: SessionEntry, reservation: MainSessionRecoveryReservation) {
@@ -339,13 +333,7 @@ export async function releaseMainSessionRecoveryOwner(
     // Exact-token cleanup survives transient writer outages without blocking its caller.
     scheduleMainSessionRecoveryMutation({
       mutation: () => releaseMainSessionRecoveryOwnerWithRetries(lease),
-      onSuccess: async (pending) => {
-        if (pending) {
-          const { scheduleMainSessionRecoveryPendingTarget } =
-            await import("./main-session-recovery-owner-release.js");
-          scheduleMainSessionRecoveryPendingTarget(pending);
-        }
-      },
+      onSuccess: scheduleMainSessionRecoveryPendingTarget,
     });
     throw error;
   }

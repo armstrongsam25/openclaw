@@ -1,7 +1,7 @@
 import { readActiveTranscriptEntryIdentityInSnapshot } from "./session-accessor.sqlite-active-events.js";
 import { withCurrentProjectionSnapshot } from "./session-accessor.sqlite-active-projection.js";
+import type { ResolvedTranscriptReadScope } from "./session-accessor.sqlite-contract.js";
 import { readTranscriptEventAtSeqInTransaction } from "./session-accessor.sqlite-read.js";
-import type { ResolvedTranscriptReadScope } from "./session-accessor.sqlite-scope.js";
 import { readActiveTranscriptEntryAnchorInTransaction } from "./session-accessor.sqlite-transcript-anchor.js";
 import { readTranscriptContextVersionInTransaction } from "./session-accessor.sqlite-transcript-state.js";
 import type { SessionTranscriptRuntimeTarget } from "./session-accessor.types.js";

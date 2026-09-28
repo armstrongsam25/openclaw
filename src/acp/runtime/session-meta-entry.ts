@@ -1,12 +1,10 @@
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
+import type { ResolvedSqliteScope } from "../../config/sessions/session-accessor.sqlite-contract.js";
 import { retainSessionEntryWorkerPublication } from "../../config/sessions/session-accessor.sqlite-entry-cache.js";
 import { publishCommittedSessionIdentity } from "../../config/sessions/session-accessor.sqlite-identity.js";
 import { kickSessionEntryMaintenanceAfterWrite } from "../../config/sessions/session-accessor.sqlite-maintenance-kick.js";
 import { withSessionEntryWorker } from "../../config/sessions/session-accessor.sqlite-replacement-worker.js";
-import {
-  resolveSqliteTranscriptArchiveDirectory,
-  type ResolvedSqliteScope,
-} from "../../config/sessions/session-accessor.sqlite-scope.js";
+import { resolveSqliteTranscriptArchiveDirectory } from "../../config/sessions/session-accessor.sqlite-scope.js";
 import type { SessionEntryReadWorkerOwner } from "../../config/sessions/session-entry-read-runtime.js";
 import { kickSessionHistoryDiskBudgetMaintenance } from "../../config/sessions/session-history-eviction.js";
 import type { ResolvedSessionMaintenanceConfig } from "../../config/sessions/store-maintenance.js";

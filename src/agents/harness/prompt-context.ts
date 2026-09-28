@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { SessionModelContextLimits } from "../../config/sessions/session-accessor.sqlite-model-context.js";
+import type { SessionModelContextLimits } from "../../config/sessions/session-accessor.sqlite-contract.js";
 import type { OpenClawConfig } from "../../config/types.js";
 import { resolveAgentWorkspaceDir } from "../agent-scope-config.js";
 import type { AgentHarnessAttemptParamsV2 } from "./types.js";

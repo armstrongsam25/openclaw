@@ -5,7 +5,7 @@ import path from "node:path";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { hasErrnoCode } from "../infra/errno.js";
 import { walkDirectory } from "../infra/fs-safe.js";
-import { removeTemporaryArtifacts } from "../infra/temp-artifact-cleanup.js";
+import { removeTemporaryArtifacts } from "../infra/temp-artifact-removal.js";
 import { resolveInstalledPluginIndexStateDatabaseOptions } from "./installed-plugin-index-store-path.js";
 import { parseInstalledPluginIndex } from "./installed-plugin-index-store.js";
 import { readPluginMetadataStateRow } from "./plugin-metadata-state-worker.js";

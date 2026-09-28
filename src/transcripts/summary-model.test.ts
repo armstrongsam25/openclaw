@@ -12,7 +12,7 @@ const { runIsolatedCompletion, resolveSimpleCompletionSelectionForAgent } = vi.h
 vi.mock("../agents/isolated-completion.js", () => ({
   runIsolatedCompletion,
 }));
-vi.mock("../agents/simple-completion-runtime.js", () => ({
+vi.mock("../agents/simple-completion-selection.js", () => ({
   resolveSimpleCompletionSelectionForAgent,
 }));
 

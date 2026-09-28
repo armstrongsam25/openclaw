@@ -13,6 +13,7 @@ import {
 } from "./openclaw-state-lease-worker-owner.js";
 import { runWithOpenClawStateLeasesWorker } from "./openclaw-state-lease-worker-storage.js";
 import type { OpenClawStateWorkerContext } from "./openclaw-state-worker-context.types.js";
+import type { DomainScope } from "./openclaw-state-worker-store.types.js";
 
 const runWorkerOperation = vi.hoisted(() => vi.fn());
 vi.mock("./openclaw-state-worker-store.js", () => ({
@@ -117,25 +118,51 @@ describe("state lease group admission", () => {
   });
 
   it.each(["admission", "environment-values"] as const)(
-    "refuses %s replacement during the bridge's first await",
+    "refuses %s replacement while the admitted worker is preparing",
     async (kind) => {
       const context = sourceContext();
       const members = [fixture(context), fixture(context, "target")];
       const operation = vi.fn(async () => {});
+      const workerStarted = createDeferredCore();
+      const workerReady = createDeferredCore();
+      const execute = vi.fn(async () => {
+        throw new Error("Replaced source must not execute a worker command");
+      });
+      runWorkerOperation.mockImplementationOnce(
+        async (
+          _context: OpenClawStateWorkerContext,
+          run: (scope: DomainScope) => Promise<void>,
+          options: { assertCurrent: () => void },
+        ) => {
+          workerStarted.resolve();
+          await workerReady.promise;
+          options.assertCurrent();
+          return run({ execute });
+        },
+      );
       const pending = runWithOpenClawStateLeasesWorker(
         members.map(({ lease }) => lease),
         context,
         operation,
       );
-      if (kind === "admission") {
-        context.admission = { ...context.admission };
-      } else {
-        context.environment.OPENCLAW_STATE_DIR = "/unrelated-state";
+      try {
+        await workerStarted.promise;
+        expect(members.every(({ owner }) => !owner.canRelease())).toBe(true);
+        if (kind === "admission") {
+          context.admission = { ...context.admission };
+        } else {
+          context.environment.OPENCLAW_STATE_DIR = "/unrelated-state";
+        }
+        workerReady.resolve();
+        await expect(pending).rejects.toThrow("source binding was replaced");
+        expect(runWorkerOperation).toHaveBeenCalledOnce();
+        expect(operation).not.toHaveBeenCalled();
+        expect(execute).not.toHaveBeenCalled();
+        expect(members.every(({ owner }) => owner.canRelease())).toBe(true);
+      } finally {
+        workerReady.resolve();
+        await Promise.allSettled([pending]);
       }
-      await expect(pending).rejects.toThrow("source binding was replaced");
-      expect(runWorkerOperation).not.toHaveBeenCalled();
-      expect(operation).not.toHaveBeenCalled();
-      expect(members.every(({ owner }) => owner.canRelease())).toBe(true);
     },
   );
 

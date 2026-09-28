@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 import type { OpenClawConfig } from "../../../config/types.openclaw.js";
 import type { AssistantMessage } from "../../../llm/types.js";
-import type { PreparedProviderFailoverOwner } from "../../failover/provider-patterns.js";
+import type { PreparedProviderFailoverOwner } from "../../failover/signal.js";
 import {
   buildEmbeddedRunnerAssistant,
   createMockUsage,

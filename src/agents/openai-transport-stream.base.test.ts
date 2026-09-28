@@ -508,7 +508,7 @@ describe("openai transport stream", () => {
         });
       process.env.AZURE_OPENAI_API_VERSION = "preview";
       try {
-        const stream = await createAzureOpenAIResponsesTransportStreamFn()(
+        const stream = createAzureOpenAIResponsesTransportStreamFn()(
           model,
           {
             messages: [{ role: "user", content: "hello", timestamp: 1 }],

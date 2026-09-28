@@ -18,14 +18,16 @@ import {
 } from "./tts-runtime.test-support.js";
 
 type Completion =
-  typeof import("../agents/simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel;
+  typeof import("../agents/simple-completion-execution.js").completeWithPreparedSimpleCompletionModel;
 const completion = vi.hoisted(() => ({
   complete: vi.fn<Completion>(),
   prepare: vi.fn(),
 }));
 
-vi.mock("../agents/simple-completion-runtime.js", () => ({
+vi.mock("../agents/simple-completion-execution.js", () => ({
   completeWithPreparedSimpleCompletionModel: completion.complete,
+}));
+vi.mock("../agents/simple-completion-runtime.js", () => ({
   acquireSimpleCompletionModelWithSelection: completion.prepare,
 }));
 

@@ -135,18 +135,19 @@ vi.mock("../../agents/tools/scoped-session-access.js", () => ({
 
 vi.mock("../../agents/tools/in-process-gateway.js", () => ({
   callAgentToolGatewayRequest: (request: unknown) => sharedMocks.gatewayRequest(request),
-  callInProcessGatewayTool: (method: string, params: Record<string, unknown>) =>
-    sharedMocks.gatewayRequest({ method, params }),
+  withAgentToolGatewayRuntimeIdentity: (request: unknown, identity: unknown) => {
+    sharedMocks.gatewayRuntimeIdentity(request, identity);
+    return request;
+  },
+}));
+
+vi.mock("../../agents/tools/gateway.js", () => ({
   callInProcessGatewayToolWithCreation: (
     method: string,
     params: Record<string, unknown>,
     creation: unknown,
     options: unknown,
   ) => sharedMocks.gatewayCreate({ creation, method, options, params }),
-  withAgentToolGatewayRuntimeIdentity: (request: unknown, identity: unknown) => {
-    sharedMocks.gatewayRuntimeIdentity(request, identity);
-    return request;
-  },
 }));
 
 export const SOURCE = {

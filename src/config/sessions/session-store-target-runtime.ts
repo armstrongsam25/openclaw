@@ -7,7 +7,7 @@ import { assertSessionStoreReadCandidate } from "./session-store-read-candidates
 import type {
   SessionStoreTargetReadRequest,
   SessionStoreTargetReadResult,
-} from "./session-store-target-inventory.js";
+} from "./session-store-target.types.js";
 import {
   withSessionHistoryWorkerReadCandidates,
   type SessionHistoryWorkerLane,

@@ -8,7 +8,7 @@ import { resetPluginRuntimeStateForTest, setActivePluginRegistry } from "../plug
 import { loadBundledPluginFacade } from "../test-utils/bundled-plugin-public-surface.js";
 import { createTestRegistry } from "../test-utils/channel-plugins.js";
 import { createOpenClawTools } from "./openclaw-tools.js";
-import * as inProcessGateway from "./tools/in-process-gateway.js";
+import * as inProcessGateway from "./tools/gateway.js";
 
 type GatewayRequest = { method: string; params?: Record<string, unknown> };
 type OpenClawToolsOptions = NonNullable<Parameters<typeof createOpenClawTools>[0]>;

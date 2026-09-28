@@ -2,7 +2,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginAutoEnableResult } from "../../config/plugin-auto-enable.js";
 import { makeCatalogEntry, makeMeta } from "../../flows/channel-setup.test-helpers.js";
-import type { InstalledPluginIndex } from "../../plugins/installed-plugin-index.js";
 
 const listPluginContributionIds = vi.hoisted(() =>
   vi.fn((_index?: unknown, _contribution?: unknown, _options?: unknown): string[] => []),
@@ -43,9 +42,9 @@ vi.mock("../../secrets/channel-env-vars.js", () => ({
   getChannelEnvVars: () => [],
 }));
 
-import { listManifestInstalledChannelIds, resolveChannelSetupEntries } from "./discovery.js";
+import { isCatalogChannelInstalled, resolveChannelSetupEntries } from "./discovery.js";
 
-describe("listManifestInstalledChannelIds", () => {
+describe("channel setup discovery", () => {
   beforeEach(() => {
     listPluginContributionIds.mockReset().mockReturnValue([]);
     listChannelPluginCatalogEntries.mockReset().mockReturnValue([]);
@@ -57,18 +56,7 @@ describe("listManifestInstalledChannelIds", () => {
     }));
   });
 
-  it.each([false, true])("uses the auto-enabled config with a provided index: %s", (provided) => {
-    const index: InstalledPluginIndex = {
-      version: 1,
-      hostContractVersion: "test",
-      compatRegistryVersion: "test",
-      migrationVersion: 1,
-      policyHash: "test",
-      generatedAtMs: 0,
-      installRecords: {},
-      plugins: [],
-      diagnostics: [],
-    };
+  it("uses the auto-enabled config to identify installed catalog channels", () => {
     const autoEnabledConfig = {
       channels: { slack: { enabled: true } },
       plugins: { allow: ["slack"] },
@@ -83,11 +71,11 @@ describe("listManifestInstalledChannelIds", () => {
     });
     listPluginContributionIds.mockReturnValue(["slack"]);
 
-    const installedIds = listManifestInstalledChannelIds({
+    const installed = isCatalogChannelInstalled({
       cfg: {} as never,
+      entry: makeCatalogEntry("slack", "Slack"),
       workspaceDir: "/tmp/workspace",
       env: { OPENCLAW_HOME: "/tmp/home" } as NodeJS.ProcessEnv,
-      ...(provided ? { index } : {}),
     });
 
     expect(applyPluginAutoEnable).toHaveBeenCalledWith({
@@ -96,12 +84,11 @@ describe("listManifestInstalledChannelIds", () => {
     });
     expect(listPluginContributionIds).toHaveBeenCalledWith({
       contribution: "channels",
-      ...(provided ? { index } : {}),
       config: autoEnabledConfig,
       workspaceDir: "/tmp/workspace",
       env: { OPENCLAW_HOME: "/tmp/home" },
     });
-    expect(installedIds).toEqual(new Set(["slack"]));
+    expect(installed).toBe(true);
   });
 
   it("filters channels hidden from setup out of interactive entries", () => {

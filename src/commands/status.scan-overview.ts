@@ -5,6 +5,7 @@ import { measureCliCommandStartup } from "../cli/command-startup-timing.js";
 import type { BestEffortConfigSnapshot } from "../config/io.js";
 import type { OpenClawConfig } from "../config/types.js";
 import { resolveGatewayAuthTokenSourceConflict } from "../gateway/auth-token-source-conflict.js";
+import { callGateway } from "../gateway/call.js";
 import type { collectChannelStatusIssues as collectChannelStatusIssuesFn } from "../infra/channels-status-issues.js";
 import { resolveOsSummary } from "../infra/os-summary.js";
 import type { UpdateCheckResult } from "../infra/update-check.js";
@@ -35,7 +36,6 @@ const statusUpdateModuleLoader = createLazyImportLoader(() => import("./status.u
 const statusScanRuntimeModuleLoader = createLazyImportLoader(
   () => import("./status.scan.runtime.js"),
 );
-const gatewayCallModuleLoader = createLazyImportLoader(() => import("../gateway/call.js"));
 const statusSummaryModuleLoader = createLazyImportLoader(() => import("../status/summary.js"));
 const channelPluginIdsModuleLoader = createLazyImportLoader(
   () => import("../plugins/channel-plugin-ids.js"),
@@ -63,7 +63,6 @@ async function resolveStatusChannelsStatus(params: {
     // Avoid a second gateway call after probe failure; channel tables can still summarize local config.
     return null;
   }
-  const { callGateway } = await gatewayCallModuleLoader.load();
   const timeoutMs = resolveStatusGatewayProbeTimeoutMs(params.opts);
   if (timeoutMs === 0) {
     return null;
@@ -286,16 +285,14 @@ export async function collectStatusScanOverview(params: {
         ? await measureCliCommandStartup(
             "status.gateway-degradation",
             () =>
-              gatewayCallModuleLoader.load().then(({ callGateway }) =>
-                callGateway<StatusSummary>({
-                  config: cfg,
-                  configPath: snapshot.path,
-                  method: "status",
-                  params: { includeChannelSummary: false },
-                  timeoutMs: Math.min(5000, resolveStatusGatewayProbeTimeoutMs(params.opts)),
-                  ...gatewaySnapshot.gatewayCallOverrides,
-                }).catch(() => null),
-              ),
+              callGateway<StatusSummary>({
+                config: cfg,
+                configPath: snapshot.path,
+                method: "status",
+                params: { includeChannelSummary: false },
+                timeoutMs: Math.min(5000, resolveStatusGatewayProbeTimeoutMs(params.opts)),
+                ...gatewaySnapshot.gatewayCallOverrides,
+              }).catch(() => null),
             { config: cfg, env },
           )
         : null);

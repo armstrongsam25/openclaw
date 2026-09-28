@@ -2,7 +2,7 @@ import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../test/helpers/promise.js";
 import { useAutoCleanupTempDirTracker } from "../../../test/helpers/temp-dir.js";
-import { startHeartbeatRunner } from "../../infra/heartbeat-runner.js";
+import { startHeartbeatRunner } from "../../infra/heartbeat-runner-scheduler.js";
 import {
   requestHeartbeatAndWait,
   setHeartbeatWakeHandler,

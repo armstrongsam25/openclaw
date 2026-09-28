@@ -11,7 +11,7 @@ import {
   createAdmittedGatewayToolCallerIdentity,
   withGatewayToolCallerIdentity,
 } from "../../agents/tools/gateway-caller-context.js";
-import { callInProcessGatewayToolWithCreation } from "../../agents/tools/in-process-gateway.js";
+import { callInProcessGatewayToolWithCreation } from "../../agents/tools/gateway.js";
 import type { dispatchInboundMessage } from "../../auto-reply/dispatch.js";
 import { getRuntimeConfig } from "../../config/config.js";
 import {

@@ -46,11 +46,12 @@ import type {
 } from "./session-accessor.types.js";
 import { canonicalSessionKeyMigrationRequiredError } from "./session-canonical-key.js";
 import type { CapturedSessionEntryReadSource } from "./session-entry-read-source.types.js";
+import type { SessionStoreTarget } from "./session-store-target.types.js";
 import {
   normalizeStoreSessionKey,
   resolveSessionStoreEntryCore as resolveSessionEntryFromStore,
 } from "./store-entry.js";
-import { resolveAllAgentSessionStoreTargetsSync, type SessionStoreTarget } from "./targets.js";
+import { resolveAllAgentSessionStoreTargetsSync } from "./targets.js";
 import type { InternalSessionEntry as SessionEntry } from "./types.js";
 export { clearPluginOwnedSessionState } from "./plugin-host-cleanup.js";
 export {

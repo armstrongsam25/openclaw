@@ -11,7 +11,7 @@ import {
 import { getPluginInstance, type PluginInstanceHandle } from "../plugins/plugin-instance-scope.js";
 import { clearPluginMetadataLifecycleCaches } from "../plugins/plugin-metadata-lifecycle.js";
 import { getPluginRegistryInspectionResources } from "../plugins/registry-inspection-resources.js";
-import { clearActivePluginRegistry } from "../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../plugins/runtime.test-support.js";
 import { withPluginRuntimeRegistryScope } from "../plugins/runtime/gateway-request-scope.js";
 import { createColdPluginFixture } from "../plugins/test-helpers/cold-plugin-fixtures.js";
 import { withEnvAsync } from "../test-utils/env.js";

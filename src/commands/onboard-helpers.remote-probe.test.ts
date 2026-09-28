@@ -2,11 +2,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConnectErrorDetailCodes } from "../../packages/gateway-protocol/src/connect-error-details.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import {
-  probeGatewayConfiguredModel,
-  probeGatewayReachable,
-  waitForGatewayReachable,
-} from "./onboard-helpers.js";
+import { probeGatewayConfiguredModel } from "./onboard-gateway-model.runtime.js";
+import { probeGatewayReachable, waitForGatewayReachable } from "./onboard-helpers.js";
 
 const mocks = vi.hoisted(() => ({ probeGateway: vi.fn() }));
 

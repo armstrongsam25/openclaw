@@ -42,7 +42,10 @@ import type {
 import { PreparedModelRuntimePublicationSupersededError } from "./prepared-model-runtime.errors.js";
 import { fingerprintPreparedRuntimeFacts } from "./prepared-model-runtime.facts.js";
 import { markPreparedModelCatalogFull } from "./prepared-model-runtime.full-catalog.js";
-import { registerPreparedModelRuntimeClose } from "./prepared-model-runtime.lifecycle.js";
+import {
+  recoverPreparedModelCatalogBorrowers,
+  registerPreparedModelRuntimeClose,
+} from "./prepared-model-runtime.lifecycle.js";
 import { scopeSyntheticAuthProviderRefs } from "./prepared-model-runtime.synthetic-auth.js";
 import type { PreparedModelRuntimeInput } from "./prepared-model-runtime.types.js";
 import type { AuthStorageData } from "./sessions/auth-storage.js";
@@ -243,9 +246,7 @@ async function getGatewayCatalogPool(
           if (gatewayCatalog.current === current) {
             gatewayCatalog.current = undefined;
           }
-          const { recoverPreparedModelRuntimeCatalogWorker } =
-            await import("./prepared-model-runtime.js");
-          await recoverPreparedModelRuntimeCatalogWorker(borrowers);
+          await recoverPreparedModelCatalogBorrowers(borrowers);
         })()),
       close: async (error) => {
         signal.removeEventListener("abort", retire);

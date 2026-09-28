@@ -12,7 +12,7 @@ import {
   runWithCronCreatorAuthorityCapability,
 } from "../../agents/cron-creator-authority-context.js";
 import { isTimeoutError } from "../../agents/failover-error.js";
-import type { MainSessionRecoveryPendingTarget } from "../../agents/main-session-recovery/main-session-recovery-store.js";
+import type { MainSessionRecoveryPendingTarget } from "../../agents/main-session-recovery/main-session-recovery-types.js";
 import { runWithCanonicalSkillWorkspace } from "../../agents/skill-workshop-workspace-context.js";
 import type {
   FollowupCompletionOwner,

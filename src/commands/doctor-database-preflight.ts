@@ -1,4 +1,6 @@
 import path from "node:path";
+import { listAgentIds, resolveAgentDir } from "../agents/agent-scope-config.js";
+import { resolveConfiguredAgentDatabaseCandidatePaths } from "../config/sessions/targets-configured-agents.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { PreparedAgentDatabaseMigrationDiscovery } from "../infra/state-migrations.media-persistence-targets.js";
 import { DoctorUnreadableStateDatabaseError } from "../infra/state-repair-message.js";
@@ -16,15 +18,8 @@ export async function prepareDoctorDatabasePreflight(
 ): Promise<DoctorDatabasePreflight> {
   const { scope } = options;
   const databasePreflight = await import("../state/openclaw-database-preflight.js");
-  const [
-    { createConfigIO },
-    targets,
-    { listAgentIds, resolveAgentDir },
-    { openDoctorStateSchemaReadAdmission },
-  ] = await Promise.all([
+  const [{ createConfigIO }, { openDoctorStateSchemaReadAdmission }] = await Promise.all([
     import("../config/io.js"),
-    import("../config/sessions/targets.js"),
-    import("../agents/agent-scope-config.js"),
     import("../state/openclaw-state-db-doctor-schema.js"),
   ]);
   const snapshot =
@@ -50,8 +45,9 @@ export async function prepareDoctorDatabasePreflight(
             agentId,
             path: path.join(resolveAgentDir(cfg, agentId), "openclaw-agent.sqlite"),
           })),
-          configuredAgentDatabaseCandidatePaths:
-            targets.resolveConfiguredAgentDatabaseCandidatePaths(cfg, { env: process.env }),
+          configuredAgentDatabaseCandidatePaths: resolveConfiguredAgentDatabaseCandidatePaths(cfg, {
+            env: process.env,
+          }),
           agentAdmissionConfig: cfg,
           onAgentDatabaseDiscovery: (prepared: PreparedAgentDatabaseMigrationDiscovery) => {
             agentDatabaseMigrationDiscovery = prepared;

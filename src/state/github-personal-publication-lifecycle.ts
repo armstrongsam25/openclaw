@@ -21,6 +21,7 @@ import {
   type OpenClawStateDatabase,
 } from "./openclaw-state-db.js";
 import { captureOpenClawStateWorkerContext } from "./openclaw-state-worker-context.js";
+import { runOpenClawStateWorkerOperation } from "./openclaw-state-worker-store.js";
 
 /** Capture historical receipts while the session still owns its logical keys. */
 export async function preparePersonalGitHubSessionReceiptDeletion(params: {
@@ -38,7 +39,6 @@ export async function preparePersonalGitHubSessionReceiptDeletion(params: {
     agentId: params.agentId,
     sessionKeys: [...new Set(generations.map((generation) => generation.sessionKey))],
   };
-  const { runOpenClawStateWorkerOperation } = await import("./openclaw-state-worker-store.js");
   const receipts = (await runOpenClawStateWorkerOperation(
     context,
     (scope) => scope.execute({ type: "githubPublication.prepareSessionReceiptDeletion", input }),

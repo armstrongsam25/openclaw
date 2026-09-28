@@ -18,6 +18,7 @@ import {
   type ServiceDefinitionDrift,
 } from "../../daemon/service-audit.js";
 import { resolveGatewayService } from "../../daemon/service.js";
+import { callGateway } from "../../gateway/call.js";
 import {
   formatDeferredPluginMigration,
   readDeferredPluginMigrations,
@@ -74,10 +75,7 @@ async function readChannelStatusIssues(
   timeoutMs = 5_000,
 ): Promise<ChannelStatusIssue[]> {
   try {
-    const [{ callGateway }, { collectChannelStatusIssues }] = await Promise.all([
-      import("../../gateway/call.js"),
-      import("../../infra/channels-status-issues.js"),
-    ]);
+    const { collectChannelStatusIssues } = await import("../../infra/channels-status-issues.js");
     const payload = await callGateway({
       method: "channels.status",
       params: { probe: false, timeoutMs },

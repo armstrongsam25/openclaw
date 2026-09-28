@@ -1,11 +1,11 @@
 import { readSessionGroupCatalogEntry } from "../../gateway/session-group-catalog.kernel.js";
 import type { OpenClawAgentDatabase } from "../../state/openclaw-agent-db.js";
 import { withExistingOpenClawStateDatabaseReadOnly } from "../../state/openclaw-state-db-readonly.js";
+import type { ResolvedSessionEntryRow } from "./session-accessor.sqlite-entry-cache.types.js";
 import { sqliteSessionEntriesEqual } from "./session-accessor.sqlite-entry-equality.js";
 import {
   prepareExactSessionEntryRowReads,
   readExactSessionEntryRow,
-  type ResolvedSessionEntryRow,
 } from "./session-accessor.sqlite-entry-read.js";
 import { writeSessionEntry } from "./session-accessor.sqlite-entry-store.js";
 import { readSessionGroupCategoryKeys } from "./session-group-categories.read.js";

@@ -15,10 +15,10 @@ import {
   installManagedGitHubProfile,
   preparePersonalGitHubPublicationIdentity,
   refreshManagedGitHubProfile,
-  removeManagedGitHubProfile,
   resolveManagedGitHubProfileDir,
   resolveManagedGitHubProfileRoot,
 } from "../agents/github-tool-identity.js";
+import { removeManagedGitHubProfile } from "../agents/github-tool-profile.js";
 import { hasErrnoCode } from "../infra/errno.js";
 import { getOrCreatePromise } from "../shared/lazy-promise.js";
 import { withOpenClawStateLease } from "../state/openclaw-state-lease.js";

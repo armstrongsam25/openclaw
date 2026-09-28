@@ -29,7 +29,7 @@ import {
 import { buildOnboardingWelcome } from "./onboarding-welcome.js";
 import { loadOverviewForOperation } from "./operations-execution-helpers.js";
 import { executeSystemAgentOperation, type SystemAgentOperation } from "./operations.js";
-import { formatSystemAgentStartupMessage } from "./overview.js";
+import { formatSystemAgentStartupMessage } from "./overview-format.js";
 import { resolveSystemAgentVerifiedInferenceState } from "./verified-inference.js";
 
 type RunTui = typeof import("../tui/tui.js").runTui;

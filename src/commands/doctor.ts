@@ -1,4 +1,5 @@
 import { exitCliAfterOutput } from "../cli/one-shot-exit.js";
+import { resolveSessionStoreTargets } from "../config/sessions/targets.js";
 import { LEGACY_IMPLICIT_AGENT_ID, normalizeAgentId } from "../routing/session-key.js";
 import { defaultRuntime, type RuntimeEnv, writeRuntimeJson } from "../runtime.js";
 import type { DoctorDatabasePreflight } from "./doctor-database-preflight.js";
@@ -14,15 +15,11 @@ async function resolveExplicitSessionSqliteMaintenancePaths(
   if (!options.sessionSqliteStore) {
     return [];
   }
-  const [
-    { resolveSessionStoreTargets },
-    { resolveSqliteTargetFromSessionStorePath },
-    { resolveSqliteDatabaseFilePaths },
-  ] = await Promise.all([
-    import("../config/sessions/targets.js"),
-    import("../config/sessions/session-sqlite-target.js"),
-    import("../infra/sqlite-files.js"),
-  ]);
+  const [{ resolveSqliteTargetFromSessionStorePath }, { resolveSqliteDatabaseFilePaths }] =
+    await Promise.all([
+      import("../config/sessions/session-sqlite-target.js"),
+      import("../infra/sqlite-files.js"),
+    ]);
   const requestedAgentId = normalizeAgentId(options.sessionSqliteAgent ?? LEGACY_IMPLICIT_AGENT_ID);
   // Explicit path mode intentionally bypasses runtime config. Resolve through
   // the same selector as the migration so ownership checks cover exact targets.

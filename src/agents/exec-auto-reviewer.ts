@@ -24,10 +24,8 @@ import {
   DEFAULT_EXEC_REVIEWER_SYSTEM_PROMPT,
   DEFAULT_WIDGET_REVIEWER_SYSTEM_PROMPT,
 } from "./exec-auto-reviewer.prompt.js";
-import {
-  acquireSimpleCompletionModelForAgent,
-  completeWithPreparedSimpleCompletionModel,
-} from "./simple-completion-runtime.js";
+import { completeWithPreparedSimpleCompletionModel } from "./simple-completion-execution.js";
+import type { acquireSimpleCompletionModelForAgent } from "./simple-completion-runtime.js";
 import { coerceToolModelConfig } from "./tools/model-config.helpers.js";
 
 const DEFAULT_EXEC_REVIEWER_TIMEOUT_MS = 30_000;
@@ -382,8 +380,7 @@ export function createModelExecAutoReviewer(params: {
         : defaultExecAutoReviewer(input);
   }
   const agentId = params.agentId ?? resolveAmbientOwnerAgentId(cfg);
-  const prepareModel =
-    params.deps?.acquireSimpleCompletionModelForAgent ?? acquireSimpleCompletionModelForAgent;
+  const prepareModel = params.deps?.acquireSimpleCompletionModelForAgent;
   const complete =
     params.deps?.completeWithPreparedSimpleCompletionModel ??
     completeWithPreparedSimpleCompletionModel;
@@ -425,24 +422,29 @@ export function createModelExecAutoReviewer(params: {
       const signal = params.signal
         ? AbortSignal.any([completionController.signal, params.signal])
         : completionController.signal;
-      const preparedResult = createDeferredCore<Awaited<ReturnType<typeof prepareModel>>>();
+      const preparedResult =
+        createDeferredCore<Awaited<ReturnType<typeof acquireSimpleCompletionModelForAgent>>>();
       const finished = createDeferredCore();
       callerFinished = finished;
       const work = new AsyncWorkScope();
       const trackOwner = captureAsyncWorkTracker();
       // The parent retains late preparation and transport tails after a caller timeout.
       void trackOwner(async () => {
-        let acquired: Awaited<ReturnType<typeof prepareModel>> | undefined;
+        let acquired: Awaited<ReturnType<typeof acquireSimpleCompletionModelForAgent>> | undefined;
         try {
-          acquired = await work.track(() =>
-            prepareModel({
+          acquired = await work.track(async () => {
+            const acquire =
+              prepareModel ??
+              (await import("./simple-completion-runtime.js")).acquireSimpleCompletionModelForAgent;
+            signal.throwIfAborted();
+            return acquire({
               cfg,
               agentId,
               modelRef,
               allowMissingApiKeyModes: ["aws-sdk"],
               signal,
-            }),
-          );
+            });
+          });
           preparedResult.resolve(acquired);
           await finished.promise;
         } catch (error) {

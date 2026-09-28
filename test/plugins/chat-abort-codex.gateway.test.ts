@@ -13,7 +13,6 @@ import { dispatchAgentRunFromGateway } from "../../src/gateway/agent-turn/agent-
 import { createTrackedDispatch } from "../../src/gateway/agent-turn/agent-run-dispatch.test-support.js";
 import { registerChatAbortController } from "../../src/gateway/chat-abort.js";
 import { handleChatAbortRequest } from "../../src/gateway/server-methods/chat-abort-handler.js";
-import { ABORTED_PARTIAL_PERSISTENCE_WARNING } from "../../src/gateway/server-methods/chat-aborted-partial.js";
 import {
   createAbortTestRunState,
   createChatAbortContext,
@@ -232,7 +231,8 @@ describe("chat.abort native transcript settlement", () => {
               expect.objectContaining({
                 runId,
                 state: "error",
-                errorMessage: ABORTED_PARTIAL_PERSISTENCE_WARNING,
+                errorMessage:
+                  "Stopped, but a reply could not be saved to history. Copy any visible text before leaving this chat.",
               }),
               expect.anything(),
             );

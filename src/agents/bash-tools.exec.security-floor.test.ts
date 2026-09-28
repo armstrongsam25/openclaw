@@ -24,13 +24,15 @@ const reviewerRuntime = vi.hoisted(() => ({
     vi.fn<typeof import("./simple-completion-runtime.js").acquireSimpleCompletionModelForAgent>(),
   complete:
     vi.fn<
-      typeof import("./simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel
+      typeof import("./simple-completion-execution.js").completeWithPreparedSimpleCompletionModel
     >(),
 }));
 
+vi.mock("./simple-completion-execution.js", () => ({
+  completeWithPreparedSimpleCompletionModel: reviewerRuntime.complete,
+}));
 vi.mock("./simple-completion-runtime.js", () => ({
   acquireSimpleCompletionModelForAgent: reviewerRuntime.prepare,
-  completeWithPreparedSimpleCompletionModel: reviewerRuntime.complete,
 }));
 
 vi.mock("./exec-auto-reviewer.js", async (importOriginal) => {

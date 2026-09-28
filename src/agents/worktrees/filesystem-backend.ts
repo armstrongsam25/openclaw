@@ -7,6 +7,8 @@ import type {
 } from "./filesystem-backend.types.js";
 import { nativeWorktreeFilesystem } from "./filesystem-native.js";
 
+declare const SEALED_RUNTIME_BUILD: boolean;
+
 function assertActive(options: WorktreeFilesystemOptions): void {
   options.signal?.throwIfAborted();
   options.commitGuard();
@@ -48,6 +50,10 @@ export async function detectWorktreeFilesystemBackend(
   options: WorktreeFilesystemOptions,
 ): Promise<WorktreeFilesystemBackend | null> {
   assertActive(options);
+  // Sealed artifacts have no native clone payload; the checkout owner retains its Git path.
+  if (typeof SEALED_RUNTIME_BUILD === "boolean" && SEALED_RUNTIME_BUILD) {
+    return null;
+  }
   if (process.platform === "win32") {
     // ReFS requires the live host guard before each file; the bulk API cannot supply it.
     const { refsFilesystem } = await import("./filesystem-refs.native.js");

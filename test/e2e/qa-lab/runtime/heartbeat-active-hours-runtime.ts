@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import type { OpenClawConfig } from "../../../../src/config/types.openclaw.js";
 import { formatErrorMessage } from "../../../../src/infra/errors.js";
 import { isWithinActiveHours } from "../../../../src/infra/heartbeat-active-hours.js";
-import { startHeartbeatRunner } from "../../../../src/infra/heartbeat-runner.js";
+import { startHeartbeatRunner } from "../../../../src/infra/heartbeat-runner-scheduler.js";
 import { requestHeartbeat } from "../../../../src/infra/heartbeat-wake.js";
 import { createQaScriptEvidenceWriter } from "./script-evidence.js";
 
@@ -124,7 +124,7 @@ function createWriter(options: HeartbeatRuntimeOptions) {
       docsRefs: ["docs/gateway/heartbeat.md"],
       codeRefs: [
         "test/e2e/qa-lab/runtime/heartbeat-active-hours-runtime.ts",
-        "src/infra/heartbeat-runner.ts",
+        "src/infra/heartbeat-runner-scheduler.ts",
         "src/infra/heartbeat-active-hours.ts",
       ],
     },

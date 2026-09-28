@@ -3,8 +3,10 @@ import { runtimeProcessEntrypoints } from "../../infra/runtime-process-entrypoin
 import { resolveRuntimeWorkerUrl } from "../../infra/runtime-worker-url.js";
 import { WorkerTaskPool } from "../../infra/worker-task-pool.js";
 import type { SensitiveTextRedactionSnapshot } from "../../logging/redact.js";
-import type { SessionBranchSummaryReadRequest } from "./session-accessor.sqlite-branches.js";
-import type { readSessionTranscriptModelContext } from "./session-accessor.sqlite-model-context.js";
+import type {
+  SessionBranchSummaryReadRequest,
+  SessionTranscriptModelContext,
+} from "./session-accessor.sqlite-contract.js";
 import type { SessionTranscriptRuntimeTarget } from "./session-accessor.types.js";
 import { unwrapSessionTranscriptWorkerReply } from "./session-history-worker-errors.js";
 import { resolveSessionTranscriptReadFence } from "./session-transcript-read-fence.js";
@@ -55,7 +57,7 @@ export async function readSessionTranscriptModelContextAsync(
   signal?: AbortSignal,
   through?: SessionModelContextWorkerInput["through"],
   limits?: SessionModelContextWorkerInput["limits"],
-): Promise<ReturnType<typeof readSessionTranscriptModelContext>> {
+): Promise<SessionTranscriptModelContext> {
   signal?.throwIfAborted();
   const value = unwrapSessionTranscriptWorkerReply<"model-context" | "sqlite-target">(
     await modelContextReads.run(

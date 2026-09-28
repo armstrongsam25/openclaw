@@ -9,15 +9,13 @@ import { onSqliteWalCheckpoint } from "../../infra/sqlite-wal-checkpoint.js";
 import { assertExistingDatabaseIdentity } from "../../infra/sqlite-worker-identity.js";
 import { cancelWorkerIdleGc, scheduleWorkerIdleGc } from "../../infra/worker-idle-gc.js";
 import { recordOpenClawAgentCanonicalValidation } from "../../state/openclaw-agent-canonical-validation-receipt.js";
+import type { OpenClawAgentDatabaseWorkerLeaseReceipt } from "../../state/openclaw-agent-db-contract.js";
 import {
   createOpenClawAgentDatabaseClaim,
   readOpenClawAgentDatabaseIdentity,
   type OpenClawAgentDatabaseClaim,
 } from "../../state/openclaw-agent-db-identity.js";
-import {
-  assertOpenClawAgentDatabaseLease,
-  type OpenClawAgentDatabaseWorkerLeaseReceipt,
-} from "../../state/openclaw-agent-db-lease.js";
+import { assertOpenClawAgentDatabaseLease } from "../../state/openclaw-agent-db-lease.js";
 import { readOpenClawAgentDatabaseWorkerLeaseReceipt } from "../../state/openclaw-agent-db-lifecycle.js";
 import { withFreshOpenClawAgentDatabaseReadOnly } from "../../state/openclaw-agent-db-readonly-open.js";
 import {

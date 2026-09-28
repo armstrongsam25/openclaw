@@ -24,12 +24,12 @@ import {
   acquirePublishedPreparedModelRuntime,
   getPreparedModelRuntimeSnapshot,
   refreshPreparedModelRuntimeSnapshots,
-  registerPreparedModelRuntimePublicationListener,
 } from "./prepared-model-runtime.js";
 import {
   closePreparedModelRuntimeSnapshots,
   registerPreparedModelRuntimeClose,
 } from "./prepared-model-runtime.lifecycle.js";
+import { registerPreparedModelRuntimePublicationListener } from "./prepared-model-runtime.publication-events.js";
 import { createCatalogFleetFixture } from "./test-helpers/prepared-model-catalog-fleet-fixture.js";
 import {
   loadCompletedFullCatalog,

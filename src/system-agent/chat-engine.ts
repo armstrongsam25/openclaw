@@ -32,7 +32,7 @@ import {
   isSystemAgentInferenceUnavailableError,
 } from "./inference-error.js";
 import type { SystemAgentCommandDeps, SystemAgentOperation } from "./operations.js";
-import { loadSystemAgentOverview, type SystemAgentOverview } from "./overview.js";
+import type { SystemAgentOverview } from "./overview.js";
 import { verifyConfigAfterSystemAgentWrite } from "./post-write-verification.js";
 import {
   resolveSystemAgentVerifiedInferenceRoute,
@@ -218,7 +218,9 @@ export class SystemAgentChatEngine {
 
   async loadOverview(): Promise<SystemAgentOverview> {
     const route = await this.requireVerifiedInference();
-    const overview = await (this.options.deps?.loadOverview ?? loadSystemAgentOverview)({
+    const loadOverview =
+      this.options.deps?.loadOverview ?? (await import("./overview.js")).loadSystemAgentOverview;
+    const overview = await loadOverview({
       agentId: route.agentId,
     });
     return route.modelTarget === "utility"

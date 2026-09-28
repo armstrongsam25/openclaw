@@ -1,7 +1,9 @@
 // Migration context tests cover report directory naming and timestamp fallback behavior.
 import path from "node:path";
-import { describe, expect, it } from "vitest";
-import { buildMigrationReportDir, resolveMigrationTargetAgentId } from "./context.js";
+import { describe, expect, it, vi } from "vitest";
+import { buildMigrationContext, buildMigrationReportDir } from "./context.js";
+
+const runtime = { log: vi.fn(), error: vi.fn(), exit: vi.fn() };
 
 describe("migration context helpers", () => {
   it("builds report directories with filename-safe timestamps", () => {
@@ -24,20 +26,25 @@ describe("migration context helpers", () => {
       },
     };
 
-    expect(resolveMigrationTargetAgentId(config, "Research")).toBe("research");
-    expect(() => resolveMigrationTargetAgentId(config, "research/../main")).toThrow(
-      'Invalid agent id "research/../main"',
-    );
-    expect(() => resolveMigrationTargetAgentId(config, "missing")).toThrow(
-      'Unknown agent id "missing"',
-    );
+    expect(
+      buildMigrationContext({ configOverride: config, targetAgentId: "Research", runtime })
+        .targetAgentId,
+    ).toBe("research");
+    expect(() =>
+      buildMigrationContext({ configOverride: config, targetAgentId: "research/../main", runtime }),
+    ).toThrow('Invalid agent id "research/../main"');
+    expect(() =>
+      buildMigrationContext({ configOverride: config, targetAgentId: "missing", runtime }),
+    ).toThrow('Unknown agent id "missing"');
   });
 
   it("keeps the configured default when no migration target is supplied", () => {
-    expect(resolveMigrationTargetAgentId({}, undefined)).toBeUndefined();
+    expect(buildMigrationContext({ configOverride: {}, runtime }).targetAgentId).toBeUndefined();
   });
 
   it("rejects an explicitly blank migration target", () => {
-    expect(() => resolveMigrationTargetAgentId({}, "")).toThrow("--agent must not be blank");
+    expect(() => buildMigrationContext({ configOverride: {}, targetAgentId: "", runtime })).toThrow(
+      "--agent must not be blank",
+    );
   });
 });

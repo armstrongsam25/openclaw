@@ -12,9 +12,9 @@ import { WizardSession } from "../wizard/session.js";
 import {
   ensureCodexRuntimePluginForModelSelection,
   ensureCodexRuntimePluginForSupervision,
-  repairCodexRuntimePluginInstallForModelSelection,
-} from "./codex-runtime-plugin-install.js";
-import { ensureModelSelectionRuntimePlugins } from "./runtime-plugin-install.js";
+  repairModelSelectionRuntimePlugins,
+  ensureModelSelectionRuntimePlugins,
+} from "./runtime-plugin-install.js";
 
 const mocks = vi.hoisted(() => ({
   loadInstalledPluginIndexInstallRecords: vi.fn(),
@@ -213,7 +213,7 @@ describe("Codex runtime plugin install repair", () => {
       notices: [reviewNotice],
     });
 
-    const result = await repairCodexRuntimePluginInstallForModelSelection({
+    const result = await repairModelSelectionRuntimePlugins({
       cfg: {},
       model: "openai/gpt-5.5",
       env: {},

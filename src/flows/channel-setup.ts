@@ -1,7 +1,6 @@
 import { sanitizeTerminalText } from "../../packages/terminal-core/src/safe-text.js";
 import { getBundledChannelSetupPlugin } from "../channels/plugins/bundled.js";
 import { resolveChannelDefaultAccountId } from "../channels/plugins/helpers.js";
-import { listActiveChannelSetupPlugins } from "../channels/plugins/setup-registry.js";
 import type {
   ChannelOnboardingPostWriteHook,
   ChannelSetupConfiguredResult,
@@ -158,6 +157,7 @@ export async function setupChannels(
   prompter: WizardPrompter,
   options?: SetupChannelsOptions,
 ): Promise<OpenClawConfig> {
+  const { listActiveChannelSetupPlugins } = await import("../channels/plugins/setup-registry.js");
   let next = cfg;
   const deferStatusUntilSelection = options?.deferStatusUntilSelection === true;
   const forceAllowFromChannels = new Set(options?.forceAllowFromChannels ?? []);

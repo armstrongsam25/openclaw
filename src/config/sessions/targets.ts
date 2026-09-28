@@ -14,12 +14,10 @@ import { resolveStateDir } from "../paths.js";
 import type { OpenClawConfig } from "../types.openclaw.js";
 import { resolveAgentsDirFromSessionStorePath, resolveSessionStorePathCore } from "./paths.js";
 import { iterateSessionEntryKeys } from "./session-accessor.sqlite-entry-inventory.js";
-import { listSqliteTargetCandidatePathsForSessionStorePath } from "./session-sqlite-target-paths.js";
 import {
   listDurableSqliteTargetOwnersForSessionStorePath,
   readSessionStoreRegistryRows,
   resolveSqliteTargetFromSessionStorePath,
-  type SessionStoreRegistryRead,
 } from "./session-sqlite-target.js";
 import { isPerAgentSessionStoreConfig } from "./session-store-config.js";
 import {
@@ -32,10 +30,8 @@ import {
   type CapturedSessionStorePaths,
   type SessionStoreReadCandidate,
 } from "./session-store-read-candidates.js";
-import {
-  dedupeSessionStoreTargetsBySqliteTarget,
-  type SessionStoreTarget,
-} from "./targets-collision.js";
+import type { SessionStoreRegistryRead, SessionStoreTarget } from "./session-store-target.types.js";
+import { dedupeSessionStoreTargetsBySqliteTarget } from "./targets-collision.js";
 import {
   isConfiguredSessionStoreAgentId,
   listConfiguredSessionStoreAgentIds,
@@ -54,7 +50,7 @@ export {
   isConfiguredSessionStoreAgentId,
   listConfiguredSessionStoreAgentIds,
 } from "./targets-configured-agents.js";
-export type { SessionStoreTarget } from "./targets-collision.js";
+export type { SessionStoreTarget } from "./session-store-target.types.js";
 export { dedupeSessionStoreTargetsBySqliteTarget } from "./targets-collision.js";
 export { resolveSessionStoreCompatibilityAgentId } from "../legacy.default-agent-owner.js";
 export { isPerAgentSessionStoreConfig } from "./session-store-config.js";
@@ -554,22 +550,6 @@ function resolveAgentSessionStoreTargets(
   }
 
   return dedupeTargetsByStorePath(targets);
-}
-
-/** Candidate files for version inspection only; this does not assign migration ownership. */
-export function resolveConfiguredAgentDatabaseCandidatePaths(
-  cfg: OpenClawConfig,
-  params: { env: NodeJS.ProcessEnv },
-): string[] {
-  return [
-    ...new Set(
-      listConfiguredSessionStoreAgentIds(cfg).flatMap((agentId) =>
-        listSqliteTargetCandidatePathsForSessionStorePath(
-          resolveSessionStorePathCore(cfg.session?.store, { agentId, env: params.env }),
-        ),
-      ),
-    ),
-  ];
 }
 
 /** Include configured agent roots and session stores with their exact database owners. */

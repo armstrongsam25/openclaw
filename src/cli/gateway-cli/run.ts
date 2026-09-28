@@ -61,6 +61,13 @@ import {
   findVerifiedGatewayListenerPidsOnPortSync,
   formatGatewayPidList,
 } from "../../infra/gateway-processes.js";
+import {
+  clearShellEnvAppliedKeys,
+  loadShellEnvFallback,
+  resolveShellEnvFallbackTimeoutMs,
+  shouldDeferShellEnvFallback,
+  shouldEnableShellEnvFallback,
+} from "../../infra/shell-env.js";
 import type { RespawnSupervisor } from "../../infra/supervisor-markers.js";
 import { isTailscaleRouteOwnershipConflictError } from "../../infra/tailscale-route-ownership-error.js";
 import { parseTcpPort } from "../../infra/tcp-port.js";
@@ -195,11 +202,6 @@ async function resolveGatewayRunShellEnvFallbackPlan(
   cfg: OpenClawConfig,
 ): Promise<GatewayRunShellEnvFallbackPlan> {
   const { createConfigRuntimeEnv } = await import("../../config/env-vars.js");
-  const {
-    resolveShellEnvFallbackTimeoutMs,
-    shouldDeferShellEnvFallback,
-    shouldEnableShellEnvFallback,
-  } = await import("../../infra/shell-env.js");
   const planEnv = createConfigRuntimeEnv(cfg, process.env);
   const enabled =
     (shouldEnableShellEnvFallback(planEnv) || cfg.env?.shellEnv?.enabled === true) &&
@@ -218,7 +220,6 @@ async function resolveGatewayRunShellEnvFallbackPlan(
 async function loadGatewayRunShellEnvFallback(
   plan: Extract<GatewayRunShellEnvFallbackPlan, { enabled: true }>,
 ): Promise<Record<string, string>> {
-  const { loadShellEnvFallback } = await import("../../infra/shell-env.js");
   const valuesBeforeLoad = new Map(plan.expectedKeys.map((key) => [key, process.env[key]]));
   loadShellEnvFallback({
     enabled: true,
@@ -247,7 +248,6 @@ async function clearGatewayRunShellEnvFallback(
       delete process.env[key];
     }
   }
-  const { clearShellEnvAppliedKeys } = await import("../../infra/shell-env.js");
   clearShellEnvAppliedKeys(keys);
 }
 

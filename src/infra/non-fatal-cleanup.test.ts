@@ -11,13 +11,17 @@ describe("runBestEffortCleanup", () => {
     ).resolves.toBe(7);
   });
 
-  it.each([false, true])(
-    "preserves the primary result when cleanup fails (reporter throws: %s)",
-    async (reporterThrows) => {
+  it.each(["ok", "throw", "reject"] as const)(
+    "preserves the primary result when cleanup fails (reporter: %s)",
+    async (reporter) => {
       const onError = vi.fn(() => {
-        if (reporterThrows) {
+        if (reporter === "throw") {
           throw new Error("cleanup warning failed");
         }
+        if (reporter === "reject") {
+          return Promise.reject(new Error("cleanup warning failed"));
+        }
+        return undefined;
       });
       const error = new Error("cleanup failed");
 

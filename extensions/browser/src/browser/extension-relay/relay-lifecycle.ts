@@ -13,8 +13,8 @@ import {
   withProfileOperationLease,
 } from "../server-context.lifecycle.js";
 import type { BrowserServerState, ProfileRuntimeState } from "../server-context.types.js";
-import { RelayOwnerClient } from "./owner-client.js";
 import { registerBorrowedRelayCdpAccess, type ExtensionRelayResource } from "./relay-access.js";
+import { ensureExtensionRelayToken } from "./relay-auth.js";
 import { startExtensionRelayServer } from "./relay-server.js";
 
 const log = createSubsystemLogger("browser").child("extension-relay");
@@ -67,7 +67,6 @@ export async function ensureExtensionRelayForProfile(
     }
     // The host-local HMAC key can rotate while Browser control stays up.
     // Resolve one canonical desired profile after adopting the live key.
-    const { ensureExtensionRelayToken } = await import("./relay-auth.js");
     const token = await ensureExtensionRelayToken();
     if (state.resolved.extensionRelayToken !== token) {
       state.resolved = { ...state.resolved, extensionRelayToken: token };
@@ -202,6 +201,7 @@ async function ensureDesiredRelay(params: {
           }
         }
         if (!handle) {
+          const { RelayOwnerClient } = await import("./owner-client.js");
           const client = await RelayOwnerClient.connect({
             port: profile.cdpPort,
             profile: profile.name,

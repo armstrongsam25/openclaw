@@ -44,7 +44,7 @@ import {
   sanitizeAssistantVisibleStreamText,
 } from "../../embedded-agent-utils.js";
 import { isTimeoutErrorMessage } from "../../failover/classify.js";
-import type { PreparedProviderFailoverOwner } from "../../failover/provider-patterns.js";
+import type { PreparedProviderFailoverOwner } from "../../failover/signal.js";
 import type { ToolErrorSummary } from "../../tool-error-summary.js";
 import {
   hasCompletedMessagingToolDeliveryEvidence,

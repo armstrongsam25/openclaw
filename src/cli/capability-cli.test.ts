@@ -326,9 +326,11 @@ vi.mock("../agents/prepared-model-catalog.js", () => ({
   readPreparedModelCatalog: mocks.loadModelCatalog,
 }));
 
+vi.mock("../agents/simple-completion-execution.js", () => ({
+  completeWithPreparedSimpleCompletionModel: mocks.completeWithPreparedSimpleCompletionModel,
+}));
 vi.mock("../agents/simple-completion-runtime.js", () => ({
   acquireSimpleCompletionModelForAgent: mocks.acquireSimpleCompletionModelForAgent,
-  completeWithPreparedSimpleCompletionModel: mocks.completeWithPreparedSimpleCompletionModel,
 }));
 
 vi.mock("../agents/auth-profiles.js", () => ({

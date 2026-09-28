@@ -13,7 +13,7 @@ import {
   streamMocks,
   testModel,
 } from "../../sessions/agent-session-loop-correctness.test-support.js";
-import * as gatewayTool from "../../tools/in-process-gateway.js";
+import * as gatewayTool from "../../tools/gateway.js";
 import { createProgressCardTool } from "../../tools/progress-card-tool.js";
 import { clearActiveEmbeddedRun } from "../runs.js";
 import { prepareCatalogExecutor } from "./attempt-stream-prepare.test-support.js";

@@ -1,3 +1,5 @@
+import { refreshPreparedModelRuntimeSnapshots } from "../agents/prepared-model-runtime.js";
+import { registerPreparedModelRuntimePublicationListener } from "../agents/prepared-model-runtime.publication-events.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { onSessionCostUsageUpdated } from "../infra/session-cost-usage-events.js";
 import type { createSubsystemLogger } from "../logging/subsystem.js";
@@ -72,8 +74,6 @@ export async function createGatewayChatMetadataLifecycle(params: {
             ) {
               return;
             }
-            const { refreshPreparedModelRuntimeSnapshots } =
-              await import("../agents/prepared-model-runtime.js");
             await refreshPreparedModelRuntimeSnapshots(config, {
               gatewayLifecycle: true,
               catalogMode: "static",
@@ -108,15 +108,11 @@ export async function createGatewayChatMetadataLifecycle(params: {
     if (params.minimalTestGateway) {
       return undefined;
     }
-    const [
-      { registerRuntimeAuthProfileStoreMutationListener },
-      { registerPreparedModelRuntimePublicationListener },
-      { registerSkillsChangeListener },
-    ] = await Promise.all([
-      import("../agents/auth-profiles/runtime-snapshots.js"),
-      import("../agents/prepared-model-runtime.js"),
-      import("../skills/runtime/refresh.js"),
-    ]);
+    const [{ registerRuntimeAuthProfileStoreMutationListener }, { registerSkillsChangeListener }] =
+      await Promise.all([
+        import("../agents/auth-profiles/runtime-snapshots.js"),
+        import("../skills/runtime/refresh.js"),
+      ]);
     const unregisterPreparedModelRuntimePublication =
       registerPreparedModelRuntimePublicationListener((event) => {
         if (event.phase === "catalog-published" || event.phase === "catalog-failed") {

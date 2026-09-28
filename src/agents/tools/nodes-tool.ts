@@ -16,8 +16,9 @@ import {
   stringEnum,
 } from "../schema/typebox.js";
 import { type AnyAgentTool, jsonResult, readToolStringParam } from "./common.js";
+import type { GatewayCallOptions } from "./gateway-options.js";
 import { gatewayCallOptionSchemaProperties } from "./gateway-schema.js";
-import { callGatewayTool, readGatewayCallOptions, type GatewayCallOptions } from "./gateway.js";
+import { callGatewayTool, readGatewayCallOptions } from "./gateway.js";
 import { executeNodeCommandAction } from "./nodes-tool-commands.js";
 import { callNodesToolNodeInvoke } from "./nodes-tool-invoke.js";
 import { executeNodeMediaAction } from "./nodes-tool-media.js";

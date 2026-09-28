@@ -6,7 +6,7 @@ import { setCurrentPluginMetadataSnapshot } from "../plugins/current-plugin-meta
 import { resolveInstalledPluginIndexPolicyHash } from "../plugins/installed-plugin-index-policy.js";
 import type { PluginManifestRecord } from "../plugins/manifest-registry.js";
 import { clearPluginMetadataLifecycleCaches } from "../plugins/plugin-metadata-lifecycle.js";
-import { finalizePluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
+import { restorePluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
 import { createPluginMetadataSnapshotFixture } from "../plugins/plugin-metadata.test-support.js";
 import { resetPluginRuntimeStateForTest } from "../plugins/runtime.js";
 import { clearSecretsRuntimeSnapshot } from "../secrets/runtime.js";
@@ -121,7 +121,7 @@ function installSnapshot(
   const prepared = createPluginMetadataSnapshotFixture({ plugins });
   const policyHash = resolveInstalledPluginIndexPolicyHash(config);
   const index = { ...prepared.index, policyHash };
-  const snapshot = finalizePluginMetadataSnapshot({
+  const snapshot = restorePluginMetadataSnapshot({
     ...prepared,
     policyHash,
     ...(workspaceDir ? { workspaceDir } : {}),

@@ -37,12 +37,14 @@ import {
   activateStandalonePreparedModelRuntime,
   getPreparedModelRuntimeSnapshot,
   loadPublishedGatewayReplyDispatchRuntime,
-  publishPreparedModelRuntimeSnapshot,
   refreshPreparedModelRuntimeSnapshots,
   type PreparedModelRuntimeLease,
 } from "./prepared-model-runtime.js";
 import { closePreparedModelRuntimeSnapshots } from "./prepared-model-runtime.lifecycle.js";
-import { resetPreparedModelRuntimeSnapshotsForTest } from "./prepared-model-runtime.test-support.js";
+import {
+  publishPreparedModelRuntimeSnapshot,
+  resetPreparedModelRuntimeSnapshotsForTest,
+} from "./prepared-model-runtime.test-support.js";
 
 const providerId = "run-owner-provider";
 const siblingId = "run-owner-sibling";

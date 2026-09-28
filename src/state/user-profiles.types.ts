@@ -24,6 +24,14 @@ export type CachedGitHubIdentity = { profileId: string; updatedAt: number };
 
 export type StoredGitHubIdentity = { accountId: number; login: string };
 
+export type UserProfileGitHubSyncInput = {
+  identity: { accountId: number; login: string; name?: string };
+  authenticationAlias: { kind: "email"; email: string } | { kind: "github-login"; login: string };
+  initialDisplayName?: string;
+  /** OIDC enrichment must retain the authenticated email profile and its credit preference. */
+  preserveEmailProfile?: boolean;
+};
+
 export type UserProfileGitHubAttribution = Map<string, StoredGitHubIdentity | null>;
 
 export type UserProfileGitHubAttributionRead = {

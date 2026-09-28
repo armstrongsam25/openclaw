@@ -13,6 +13,7 @@ import { writeUpdateRunReportArtifact } from "../../infra/update-failure-report-
 import { resolveUpdateInstallRoot } from "../../infra/update-install-root.js";
 import { createManagedHandoffProcessIdentityReader } from "../../infra/update-managed-service-handoff-process.js";
 import type { HandoffProcessIdentity } from "../../infra/update-managed-service-handoff-schema.js";
+import { assertManagedServiceUpdateHandoffRoot } from "../../infra/update-managed-service-handoff.js";
 import {
   POST_CORE_UPDATE_REQUESTED_CHANNEL_ENV,
   POST_CORE_UPDATE_ENV,
@@ -24,7 +25,6 @@ import {
 } from "../../infra/update-post-core-context.js";
 import {
   createManagedUpdateRequesterAuthority,
-  createManagedUpdateRequesterContinuationAuthority,
   resolveManagedUpdateRequester,
 } from "../../infra/update-requester-authority.js";
 import { recordPostCoreUpdateEvidence } from "../../infra/update-run-interruption.js";
@@ -50,6 +50,7 @@ import {
   runUpdateFinalizationDoctorInFreshProcess,
 } from "./update-command-fresh-doctor.js";
 import { settleUpdateDoctorMaintenance } from "./update-command-maintenance.js";
+import { createManagedUpdateRequesterContinuationAuthority } from "./update-command-managed-context.js";
 import { readPackageUpdateIdentity } from "./update-command-package.js";
 import {
   collectPostCorePluginAdvisories,
@@ -140,8 +141,6 @@ export async function resumePostCoreUpdate(params: ResumePostCoreUpdateParams): 
         );
       }
       if (meta?.handoffId && meta.root) {
-        const { assertManagedServiceUpdateHandoffRoot } =
-          await import("../../infra/update-managed-service-handoff.js");
         await assertManagedServiceUpdateHandoffRoot({
           expectedRoot: meta.root,
           root,

@@ -1,3 +1,5 @@
+import type { RuntimeEnv } from "../runtime.js";
+
 export type WizardSelectOption<T = string> = {
   value: T;
   label: string;
@@ -82,6 +84,42 @@ export type WizardPrompter = {
   openUrl?: (url: string) => Promise<void>;
   disableBackNavigation?: () => void;
 };
+
+/** Prompter for quickstart-only flows: notes go to the log, prompts fail loud. */
+export function createQuickstartNotePrompter(runtime: RuntimeEnv): WizardPrompter {
+  const unexpected = (kind: string) => {
+    throw new Error(`openclaw setup hit an interactive ${kind} prompt; quickstart must not ask`);
+  };
+  return {
+    intro: async () => {},
+    outro: async () => {},
+    note: async (message, title) => {
+      runtime.log(title ? `${title}: ${message}` : message);
+    },
+    select: async (params) => {
+      // Quickstart paths never select interactively; honor defaults if a
+      // pre-answered prompt sneaks through, otherwise fail loud.
+      if (params.initialValue !== undefined) {
+        return params.initialValue;
+      }
+      return unexpected("select");
+    },
+    multiselect: async () => unexpected("multiselect"),
+    text: async () => unexpected("text"),
+    confirm: async (params) => params.initialValue ?? true,
+    progress: (label) => {
+      runtime.log(label);
+      return {
+        update: (message) => runtime.log(message),
+        stop: (message) => {
+          if (message) {
+            runtime.log(message);
+          }
+        },
+      };
+    },
+  };
+}
 
 export class WizardCancelledError extends Error {
   constructor(message = "wizard cancelled") {

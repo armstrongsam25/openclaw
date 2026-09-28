@@ -8,7 +8,7 @@ import { extractReadableContent } from "../web-fetch/content-extractors.runtime.
 import { withPluginMetadataSnapshotScope } from "./current-plugin-metadata-snapshot.js";
 import { createPluginCache, withPluginCache } from "./plugin-cache.js";
 import { clearPluginMetadataLifecycleCaches } from "./plugin-metadata-lifecycle.js";
-import { finalizePluginMetadataSnapshot } from "./plugin-metadata-snapshot.js";
+import { restorePluginMetadataSnapshot } from "./plugin-metadata-snapshot.js";
 import { createPluginMetadataSnapshotFixture } from "./plugin-metadata.test-support.js";
 
 const tempDirs = useAutoCleanupTempDirTracker(afterEach);
@@ -83,7 +83,7 @@ exports.${factory} = () => ({
       const options = { config, trustConfigIdentity: true };
       await using cache = createPluginCache();
       const { available, empty } = withPluginCache(cache, () => ({
-        available: finalizePluginMetadataSnapshot(
+        available: restorePluginMetadataSnapshot(
           createPluginMetadataSnapshotFixture({
             plugins: [
               {
@@ -95,7 +95,7 @@ exports.${factory} = () => ({
             ],
           }),
         ),
-        empty: finalizePluginMetadataSnapshot(createPluginMetadataSnapshotFixture()),
+        empty: restorePluginMetadataSnapshot(createPluginMetadataSnapshotFixture()),
       }));
 
       await withPluginMetadataSnapshotScope(

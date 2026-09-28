@@ -43,14 +43,18 @@ async function capturePayload(
       throw new Error("captured before network");
     },
   } satisfies OpenAICompletionsOptions;
-  const stream = await (request.transport === "managed"
-    ? createOpenAICompletionsTransportStreamFn()(model, context, {
-        ...options,
-        reasoning: request.reasoning,
-      })
-    : request.reasoning !== undefined
-      ? streamSimpleOpenAICompletions(model, context, { ...options, reasoning: request.reasoning })
-      : streamOpenAICompletions(model, context, options));
+  const stream =
+    request.transport === "managed"
+      ? createOpenAICompletionsTransportStreamFn()(model, context, {
+          ...options,
+          reasoning: request.reasoning,
+        })
+      : request.reasoning !== undefined
+        ? streamSimpleOpenAICompletions(model, context, {
+            ...options,
+            reasoning: request.reasoning,
+          })
+        : streamOpenAICompletions(model, context, options);
   const result = await stream.result();
   expect(result.errorMessage).toBe("captured before network");
   return payload;

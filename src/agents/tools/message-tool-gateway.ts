@@ -10,9 +10,9 @@ import type {
   OutboundGatewayRequest,
   OutboundGatewayRequestContext,
 } from "../../infra/outbound/message-gateway-options.js";
+import { resolveGatewayOptions } from "./gateway-options.js";
 import {
   readGatewayCallOptions,
-  resolveGatewayOptions,
   resolveMessageActionAgentRuntimeIdentity,
   resolveMessageActionAgentRuntimeIdentityToken,
   shouldUseInProcessGatewayTool,

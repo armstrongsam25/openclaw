@@ -41,7 +41,6 @@ import {
   resolveSqliteDatabaseFilePaths,
   SQLITE_SIDECAR_SUFFIXES,
 } from "./sqlite-files.js";
-import { createVerifiedSqliteSnapshot } from "./sqlite-snapshot.js";
 import {
   createLegacyAuditDatabaseWitness,
   LegacyAuditBackupStateChangedError,
@@ -229,6 +228,7 @@ export async function createBackupSqliteSnapshotPlan(params: {
   const capturedSnapshots = new Map<BackupSqliteSourceGroup, string>();
   const snapshots: SqliteBackupAsset[] = [];
   let capturedAgents: Array<{ role: "agent"; agentId: string; sourcePath: string }> = [];
+  const { createVerifiedSqliteSnapshot } = await import("./sqlite-snapshot.js");
   async function captureSource(
     archiveSourcePath: string,
     sourceGroup: BackupSqliteSourceGroup | undefined,

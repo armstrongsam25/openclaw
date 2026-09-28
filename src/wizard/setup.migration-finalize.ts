@@ -1,5 +1,6 @@
 // Setup migration finalization owns deferred activation, reporting, and terminal acknowledgement.
 import path from "node:path";
+import { mutateConfigFile } from "../config/mutate.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { writeMigrationReport } from "../plugin-sdk/migration-runtime.js";
@@ -153,7 +154,6 @@ function hasPendingDeferredMigrationItems(
 async function createPromotionConfigRuntime(
   config: OpenClawConfig,
 ): Promise<MigrationConfigRuntime> {
-  const { mutateConfigFile } = await import("../config/mutate.js");
   let currentConfig = structuredClone(config);
   return {
     current: () => currentConfig,

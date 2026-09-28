@@ -13,7 +13,11 @@ const { dispatch, callGatewayTool, readChannelContextGatewayContextResolver, hos
     host: { context: {} as GatewayRequestContext | undefined },
   }),
 );
-vi.mock("../../agents/tools/gateway.js", () => ({ callGatewayTool }));
+vi.mock("../../agents/tools/gateway.js", async (importOriginal) => {
+  const { callInProcessGatewayTool } =
+    await importOriginal<typeof import("../../agents/tools/gateway.js")>();
+  return { callGatewayTool, callInProcessGatewayTool };
+});
 vi.mock("../../channels/message-access/admission-evidence.js", () => ({
   readChannelContextGatewayContextResolver,
 }));

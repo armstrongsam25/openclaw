@@ -8,7 +8,7 @@ import { setRuntimeConfigSnapshot } from "../config/runtime-snapshot.js";
 import * as mutationAdmission from "../infra/sqlite-worker-operation-admission.js";
 import type { OpenClawConfig, OpenClawPluginToolContext } from "../plugin-sdk/plugin-entry.js";
 import { loadAndActivateRootPluginRegistry } from "../plugins/loader.js";
-import { clearActivePluginRegistry } from "../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../plugins/runtime.test-support.js";
 import type { PluginRuntime } from "../plugins/runtime/types.js";
 import { startPluginServices, type PluginServicesHandle } from "../plugins/services.js";
 import { closeOpenClawStateDatabaseAsync } from "../state/openclaw-state-db-cache.js";

@@ -11,7 +11,6 @@ import {
   getSubagentSessionListReadSnapshotIdentity,
   prepareOptionalSubagentSessionListReadCache,
 } from "../../agents/subagents/registry/subagent-registry-state.js";
-import { readSessionHistoryPageInWorker } from "../../config/sessions/session-history-worker-runtime.js";
 import { readSessionPendingInputReceiptsInWorker } from "../../config/sessions/session-pending-input-receipts.js";
 import {
   measureDiagnosticsTimelineSpan,
@@ -133,6 +132,8 @@ export async function handleChatHistoryRequest({
       if (!requestedSessionId) {
         return true;
       }
+      const { readSessionHistoryPageInWorker } =
+        await import("../../config/sessions/session-history-worker-runtime.js");
       const transcript = await readSessionHistoryPageInWorker(
         {
           kind: "transcript-binding",

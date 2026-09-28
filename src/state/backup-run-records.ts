@@ -15,6 +15,7 @@ import { tableExists } from "./openclaw-state-db-schema-helpers.js";
 import type { DB as OpenClawStateDatabase } from "./openclaw-state-db.generated.js";
 import { resolveOpenClawStateSqlitePath } from "./openclaw-state-db.paths.js";
 import { captureOpenClawStateWorkerContext } from "./openclaw-state-worker-context.js";
+import { runOpenClawStateWorkerOperation } from "./openclaw-state-worker-store.js";
 
 type BackupRunDatabase = Pick<OpenClawStateDatabase, "backup_runs">;
 
@@ -100,7 +101,6 @@ export async function recordBackupRunOutcome(params: {
     status: params.status,
     manifest_json: manifest,
   };
-  const { runOpenClawStateWorkerOperation } = await import("./openclaw-state-worker-store.js");
   await runOpenClawStateWorkerOperation(
     context,
     (scope) => scope.execute({ type: "backup.recordOutcome", input: row }),

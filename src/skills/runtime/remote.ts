@@ -6,6 +6,7 @@ import { sleepWithAbort } from "../../infra/backoff.js";
 import { updatePairedNodeBins } from "../../infra/device-pairing-node-facts.js";
 import { listNodePairing } from "../../infra/device-pairing-node.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
+import { loadWorkspaceSkills } from "../loading/workspace-skill-loader.js";
 import type { SkillEligibilityContext } from "../types.js";
 import { bumpSkillsSnapshotVersion } from "./refresh-state.js";
 import {
@@ -410,7 +411,6 @@ async function refreshRemoteNodeBinsUncoalesced(params: RemoteNodeBinRefreshPara
   if (!remoteRegistry) {
     return;
   }
-  const { loadWorkspaceSkills } = await import("../loading/workspace-skill-loader.js");
   // Pairing can replace the command surface while the connect-time readiness
   // delay or loader import is pending. Probe the live session after both settle.
   const liveSession = remoteRegistry?.get(params.nodeId);

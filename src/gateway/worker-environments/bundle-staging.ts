@@ -5,6 +5,8 @@ import { root, type Root } from "../../infra/fs-safe.js";
 import {
   WORKER_BUNDLE_ARTIFACT_MODE,
   WORKER_BUNDLE_ARTIFACT_PATHS,
+  compareWorkerBundlePaths,
+  isWorkerBundleChunkPath,
   type WorkerBundleHashEntry,
 } from "../../shared/worker-bundle-hash.js";
 
@@ -12,7 +14,7 @@ async function stageWorkerDeployArtifact(params: {
   sourceRoot: string;
   source: Root;
   staging: Root;
-  artifactPath: (typeof WORKER_BUNDLE_ARTIFACT_PATHS)[number];
+  artifactPath: string;
 }): Promise<WorkerBundleHashEntry> {
   const relativeSourcePath = `dist/worker/${params.artifactPath}`;
   const sourcePath = path.join(params.sourceRoot, relativeSourcePath);
@@ -66,16 +68,22 @@ export async function collectWorkerBundleManifest(
   sourceRoot: string,
   stagingRoot: string,
 ): Promise<WorkerBundleHashEntry[]> {
-  const source = await root(sourceRoot, { maxBytes: Infinity }).catch((error: unknown) => {
+  let source: Root;
+  let artifacts: string[];
+  try {
+    source = await root(sourceRoot, { maxBytes: Infinity });
+    artifacts = await fs.readdir(path.join(sourceRoot, "dist/worker"));
+  } catch (error) {
     throw new Error(
       `OpenClaw worker deploy artifact is missing; build the running package at ${sourceRoot}`,
       { cause: error },
     );
-  });
+  }
   const staging = await root(stagingRoot, { maxBytes: Infinity });
   const manifest: WorkerBundleHashEntry[] = [];
-  for (const artifactPath of WORKER_BUNDLE_ARTIFACT_PATHS) {
+  const chunks = artifacts.filter(isWorkerBundleChunkPath);
+  for (const artifactPath of [...WORKER_BUNDLE_ARTIFACT_PATHS, ...chunks]) {
     manifest.push(await stageWorkerDeployArtifact({ sourceRoot, source, staging, artifactPath }));
   }
-  return manifest;
+  return manifest.toSorted((left, right) => compareWorkerBundlePaths(left.path, right.path));
 }

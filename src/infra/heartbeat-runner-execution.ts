@@ -75,7 +75,7 @@ import { deferSessionEventWakePoll } from "./session-event-wake.js";
 
 const CRON_COMMAND_LANE: string = CommandLane.Cron;
 
-export type HeartbeatDeps = OutboundSendDeps &
+type HeartbeatDeps = OutboundSendDeps &
   ChannelHeartbeatDeps & {
     getReplyFromConfig?: typeof import("../auto-reply/reply/get-reply.js").getReplyFromConfig;
     runtime?: RuntimeEnv;

@@ -11,8 +11,10 @@ import {
 import type { AuthChoice, OnboardOptions } from "../commands/onboard-types.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
+import { persistProviderAuthProfileBatch } from "../plugins/provider-auth-persistence.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { createLazyRuntimeModule } from "../shared/lazy-runtime.js";
+import { prepareCustomSetupCredentials } from "../system-agent/setup-inference-custom.js";
 import { t } from "./i18n/index.js";
 import { WizardCancelledError, type WizardPrompter } from "./prompts.js";
 
@@ -188,15 +190,7 @@ export async function runSetupModelAuthStep(params: {
     persistAuthProfiles = async () => {};
 
     if (authChoice === "custom-api-key") {
-      const [
-        { promptCustomApiConfig },
-        { prepareCustomSetupCredentials },
-        { persistProviderAuthProfileBatch },
-      ] = await Promise.all([
-        import("../commands/onboard-custom.js"),
-        import("../system-agent/setup-inference-custom.js"),
-        import("../plugins/provider-auth-persistence.js"),
-      ]);
+      const { promptCustomApiConfig } = await import("../commands/onboard-custom.js");
       const customResult = await promptCustomApiConfig({
         prompter,
         runtime,

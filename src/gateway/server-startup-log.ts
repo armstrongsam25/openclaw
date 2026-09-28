@@ -23,6 +23,7 @@ import { getWorkerComputeCapacity } from "../infra/worker-task-capacity.js";
 import { getResolvedLoggerSettings } from "../logging.js";
 import type { PluginManifestRecord } from "../plugins/manifest-registry.js";
 import { collectEnabledInsecureOrDangerousFlagsFromCurrentSnapshot } from "../security/dangerous-config-flags-current.js";
+import { collectEnabledInsecureOrDangerousFlags } from "../security/dangerous-config-flags.js";
 
 /** Emit startup summary lines after Gateway bind and plugin loading complete. */
 export async function logGatewayStartup(params: {
@@ -102,9 +103,7 @@ export async function logGatewayStartup(params: {
 
   const enabledDangerousFlags =
     collectEnabledInsecureOrDangerousFlagsFromCurrentSnapshot(params.cfg) ??
-    (await import("../security/dangerous-config-flags.js")).collectEnabledInsecureOrDangerousFlags(
-      params.cfg,
-    );
+    collectEnabledInsecureOrDangerousFlags(params.cfg);
   if (enabledDangerousFlags.length > 0) {
     const warning =
       `security warning: dangerous config flags enabled: ${enabledDangerousFlags.join(", ")}. ` +

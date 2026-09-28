@@ -14,7 +14,6 @@ import { listUserProfilesSync } from "./user-profile-identity.read.js";
 import {
   executeUserProfileWrite,
   isUserProfileWriteCommand,
-  type UserProfileWriteOperations,
 } from "./user-profile-writes.worker.js";
 import {
   selectProfileDisplayEntries,
@@ -25,18 +24,10 @@ import {
 } from "./user-profiles-internal.js";
 import { ensureUserProfilesSchema } from "./user-profiles-schema.js";
 import type {
-  ProfileDisplayRow,
-  UserProfileAvatarMime,
-  UserChannelIdentityWorkerOperations,
-} from "./user-profiles.types.js";
-
-type UserProfileReadWorkerOperations = {
-  "userProfiles.list": { input: undefined; output: ReturnType<typeof listUserProfilesSync> };
-  "userProfiles.directory": {
-    input: { limit: number };
-    output: { profiles: Array<{ id: string; logins: string[] }>; truncated: boolean };
-  };
-};
+  UserProfileReadWorkerOperations,
+  UserProfileAvatarWorkerOperations,
+  UserProfileWorkerOperations,
+} from "./user-profiles.worker-contract.js";
 
 function executeUserProfileReadCommand(
   command: SqliteWorkerCommand<UserProfileReadWorkerOperations>,
@@ -76,20 +67,6 @@ function executeUserProfileReadCommand(
     { databaseLabel: database.path, operationLabel: "user-profiles.directory" },
   );
 }
-
-type UserProfileAvatarWorkerOperations = {
-  "userProfiles.avatar.inspect": {
-    input: { profileId: string };
-    output: ReturnType<typeof inspectProfileAvatarInDatabase>;
-  };
-  "userProfiles.avatar.adopt": {
-    input: { profileId: string; bytes: Uint8Array; mime: UserProfileAvatarMime; now: number };
-    output: {
-      profile: ReturnType<typeof toUserProfile> | undefined;
-      committed?: ProfileDisplayRow;
-    };
-  };
-};
 
 function executeUserProfileAvatarCommand(
   command: SqliteWorkerCommand<UserProfileAvatarWorkerOperations>,
@@ -139,11 +116,6 @@ function executeUserProfileAvatarCommand(
     { operationLabel: "user-profiles.adopt-avatar" },
   );
 }
-
-export type UserProfileWorkerOperations = UserProfileReadWorkerOperations &
-  UserProfileAvatarWorkerOperations &
-  UserProfileWriteOperations &
-  UserChannelIdentityWorkerOperations;
 
 export function isUserProfileCommand(command: {
   type: string;

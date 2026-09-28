@@ -11,6 +11,7 @@ import {
   tryResolveLegacyCompatibilityAgentId,
 } from "../agents/agent-scope.js";
 import { DEFAULT_PROVIDER } from "../agents/defaults.js";
+import { resolveModelAsync } from "../agents/embedded-agent-runner/model.js";
 import { splitTrailingAuthProfile } from "../agents/model-ref-profile.js";
 import type { ModelManifestNormalizationContext } from "../agents/model-ref-shared.js";
 import { resolveDefaultModelForAgent } from "../agents/model-selection-config.js";
@@ -19,6 +20,7 @@ import {
   resolveConfiguredModelRef,
   resolveModelRefFromString,
 } from "../agents/model-selection-shared.js";
+import { acquireReadOnlyPreparedModelRuntime } from "../agents/prepared-model-runtime.js";
 import {
   containsEnvVarReference,
   type EnvSubstitutionWarning,
@@ -401,12 +403,6 @@ function validateModelRefSyntax(
 
 async function createRuntimeModelRefResolver(): Promise<ConfigModelRefResolver> {
   const modelSelection = await import("../agents/model-selection.js");
-  const loadModelModules = () =>
-    Promise.all([
-      import("../agents/embedded-agent-runner/model.js"),
-      import("../agents/prepared-model-runtime.js"),
-    ]);
-  let modelModules: ReturnType<typeof loadModelModules> | undefined;
 
   return async ({ config, ref }) => {
     let resolvedRef = resolveCanonicalModelRef(config, ref);
@@ -421,10 +417,9 @@ async function createRuntimeModelRefResolver(): Promise<ConfigModelRefResolver> 
       ref.agentId ?? tryResolveLegacyCompatibilityAgentId(config) ?? resolveDefaultAgentId(config);
     const agentDir = resolveAgentDir(config, targetAgentId);
     const workspaceDir = resolveAgentWorkspaceDir(config, targetAgentId);
-    const [modelRuntime, preparedRuntime] = await (modelModules ??= loadModelModules());
 
     // Exact pins need provider hooks in their generation; a catalog-only snapshot cannot load them.
-    await using lease = await preparedRuntime.acquireReadOnlyPreparedModelRuntime(
+    await using lease = await acquireReadOnlyPreparedModelRuntime(
       {
         agentId: targetAgentId,
         agentDir,
@@ -448,7 +443,7 @@ async function createRuntimeModelRefResolver(): Promise<ConfigModelRefResolver> 
     }
     const { provider, model } = resolvedRef;
     const stores = lease.snapshot.createStores();
-    const resolution = await modelRuntime.resolveModelAsync(provider, model, agentDir, config, {
+    const resolution = await resolveModelAsync(provider, model, agentDir, config, {
       ...stores,
       modelIdSource: "selected",
       agentId: targetAgentId,

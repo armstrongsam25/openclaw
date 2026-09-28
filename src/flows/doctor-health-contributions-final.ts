@@ -1,3 +1,4 @@
+import { bindAgentToolGatewayRequest } from "../agents/tools/in-process-gateway.js";
 import { isExperimentalClawsEnabled } from "../claws/experimental.js";
 import { shouldDeferConfiguredPluginInstallRepair } from "../commands/doctor/shared/update-phase.js";
 import { hasActiveGatewayExecCredential } from "./doctor-gateway-exec-credential.js";
@@ -363,8 +364,6 @@ export function resolveFinalDoctorHealthContributions(params: {
         async detect(ctx) {
           const { collectWhatsappResponsivenessHealthFindings } =
             await import("../commands/doctor-whatsapp-responsiveness.js");
-          const { bindAgentToolGatewayRequest } =
-            await import("../agents/tools/in-process-gateway.js");
           const requestGateway = bindAgentToolGatewayRequest({ hostedOnly: true });
           let status: import("../status/summary.js").StatusSummary | undefined;
           if (

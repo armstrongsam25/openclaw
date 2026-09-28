@@ -4,6 +4,7 @@ import {
   normalizeOptionalString,
 } from "openclaw/plugin-sdk/string-coerce-runtime";
 import { z } from "zod";
+import { createBrowserNodeSessionTabRoute } from "../browser-node-proxy.js";
 import type { BrowserNodeTarget } from "../browser-node-routing.js";
 import { getOptionalBrowserStateRuntime } from "../browser-runtime-state.js";
 import { createBrowserToolSessionTabs } from "../browser-tool-session-tabs.js";
@@ -54,7 +55,7 @@ export async function applyBrowserRequestTabScope(params: {
   };
   const registry = await import("../browser/session-tab-registry.js");
   const nodeRoute = params.nodeTarget
-    ? (await import("../browser-node-proxy.js")).createBrowserNodeSessionTabRoute(params.nodeTarget)
+    ? createBrowserNodeSessionTabRoute(params.nodeTarget)
     : undefined;
   params.assertCurrent();
   const route = nodeRoute ?? { kind: "browser-control" as const };

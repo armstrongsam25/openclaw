@@ -62,10 +62,7 @@ import { buildDeclaredProviderOwnerIndex } from "./provider-owner-index.js";
 import { registerProviderPolicyOwnerIndexes } from "./provider-policy-owners.js";
 
 const MAX_PLUGIN_METADATA_PROJECTIONS = 64;
-export type {
-  PluginMetadataSnapshot,
-  PluginMetadataSnapshotOwnerMaps,
-} from "./plugin-metadata-snapshot.types.js";
+export type { PluginMetadataSnapshot } from "./plugin-metadata-snapshot.types.js";
 
 export { resolvePluginMetadataEnvFingerprint } from "./plugin-metadata-env.js";
 
@@ -129,9 +126,7 @@ function indexesMatch(
 }
 
 /** Freezes prepared process-local facts; worker transfers must use restorePluginMetadataSnapshot. */
-export function finalizePluginMetadataSnapshot(
-  snapshot: PluginMetadataSnapshot,
-): PluginMetadataSnapshot {
+function finalizePluginMetadataSnapshot(snapshot: PluginMetadataSnapshot): PluginMetadataSnapshot {
   freezeSnapshotValue(snapshot);
   bindPluginMetadataSnapshotCache(snapshot);
   const cache = getPluginMetadataSnapshotCache(snapshot);

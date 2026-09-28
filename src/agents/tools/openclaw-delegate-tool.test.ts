@@ -6,10 +6,10 @@ import {
   getGatewayToolCallerIdentity,
   withGatewayToolCallerIdentity,
 } from "./gateway-caller-context.js";
-import { callInProcessGatewayTool } from "./in-process-gateway.js";
+import { callInProcessGatewayTool } from "./gateway.js";
 import { createOpenClawDelegateToolsForRun } from "./openclaw-delegate-tool.js";
 
-vi.mock("./in-process-gateway.js", () => ({
+vi.mock("./gateway.js", () => ({
   callInProcessGatewayTool: vi.fn(),
 }));
 

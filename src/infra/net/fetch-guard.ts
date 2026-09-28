@@ -290,14 +290,10 @@ export { retainSafeHeadersForCrossOriginRedirect as retainSafeHeadersForCrossOri
 
 async function prepareGuardedFetchCapture(params: GuardedFetchOptions, fetchImpl: FetchLike) {
   if (params.capture === false || !isTruthyEnvValue(process.env[OPENCLAW_DEBUG_PROXY_ENABLED])) {
-    return { fetchImpl };
+    return { fetchImpl, capture: undefined };
   }
-  const { prepareHttpCaptureForTransport, resolveDebugProxyFetchTransport } =
-    await import("../../proxy-capture/runtime.js");
-  return {
-    fetchImpl: resolveDebugProxyFetchTransport(fetchImpl),
-    capture: prepareHttpCaptureForTransport(),
-  };
+  const runtime = await import("../../proxy-capture/transport.runtime.js");
+  return runtime.prepareGuardedFetchCapture(fetchImpl);
 }
 
 function retainSafeHeadersForCrossOriginRedirect(init?: RequestInit): RequestInit | undefined {

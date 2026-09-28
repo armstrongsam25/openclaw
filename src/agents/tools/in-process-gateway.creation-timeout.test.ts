@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withGatewayToolCallerIdentity } from "./gateway-caller-context.js";
-import { callInProcessGatewayToolWithCreation } from "./in-process-gateway.js";
+import { callInProcessGatewayToolWithCreation } from "./gateway.js";
 
 const { callGateway } = vi.hoisted(() => ({ callGateway: vi.fn() }));
 

@@ -3,7 +3,7 @@ import path from "node:path";
 import { afterEach, beforeEach, expect, vi, type MockInstance } from "vitest";
 import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 import type { LegacyConfigIssue } from "../config/types.js";
-import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import type { LegacyStateMigrationStepReceipt } from "../infra/state-migrations.types.js";
 import * as tempRoot from "../infra/tmp-openclaw-dir.js";
 import { resolveManagedUpdateLeaseDatabasePath } from "../infra/update-managed-service-handoff-lease.js";

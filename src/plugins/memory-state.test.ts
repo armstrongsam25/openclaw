@@ -19,11 +19,8 @@ import {
   type MemoryPluginPublicArtifact,
 } from "./memory-state.test-fixtures.js";
 import { createEmptyPluginRegistry } from "./registry-empty.js";
-import {
-  clearActivePluginRegistry,
-  getActivePluginRegistry,
-  withPluginRegistrationContext,
-} from "./runtime.js";
+import { getActivePluginRegistry, withPluginRegistrationContext } from "./runtime.js";
+import { clearActivePluginRegistry } from "./runtime.test-support.js";
 import { createPluginRecord } from "./status.test-helpers.js";
 
 function createMemoryRuntime() {

@@ -11,7 +11,6 @@ import { supportsModelTools } from "../agents/model-tool-support.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { normalizeAgentId } from "../routing/session-key.js";
 import type { RuntimeEnv } from "../runtime.js";
-import { verifySystemAgentInferenceWithFallback } from "../system-agent/inference-fallback.js";
 import {
   resolveSystemAgentConfiguredRouteFromConfig,
   type SystemAgentConfiguredRoute,
@@ -39,6 +38,7 @@ export async function selectUpdateRepairInference(params: {
   const chains = new Map<string, SystemAgentConfiguredRoute[]>();
   const eligibility = new Map<SystemAgentConfiguredRoute, boolean>();
   try {
+    const inference = await import("../system-agent/inference-fallback.js");
     signal.throwIfAborted();
     const owner = resolveAmbientOwnerAgentId(params.config);
     const configuredEntries = listAgentEntries(params.config);
@@ -91,7 +91,7 @@ export async function selectUpdateRepairInference(params: {
       eligibility.set(route, accepted);
       return accepted;
     };
-    const selected = await verifySystemAgentInferenceWithFallback({
+    const selected = await inference.verifySystemAgentInferenceWithFallback({
       requestingAgentId: owner,
       runtime: params.runtime,
       deps: { readConfig: async () => params.config },

@@ -7,7 +7,9 @@ import {
   resolveAgentWorkspaceDir,
   resolveSessionAgentId,
 } from "../../agents/agent-scope.js";
+import { loadPublishedGatewayReplyDispatchRuntime } from "../../agents/prepared-model-runtime.js";
 import type { PreparedReplyDispatchRuntime } from "../../agents/prepared-model-runtime.types.js";
+import { loadAgentRuntimePluginRegistryHandle } from "../../agents/runtime-plugins.js";
 import { normalizeExplicitSessionKey } from "../../config/sessions/explicit-session-key-normalization.js";
 import {
   deriveInboundMessageHookContext,
@@ -43,10 +45,6 @@ import {
 import { createShouldEmitVerboseProgress } from "./dispatch-from-config.harness-defaults.js";
 import { createDispatchReplyOperationCoordinator } from "./dispatch-from-config.lifecycle.js";
 import { createFinalizationAwareTtsPayloadApplier } from "./dispatch-from-config.payloads.js";
-import {
-  loadPreparedModelRuntime,
-  loadRuntimePlugins,
-} from "./dispatch-from-config.runtime-loaders.js";
 import { createReplyHotPathTimingTracker } from "./dispatch-from-config.timing.js";
 import type { DispatchFromConfigParams } from "./dispatch-from-config.types.js";
 import { noteDispatchProcessedOutcome } from "./dispatch-processed-outcome.js";
@@ -417,7 +415,6 @@ export async function gatherDispatchRequest(
     preparedReplyDispatchRuntime = await traceReplyPhase(
       "reply.load_prepared_dispatch_runtime",
       async () => {
-        const { loadPublishedGatewayReplyDispatchRuntime } = await loadPreparedModelRuntime();
         return await loadPublishedGatewayReplyDispatchRuntime({
           agentId: preparedReplyDispatchAgentId,
           abortSignal: params.replyOptions?.abortSignal,
@@ -456,10 +453,6 @@ export async function gatherDispatchRequest(
   const pluginRegistry =
     preparedReplyDispatchRuntime?.inboundPluginRegistry ??
     (await traceReplyPhase("reply.load_runtime_plugin_registry_handle", async () => {
-      const { loadAgentRuntimePluginRegistryHandle } = await traceReplyPhase(
-        "reply.load_runtime_plugins",
-        loadRuntimePlugins,
-      );
       return loadAgentRuntimePluginRegistryHandle({
         config: cfg,
         workspaceDir,

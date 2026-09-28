@@ -21,7 +21,7 @@ import {
   resolveSqliteWriteAdmissionScope,
   toDatabaseOptions,
 } from "./session-accessor.sqlite-scope.js";
-import type { SessionPendingInputWithdrawal } from "./session-pending-input-withdrawal.worker.js";
+import type { SessionPendingInputWithdrawal } from "./session-accessor.types.js";
 import { assertSessionStoreReadCandidate } from "./session-store-read-candidates.js";
 import { captureSessionStoreReadCandidates } from "./session-store-target-inventory.js";
 

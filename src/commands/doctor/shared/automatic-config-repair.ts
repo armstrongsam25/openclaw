@@ -30,6 +30,7 @@ import {
   loadInstalledPluginIndexInstallRecordsSync,
   withoutPluginInstallRecords,
 } from "../../../plugins/installed-plugin-index-records.js";
+import { withPluginLifecycleLease } from "../../../plugins/plugin-lifecycle-lease.js";
 import type { PluginMetadataSnapshot } from "../../../plugins/plugin-metadata-snapshot.types.js";
 import {
   prepareDoctorConfigReferenceSource,
@@ -273,7 +274,6 @@ export async function commitAutomaticConfigRepair(
   if (!pluginInstallConfigImport) {
     return await writeAutomaticConfigRepair(plan, snapshot);
   }
-  const { withPluginLifecycleLease } = await import("../../../plugins/plugin-lifecycle-lease.js");
   await withPluginLifecycleLease({}, async (lease) => {
     // Cleanup since import wins: validate canonical records without replaying source JSON.
     const currentPlan = planAutomaticConfigRepair(snapshot, {

@@ -16,8 +16,8 @@ const { REDACTED_SENTINEL } = await import("../config/redact-snapshot.js");
 const { recordDeferredPluginMigrations } = await import("../infra/deferred-plugin-migrations.js");
 const { closeOpenClawStateDatabaseForTest } = await import("../state/openclaw-state-db.js");
 const runtimeSchema = await import("../config/runtime-schema.js");
-const { runConfigGet, runConfigPatch, runConfigSet, runConfigUnset } =
-  await import("./config-cli.js");
+const { runConfigGet } = await import("./config-cli-read.js");
+const { runConfigPatch, runConfigSet, runConfigUnset } = await import("./config-cli.js");
 const {
   registeredRuntimeLogs: logs,
   registeredRuntimeErrors: errors,

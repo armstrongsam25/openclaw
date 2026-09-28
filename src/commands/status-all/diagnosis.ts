@@ -26,7 +26,7 @@ import {
 import {
   formatPluginCompatibilityNotice,
   type PluginCompatibilityNotice,
-} from "../../plugins/status.js";
+} from "../../plugins/status-compatibility.js";
 import { dedupeByKey } from "../../shared/dedupe-by-key.js";
 import type { buildWorkspaceSkillReadiness } from "../../skills/discovery/status.js";
 import { formatDeliveryQueueHealthLine } from "../health-format.js";

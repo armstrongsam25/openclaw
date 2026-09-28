@@ -35,11 +35,11 @@ import {
   GitHubAccountMismatchError,
   installManagedGitHubProfile,
   refreshManagedGitHubProfile,
-  removeManagedGitHubProfile,
   resolveConfiguredGitHubToolIdentity,
   resolveGitHubToolIdentityStatus,
   resolveManagedGitHubProfileDir,
 } from "../agents/github-tool-identity.js";
+import { removeManagedGitHubProfile } from "../agents/github-tool-profile.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { GitHubToolIdentityConfig } from "../config/types.tools.js";
 import { formatErrorMessage } from "../infra/errors.js";

@@ -5,7 +5,10 @@ import { ensurePluginAllowlisted } from "../config/plugins-allowlist.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { PluginCapabilityConsentHandler } from "./capability-consent.js";
 import { normalizePluginId, normalizePluginsConfig } from "./config-state.js";
+import { loadInstalledPluginIndexInstallRecords } from "./installed-plugin-index-records.js";
 import { ManagedPluginLifecycleError } from "./management-lifecycle-error.js";
+import { withPluginLifecycleLease } from "./plugin-lifecycle-lease.js";
+import { resolvePluginMetadataSnapshot } from "./plugin-metadata-snapshot.js";
 import { setPluginEnabledInConfig } from "./toggle-config.js";
 
 type PluginEnableOptions = {
@@ -103,15 +106,11 @@ export async function enablePluginWithCapabilityConsent(
     return result;
   }
   try {
-    const { withPluginLifecycleLease } = await import("./plugin-lifecycle-lease.js");
     return await withPluginLifecycleLease({ env: options.env }, async () => {
-      const { loadInstalledPluginIndexInstallRecords } =
-        await import("./installed-plugin-index-records.js");
       const records = await loadInstalledPluginIndexInstallRecords({ env: options.env });
       if (Object.keys(records).length === 0) {
         return result;
       }
-      const { resolvePluginMetadataSnapshot } = await import("./plugin-metadata-snapshot.js");
       const metadata = resolvePluginMetadataSnapshot({
         config: cfg,
         env: options.env,

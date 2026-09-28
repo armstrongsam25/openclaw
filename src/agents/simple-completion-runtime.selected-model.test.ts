@@ -13,10 +13,8 @@ import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
 import * as sessionAuthRuntime from "./auth-profiles/session-override.js";
 import { resetPreparedModelRuntimeSnapshotsForTest } from "./prepared-model-runtime.test-support.js";
 import type { BoundAgentRunSessionTarget } from "./run-session-target.types.js";
-import {
-  acquireSimpleCompletionModelForAgent,
-  completeWithPreparedSimpleCompletionModel,
-} from "./simple-completion-runtime.js";
+import { completeWithPreparedSimpleCompletionModel } from "./simple-completion-execution.js";
+import { acquireSimpleCompletionModelForAgent } from "./simple-completion-runtime.js";
 
 afterEach(async () => {
   await resetPreparedModelRuntimeSnapshotsForTest();

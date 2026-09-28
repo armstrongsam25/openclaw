@@ -22,7 +22,6 @@ import {
   releaseSnapshotTempDirectory,
 } from "./sqlite-readonly-location-cleanup.js";
 import { createSqliteSnapshotStagingDirectory } from "./sqlite-snapshot-staging.js";
-import { publishVerifiedSqliteFile } from "./sqlite-snapshot.js";
 import {
   parseUpdateStateInspectionWorker,
   runUpdateStateInspectionWorker,
@@ -146,6 +145,7 @@ export async function restoreUpdateDatabaseBackup(params: {
   let preparedCopy: ReturnType<typeof adoptPreparedLocation> | undefined;
   let retainPreparedCopy = false;
   try {
+    const { publishVerifiedSqliteFile } = await import("./sqlite-snapshot.js");
     const result = await withDatabaseExclusion(
       params.env,
       paths,

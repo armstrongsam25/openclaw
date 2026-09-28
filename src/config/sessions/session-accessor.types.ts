@@ -389,6 +389,12 @@ export type SessionTranscriptTurnMessageAppend = TranscriptMessageAppendOptions<
 
 export type SessionTranscriptTurnWriteContext = Partial<SessionTranscriptRuntimeTarget>;
 
+export type SessionPendingInputWithdrawal = {
+  sessionKey: string;
+  sessionId: string;
+  runId: string;
+};
+
 export type SessionTranscriptTurnPersistOptions = {
   /** Runtime config used for lock settings, redaction, and header metadata. */
   config?: OpenClawConfig;

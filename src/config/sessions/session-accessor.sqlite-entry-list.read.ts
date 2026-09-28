@@ -13,15 +13,14 @@ import type { DB } from "../../state/openclaw-agent-db.generated.js";
 import type { OpenClawAgentDatabase } from "../../state/openclaw-agent-db.js";
 import { isIncognitoOpenClawAgentSqlitePath } from "../../state/openclaw-agent-db.paths.js";
 import { isInternalSessionEffectsKey } from "./internal-session-key.js";
-import type { SessionEntrySummary } from "./session-accessor.sqlite-contract.js";
+import type {
+  SessionEntrySummary,
+  ResolvedSqliteScope,
+} from "./session-accessor.sqlite-contract.js";
 import { readSessionEntryCache } from "./session-accessor.sqlite-entry-cache.js";
 import type { SessionEntryCacheSnapshot } from "./session-accessor.sqlite-entry-cache.types.js";
 import { validateDeliveryCanonicalSessionEntry } from "./session-accessor.sqlite-entry-read.js";
-import {
-  resolveSqliteScope,
-  toDatabaseOptions,
-  type ResolvedSqliteScope,
-} from "./session-accessor.sqlite-scope.js";
+import { resolveSqliteScope, toDatabaseOptions } from "./session-accessor.sqlite-scope.js";
 import { parseSessionEntryJson, selectSessionEntryRows } from "./session-accessor.sqlite-status.js";
 import type { SessionEntryListScope } from "./session-accessor.types.js";
 import {

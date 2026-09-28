@@ -2,7 +2,7 @@ import { truncateWithMarker } from "@openclaw/normalization-core/utf16-slice";
 import { sanitizeTerminalText } from "../../../packages/terminal-core/src/safe-text.js";
 import { getAgentRunLifecycleGeneration } from "../../infra/agent-run-registry.js";
 import { redactSensitiveText } from "../../logging/redact.js";
-import type { MainSessionRecoveryStoreTarget } from "./main-session-recovery-store.js";
+import type { MainSessionRecoveryStoreTarget } from "./main-session-recovery-types.js";
 
 export type RestartRecoveryStoreTarget = Pick<
   MainSessionRecoveryStoreTarget,

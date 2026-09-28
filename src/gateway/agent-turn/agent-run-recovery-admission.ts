@@ -1,7 +1,5 @@
-import {
-  commitMainSessionRecovery,
-  type MainSessionRecoveryPendingTarget,
-} from "../../agents/main-session-recovery/main-session-recovery-store.js";
+import { commitMainSessionRecovery } from "../../agents/main-session-recovery/main-session-recovery-store.js";
+import type { MainSessionRecoveryPendingTarget } from "../../agents/main-session-recovery/main-session-recovery-types.js";
 
 /** Bind durable recovery admission to the exact restoration needed if execution never starts. */
 export async function admitAgentRestartRecovery(params: {

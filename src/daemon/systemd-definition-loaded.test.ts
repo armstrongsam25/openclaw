@@ -161,7 +161,8 @@ it.skipIf(process.platform === "win32")(
 it.skipIf(process.platform === "win32")(
   "admits user-unit activation past an unverifiable system probe only for a loaded, owned unit",
   async () => {
-    const { assertNoSystemGatewayOwnershipForActivation } = await import("./systemd-scope.js");
+    const { assertNoSystemGatewayOwnershipForActivation } =
+      await import("./systemd-definition-mutation.js");
     const actual =
       await vi.importActual<typeof import("./systemd-system.js")>("./systemd-system.js");
     vi.mocked(execFileUtf8)

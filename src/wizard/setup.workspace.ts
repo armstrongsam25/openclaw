@@ -1,9 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import {
-  resolveOnboardingWorkspaceConflict,
-  type OnboardingWorkspaceConflict,
-} from "../commands/onboard-config.js";
+import type { OnboardingWorkspaceConflict } from "../commands/onboard-config.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { isMissingPathError } from "../infra/errno.js";
 import { extractErrorCode, formatErrorMessageWithCode } from "../infra/errors.js";
@@ -71,6 +68,7 @@ export async function resolveSetupWorkspaceSelection(params: {
   ) {
     return { workspaceDir: params.requestedWorkspaceDir, allowWorkspaceChange: true };
   }
+  const { resolveOnboardingWorkspaceConflict } = await import("../commands/onboard-config.js");
   const conflict =
     params.hasAuthoredRoster === false
       ? undefined

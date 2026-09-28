@@ -1,4 +1,4 @@
-import { stripCompactionReplayCheckpointInPlace } from "@openclaw/ai/transports";
+import { stripCompactionReplayCheckpointInPlace } from "@openclaw/ai/internal/shared";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { buildSessionContext as buildCoreSessionContext } from "../../../packages/agent-core/src/harness/session/session.js";
 import { selectSessionTranscriptLeafControlledPath } from "../../config/sessions/transcript-tree.js";

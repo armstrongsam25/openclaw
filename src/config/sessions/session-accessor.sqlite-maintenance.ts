@@ -12,7 +12,10 @@ import {
   materializeSessionStateDeletePlans,
   runSqliteTranscriptArchiveWorkerOperation,
 } from "./session-accessor.sqlite-archive.js";
-import type { SessionLifecycleArchivedTranscript } from "./session-accessor.sqlite-contract.js";
+import type {
+  SessionLifecycleArchivedTranscript,
+  ResolvedSqliteReadScope,
+} from "./session-accessor.sqlite-contract.js";
 import {
   hasPreparedNativeSessionDeletion,
   withSqliteSessionDeletions,
@@ -33,10 +36,7 @@ import {
   createSessionMaintenanceStatisticsOperation,
   resolveSessionReclamationDatabaseOptions,
 } from "./session-accessor.sqlite-reclamation.js";
-import {
-  toDatabaseOptions,
-  type ResolvedSqliteReadScope,
-} from "./session-accessor.sqlite-scope.js";
+import { toDatabaseOptions } from "./session-accessor.sqlite-scope.js";
 import { withSqliteMutationWorkerLifetime } from "./session-accessor.sqlite-worker-request.js";
 import { captureSessionMaintenancePreservation } from "./store-maintenance-preserve.js";
 import { resolveMaintenanceConfig } from "./store-maintenance-runtime.js";

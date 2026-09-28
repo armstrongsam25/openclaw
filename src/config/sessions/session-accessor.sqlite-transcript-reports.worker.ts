@@ -21,12 +21,10 @@ import {
 import type {
   SessionTranscriptWriteScope,
   TranscriptAppendRefusal,
+  ResolvedTranscriptScope,
 } from "./session-accessor.sqlite-contract.js";
 import { readSessionEntryRow } from "./session-accessor.sqlite-entry-store.js";
-import {
-  toDatabaseOptions,
-  type ResolvedTranscriptScope,
-} from "./session-accessor.sqlite-scope.js";
+import { toDatabaseOptions } from "./session-accessor.sqlite-scope.js";
 import type { PreparedTranscriptMessageAppend } from "./session-accessor.sqlite-transcript-message-append.js";
 import {
   appendAbortedSessionTranscriptPartialInTransaction,

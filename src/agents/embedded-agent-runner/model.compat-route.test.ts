@@ -226,7 +226,7 @@ describe("model route compatibility", () => {
             },
           });
           try {
-            const stream = await createOpenAICompletionsTransportStreamFn()(
+            const stream = createOpenAICompletionsTransportStreamFn()(
               resolved.model!,
               { messages: [{ role: "user", content: "Synthetic test", timestamp: 1 }] },
               { apiKey: "synthetic-key", reasoning: "xhigh", transport: "sse" },

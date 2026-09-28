@@ -5,8 +5,8 @@ import {
   type OpenClawAgentDatabase,
 } from "../../state/openclaw-agent-db.js";
 import type { SessionResetBoundaryWrite } from "./session-accessor.lifecycle-types.js";
+import type { ResolvedTranscriptScope } from "./session-accessor.sqlite-contract.js";
 import { loadTranscriptEventsFromDatabase } from "./session-accessor.sqlite-read.js";
-import type { ResolvedTranscriptScope } from "./session-accessor.sqlite-scope.js";
 import { ensureTranscriptHeader } from "./session-accessor.sqlite-transcript-header.js";
 import { appendTranscriptEventsInTransaction } from "./session-accessor.sqlite-transcript-store.js";
 import { buildSessionResetBoundaryEvent } from "./session-reset-boundary-event.js";

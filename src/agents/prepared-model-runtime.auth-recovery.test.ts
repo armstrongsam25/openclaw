@@ -47,9 +47,7 @@ import {
   advancePreparedModelRuntimeConfig,
   loadPublishedGatewayReplyDispatchRuntime,
   prepareModelRuntimeSnapshot,
-  publishPreparedModelRuntimeSnapshot,
   refreshPreparedModelRuntimeSnapshots,
-  registerPreparedModelRuntimePublicationListener,
   type PreparedModelRuntimeSnapshot,
 } from "./prepared-model-runtime.js";
 import {
@@ -58,6 +56,8 @@ import {
 } from "./prepared-model-runtime.owner.js";
 import { retainPreparedPluginGeneration } from "./prepared-model-runtime.plugin-lifetime.js";
 import * as pluginLifetime from "./prepared-model-runtime.plugin-lifetime.js";
+import { registerPreparedModelRuntimePublicationListener } from "./prepared-model-runtime.publication-events.js";
+import { publishPreparedModelRuntimeSnapshot } from "./prepared-model-runtime.test-support.js";
 
 const fixture = usePreparedModelRuntimeHarness({ label: "auth-generation-recovery" });
 const { mocks } = fixture;

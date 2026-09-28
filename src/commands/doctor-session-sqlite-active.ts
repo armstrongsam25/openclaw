@@ -1,5 +1,5 @@
 import { importSqliteSessionRowsBatch } from "../config/sessions/session-accessor.sqlite-import.js";
-import type { SessionStoreTarget } from "../config/sessions/targets.js";
+import type { SessionStoreTarget } from "../config/sessions/session-store-target.types.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { readMigrationArtifactIdentity } from "../infra/session-sqlite-migration-artifact.js";
 import { canonicalMigrationFilePath } from "../infra/session-sqlite-migration-manifest.js";

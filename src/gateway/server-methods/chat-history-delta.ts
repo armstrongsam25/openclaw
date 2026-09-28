@@ -2,8 +2,8 @@ import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 import { composeTranscriptDisplay } from "../../chat/transcript-display-position.js";
 import type { SessionTranscriptReadScope } from "../../config/sessions/session-accessor.js";
 import { readTranscriptDisplayDelta } from "../../config/sessions/session-accessor.sqlite-history-events.js";
-import type { SessionTranscriptDisplayDeltaResult } from "../../config/sessions/session-accessor.sqlite-history-query.js";
 import { readRestoredSessionTranscript } from "../../config/sessions/session-cold-storage-read.js";
+import type { SessionTranscriptDisplayDeltaResult } from "../../config/sessions/session-history-types.js";
 import {
   projectAgentHistoryActivity,
   type AgentHistoryActivity,

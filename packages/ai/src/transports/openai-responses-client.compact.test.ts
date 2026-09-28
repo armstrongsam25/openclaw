@@ -1,5 +1,8 @@
-import type { Context, Model } from "@openclaw/llm-core";
+import type { Context, Model, StreamFn } from "@openclaw/llm-core";
+import { AssistantMessageEventStream } from "@openclaw/llm-core/event-stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createLazyStream } from "../utils/lazy-stream.js";
+import { createAssistantOutput } from "./assistant-output.js";
 
 const sdkState = vi.hoisted(() => ({
   clients: [] as Array<Record<string, unknown>>,
@@ -66,6 +69,27 @@ describe("responses compact endpoint", () => {
   beforeEach(() => {
     sdkState.clients.length = 0;
     sdkState.post.mockReset();
+  });
+
+  it.each([false, true])("rejects an unclaimed compact request (lazy: %s)", async (lazy) => {
+    const createStream: StreamFn = () => {
+      const stream = new AssistantMessageEventStream();
+      stream.end(createAssistantOutput(model));
+      return stream;
+    };
+    await expect(
+      requestPreparedOpenAIResponsesCompaction(
+        lazy
+          ? createLazyStream(
+              async () => createStream,
+              (stream) => stream,
+            )
+          : createStream,
+        model,
+        context,
+        { apiKey: "test-key" },
+      ),
+    ).rejects.toThrow("Prepared stream did not reach an OpenAI Responses transport");
   });
 
   it("accepts retained-message prefixes from the official OpenAI endpoint", async () => {

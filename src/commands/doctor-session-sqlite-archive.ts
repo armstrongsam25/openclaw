@@ -5,7 +5,7 @@ import {
   resolveTrajectoryPath,
   resolveTrajectoryPointerPath,
 } from "../config/sessions/artifacts.js";
-import type { SessionStoreTarget } from "../config/sessions/targets.js";
+import type { SessionStoreTarget } from "../config/sessions/session-store-target.types.js";
 import { resolveRealpathOrAbsolute as canonicalFilePath } from "../infra/boundary-path.js";
 import {
   assertSafeSessionSqliteMigrationDirectory,

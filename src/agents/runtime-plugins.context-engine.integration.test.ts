@@ -14,11 +14,11 @@ import {
 import { createPluginCache, retirePluginCache, withPluginCache } from "../plugins/plugin-cache.js";
 import { PluginInstanceDrainTimeoutError } from "../plugins/plugin-instance-error.js";
 import {
-  clearActivePluginRegistry,
   disposePluginRegistryInstances,
   getActivePluginRegistry,
   waitForPluginRegistryRetirement,
 } from "../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../plugins/runtime.test-support.js";
 import { withPluginRuntimeRegistryScope } from "../plugins/runtime/gateway-request-scope.js";
 import { createDeferredCore } from "../shared/deferred.js";
 import { createContextEngineLogicalTurnLease } from "./harness/context-engine-logical-turn.js";

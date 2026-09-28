@@ -62,7 +62,7 @@ describe("normalizeApiKeyTokenProviderAuthChoice", () => {
     vi.restoreAllMocks();
   });
 
-  it("maps token provider auth through plugin token methods", () => {
+  it("maps token provider auth through plugin token methods", async () => {
     resolvePluginProviders.mockReturnValue([
       createProvider({
         id: "anthropic",
@@ -71,14 +71,14 @@ describe("normalizeApiKeyTokenProviderAuthChoice", () => {
     ]);
 
     expect(
-      normalizeApiKeyTokenProviderAuthChoice({
+      await normalizeApiKeyTokenProviderAuthChoice({
         authChoice: "token",
         tokenProvider: " anthropic ",
       }),
     ).toBe("setup-token");
   });
 
-  it("maps apiKey provider auth through plugin api key methods and aliases", () => {
+  it("maps apiKey provider auth through plugin api key methods and aliases", async () => {
     resolvePluginProviders.mockReturnValue([
       createProvider({
         id: "google",
@@ -88,14 +88,14 @@ describe("normalizeApiKeyTokenProviderAuthChoice", () => {
     ]);
 
     expect(
-      normalizeApiKeyTokenProviderAuthChoice({
+      await normalizeApiKeyTokenProviderAuthChoice({
         authChoice: "apiKey",
         tokenProvider: " GeMiNi ",
       }),
     ).toBe("gemini-api-key");
   });
 
-  it("leaves the auth choice unchanged when no matching provider method exists", () => {
+  it("leaves the auth choice unchanged when no matching provider method exists", async () => {
     resolvePluginProviders.mockReturnValue([
       createProvider({
         id: "openai",
@@ -104,7 +104,7 @@ describe("normalizeApiKeyTokenProviderAuthChoice", () => {
     ]);
 
     expect(
-      normalizeApiKeyTokenProviderAuthChoice({
+      await normalizeApiKeyTokenProviderAuthChoice({
         authChoice: "token",
         tokenProvider: "openai",
       }),

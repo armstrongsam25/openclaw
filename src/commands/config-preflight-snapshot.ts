@@ -13,14 +13,16 @@ import {
   type ConfigSnapshotReadOptions,
 } from "../config/io.js";
 import type { PreparedConfigRecovery } from "../config/io.types.js";
+import { resolveAllAgentSessionStoreCandidateTargetsSync } from "../config/sessions/targets.js";
 import { describeConfigSnapshotInputChange } from "../config/snapshot-inputs.js";
 import type { ConfigFileSnapshot } from "../config/types.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import type { StartupMigrationLease } from "../infra/startup-migration-checkpoint.js";
 import { recordStartupMigrationWarnings } from "../infra/state-migrations.messages.js";
 import { withDeferredPluginDoctorMigrations } from "../plugins/doctor-contract-registry.js";
 import { createPluginCache, getPluginCache, withPluginCache } from "../plugins/plugin-cache.js";
+import { withPluginLifecycleLease } from "../plugins/plugin-lifecycle-lease.js";
 import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.types.js";
 import { createLazyRuntimeModule } from "../shared/lazy-runtime.js";
 import {
@@ -173,7 +175,6 @@ export async function persistRefreshedPluginIndex(params: {
   if (!lease) {
     throwPluginRegistryPersistenceFailed("startup migration lease was not acquired");
   }
-  const { withPluginLifecycleLease } = await import("../plugins/plugin-lifecycle-lease.js");
   // Startup precedes plugin ownership; derive again after any pending installer settles.
   return await withPluginLifecycleLease(
     { env: params.env, assertCurrent: params.assertCurrent, processBound: true },
@@ -361,17 +362,13 @@ async function assertStartupStateReady(params: {
     undefined,
     () => admissionMetrics,
   );
-  const [
-    { assertSessionStoreMigrationComplete },
-    { resolveAllAgentSessionStoreCandidateTargetsSync },
-    { inspectOpenClawRegisteredAgentDatabases },
-  ] = await measureDoctorConfigPreflightStep("admission.session-runtime-import", () =>
-    Promise.all([
-      import("../config/sessions/startup-migration.js"),
-      import("../config/sessions/targets.js"),
-      import("../state/openclaw-agent-db-registry.js"),
-    ]),
-  );
+  const [{ assertSessionStoreMigrationComplete }, { inspectOpenClawRegisteredAgentDatabases }] =
+    await measureDoctorConfigPreflightStep("admission.session-runtime-import", () =>
+      Promise.all([
+        import("../config/sessions/startup-migration.js"),
+        import("../state/openclaw-agent-db-registry.js"),
+      ]),
+    );
   const registeredDatabases = await measureDoctorConfigPreflightStep(
     "admission.agent-inventory",
     () =>

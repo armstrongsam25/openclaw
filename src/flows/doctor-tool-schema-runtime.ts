@@ -12,6 +12,7 @@ import { shouldCreateBundleMcpRuntimeForAttempt } from "../agents/embedded-agent
 import { partitionMcpServersByConnectionScope } from "../agents/mcp-connection-resolver.js";
 import { collectExplicitAllowlist, normalizeToolPolicyName } from "../agents/tool-policy.js";
 import type { AnyAgentTool } from "../agents/tools/common.js";
+import { createDoctorPluginMetadataSnapshotScope } from "../commands/doctor/shared/plugin-metadata-snapshot-scope.js";
 import { isUpdateDoctorLintPass } from "../commands/doctor/shared/update-phase.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
@@ -214,10 +215,7 @@ export async function collectRuntimeToolSchemaFindings(
   const cfg = captureRuntimeConfig(sourceConfig);
   const env = options.env ?? process.env;
   const runWithPluginMetadataSnapshot =
-    options.runWithPluginMetadataSnapshot ??
-    (
-      await import("../commands/doctor/shared/plugin-metadata-snapshot-scope.js")
-    ).createDoctorPluginMetadataSnapshotScope({ env }).run;
+    options.runWithPluginMetadataSnapshot ?? createDoctorPluginMetadataSnapshotScope({ env }).run;
   const { frames, findings } = await prepareDoctorToolSchemaFrames(cfg, {
     ...options,
     env,

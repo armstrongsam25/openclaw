@@ -12,7 +12,7 @@ import { loadOpenClawPlugins } from "./loader.js";
 import { createPluginCache, retirePluginCache, withPluginCache } from "./plugin-cache.js";
 import { PluginInstanceDrainTimeoutError } from "./plugin-instance-error.js";
 import { getPluginInstance } from "./plugin-instance-scope.js";
-import { clearActivePluginRegistry } from "./runtime.js";
+import { clearActivePluginRegistry } from "./runtime.test-support.js";
 
 const temp = useAutoCleanupTempDirTracker(afterEach);
 afterEach(() => {

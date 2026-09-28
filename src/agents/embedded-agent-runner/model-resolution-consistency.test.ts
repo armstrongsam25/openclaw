@@ -106,7 +106,6 @@ vi.mock("../prepared-model-runtime.js", () => ({
 
 vi.mock("./run/setup.js", () => ({
   buildBeforeModelResolveAttachments: vi.fn(() => []),
-  createNativeModelOwnedRuntimeModel: vi.fn(),
   resolveHookModelSelection: resolveHookModelSelectionMock,
 }));
 

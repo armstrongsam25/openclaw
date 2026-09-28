@@ -2,7 +2,7 @@
 import { collectConfiguredModelRefs } from "@openclaw/model-catalog-core/configured-model-refs";
 import { normalizeLowercaseStringOrEmpty } from "@openclaw/normalization-core/string-coerce";
 import { listAgentEntriesWithSource } from "../agents/agent-scope.js";
-import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import { planManifestModelCatalogSuppressions } from "../model-catalog/index.js";
 import { normalizePluginsConfig, normalizePluginId } from "../plugins/config-state.js";
 import {

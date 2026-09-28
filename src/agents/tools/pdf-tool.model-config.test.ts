@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 import { withPluginMetadataSnapshotScope } from "../../plugins/current-plugin-metadata-snapshot.js";
-import { finalizePluginMetadataSnapshot } from "../../plugins/plugin-metadata-snapshot.js";
+import { restorePluginMetadataSnapshot } from "../../plugins/plugin-metadata-snapshot.js";
 import { createPluginMetadataSnapshotFixture } from "../../plugins/plugin-metadata.test-support.js";
 import * as modelConfigHelpers from "./model-config.helpers.js";
 import { resolvePdfModelConfigForTool } from "./pdf-tool.model-config.js";
@@ -80,7 +80,7 @@ it.each([
 it("does not select a provider that disables PDF image extraction", () => {
   available.add("restricted");
   const cfg = configuredProvider("restricted", "restricted/text");
-  const snapshot = finalizePluginMetadataSnapshot(
+  const snapshot = restorePluginMetadataSnapshot(
     createPluginMetadataSnapshotFixture({
       plugins: [
         {

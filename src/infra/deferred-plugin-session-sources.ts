@@ -23,7 +23,7 @@ import { tableExists } from "../state/openclaw-state-db-schema-helpers.js";
 import type { DB } from "../state/openclaw-state-db.generated.js";
 import { runOpenClawStateWriteTransaction } from "../state/openclaw-state-db.js";
 import { sha256Hex } from "./crypto-digest.js";
-import type { DeferredPluginMigration } from "./deferred-plugin-migrations.js";
+import type { DeferredPluginMigration } from "./deferred-plugin-migrations.contract.js";
 import { verifyDeferredSessionDatabase } from "./deferred-plugin-session-verification.js";
 import { executeSqliteQuerySync, getNodeSqliteKysely } from "./kysely-sync.js";
 import {

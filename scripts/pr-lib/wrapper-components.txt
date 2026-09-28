@@ -608,6 +608,7 @@ src/infra/agent-run-registry-state.ts
 src/infra/agent-run-registry.ts
 src/infra/agent-run-usage.ts
 src/infra/approval-resolution-ref.ts
+src/infra/archive.ts
 src/infra/backoff.ts
 src/infra/backup-scratch.ts
 src/infra/boundary-file-read.ts
@@ -706,7 +707,9 @@ src/infra/http-request-lifecycle.ts
 src/infra/http-response-body-timeout.ts
 src/infra/http-response-body.ts
 src/infra/inline-option-token.ts
+src/infra/install-mode-options.ts
 src/infra/install-safe-path.ts
+src/infra/install-source-utils.ts
 src/infra/json-files.ts
 src/infra/kysely-sync-cache-state.ts
 src/infra/kysely-sync.ts
@@ -738,6 +741,7 @@ src/infra/node-runner-inventory.ts
 src/infra/node-runtime-executable.ts
 src/infra/node-sqlite.ts
 src/infra/non-fatal-cleanup.ts
+src/infra/npm-install-env.ts
 src/infra/npm-registry-spec.ts
 src/infra/openclaw-exec-env.ts
 src/infra/openclaw-process-census.ts
@@ -849,6 +853,7 @@ src/infra/state-migrations.cron-run-logs.ts
 src/infra/state-migrations.receipts.ts
 src/infra/tcp-port.ts
 src/infra/temp-artifact-cleanup.ts
+src/infra/temp-artifact-removal.ts
 src/infra/test-runtime-env.ts
 src/infra/tmp-openclaw-dir.ts
 src/infra/update-channels.ts
@@ -874,6 +879,7 @@ src/infra/update-managed-service-handoff-schema.ts
 src/infra/update-managed-service-handoff-scope.ts
 src/infra/update-managed-service-handoff-source-inspection.ts
 src/infra/update-managed-service-handoff-store-repair.ts
+src/infra/update-network-budget.ts
 src/infra/update-preflight-details.ts
 src/infra/update-recovery-receipt-schema.ts
 src/infra/update-recovery.ts
@@ -979,7 +985,6 @@ src/plugins/channel-catalog-registry.ts
 src/plugins/channel-presence-policy.ts
 src/plugins/channel-startup-policy.ts
 src/plugins/clawhub-error-codes.ts
-src/plugins/command-execution-lock.ts
 src/plugins/compat/deprecation-marking.ts
 src/plugins/compat/media-legacy-projection.ts
 src/plugins/compat/plugin-sdk-subpath-records.ts
@@ -1033,14 +1038,17 @@ src/plugins/installed-plugin-index-record-builder.ts
 src/plugins/installed-plugin-index-record-cache.ts
 src/plugins/installed-plugin-index-record-reader.ts
 src/plugins/installed-plugin-index-record-state.ts
+src/plugins/installed-plugin-index-records.ts
 src/plugins/installed-plugin-index-row.ts
 src/plugins/installed-plugin-index-source-admissions.ts
 src/plugins/installed-plugin-index-store-path.ts
+src/plugins/installed-plugin-index-store-write.ts
 src/plugins/installed-plugin-index-store.ts
 src/plugins/installed-plugin-index-types.ts
 src/plugins/installed-plugin-index.ts
 src/plugins/installed-plugin-package-ownership.ts
 src/plugins/installed-plugin-record-match.ts
+src/plugins/installs.ts
 src/plugins/jiti-factory.ts
 src/plugins/legacy-npm-declaration.ts
 src/plugins/loader-cache-state.ts
@@ -1105,6 +1113,8 @@ src/plugins/plugin-instance-owned-values.ts
 src/plugins/plugin-instance-scope.ts
 src/plugins/plugin-instance-value-views.ts
 src/plugins/plugin-instance.ts
+src/plugins/plugin-lifecycle-lease-identity.ts
+src/plugins/plugin-lifecycle-lease.ts
 src/plugins/plugin-lifecycle-trace.ts
 src/plugins/plugin-lru-cache.ts
 src/plugins/plugin-metadata-contributions.ts

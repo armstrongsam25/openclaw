@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import nodePath from "node:path";
+import { assertInstalledPluginIdRecoveryCurrent } from "../commands/doctor/shared/installed-plugin-id-recovery.js";
 import { shouldSkipLegacyUpdateDoctorConfigWrite } from "../commands/doctor/shared/update-phase.js";
+import { applyWizardMetadata } from "../commands/onboard-helpers.js";
 import { ConfigWritePostCommitError } from "../config/io.write-errors.js";
+import { resolveConfigIncludeWriteBoundary } from "../config/mutate.js";
 import { resolveIsConfigReadOnly, resolveIsNixMode } from "../config/paths.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { recordUpdateModelRetirement } from "../infra/update-deferred-model-retirement.js";
@@ -11,12 +14,15 @@ import {
   recordUpdateDoctorConfigWriteRefusal,
   runUpdateDoctorIncludeWrite,
 } from "../infra/update-doctor-result.js";
+import { createSubsystemLogger } from "../logging/subsystem.js";
+import { withPluginLifecycleLease } from "../plugins/plugin-lifecycle-lease.js";
 import type { DoctorHealthFlowContext } from "./doctor-health-contribution-types.js";
 import {
   isUpdateDoctorRun,
   resolveDoctorMode,
   resolveLegacyParentVersionOverride,
 } from "./doctor-health-contribution-utils.js";
+import { recordDoctorHealthWarnings } from "./doctor-health-contribution.js";
 import type { HealthCheckContext, HealthFinding } from "./health-checks.js";
 
 /** Removes queued retired profiles after any config references have been durably repaired. */
@@ -47,17 +53,13 @@ export async function runWriteConfigHealth(
     // same candidate would fail identically and duplicate the warning.
     return false;
   }
-  const { applyWizardMetadata } = await import("../commands/onboard-helpers.js");
   const { ConfigMutationConflictError, readConfigFileSnapshot, transformConfigFile } =
     await import("../config/config.js");
   const { collectChangedConfigPaths } = await import("../config/include-write-boundary.js");
   const { hashConfigRaw } = await import("../config/io.read-helpers.js");
-  const { resolveConfigIncludeWriteBoundary } = await import("../config/mutate.js");
   const { isDeepStrictEqual } = await import("node:util");
   const { getDeferredPluginMigrationConfigFacts, preserveDeferredPluginMigrationConfig } =
     await import("../config/deferred-plugin-migration-config.js");
-  const { createSubsystemLogger } = await import("../logging/subsystem.js");
-  const { recordDoctorHealthWarnings } = await import("./doctor-health-contribution.js");
   const { logConfigUpdated } = await import("../config/logging.js");
   const { shortenHomePath } = await import("../utils.js");
   const configResultWritePending =
@@ -106,8 +108,6 @@ export async function runWriteConfigHealth(
       resolveLegacyParentVersionOverride(ctx).lastTouchedVersionOverride;
     const { assertShippedPluginInstallConfigImportCurrent } =
       await import("../commands/doctor/shared/plugin-registry-migration.js");
-    const { assertInstalledPluginIdRecoveryCurrent } =
-      await import("../commands/doctor/shared/installed-plugin-id-recovery.js");
     const installedPluginIdRecovery = ctx.configResult.referenceSource?.installedPluginIdRecovery;
     let committed: Awaited<ReturnType<typeof transformConfigFile>>;
     let rosterWriteCommitted = false;
@@ -288,7 +288,6 @@ export async function runWriteConfigHealth(
         if (!installedPluginIdRecovery?.size) {
           return await persistConfig();
         }
-        const { withPluginLifecycleLease } = await import("../plugins/plugin-lifecycle-lease.js");
         return await withPluginLifecycleLease(
           { env: ctx.env ?? process.env, assertCurrent: () => authority?.assertCurrent() },
           (lease) => persistConfig(() => lease.assertOwned()),

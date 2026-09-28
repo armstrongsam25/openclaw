@@ -5,6 +5,7 @@ import {
   isArtifactPreservingStateRead,
 } from "../state/openclaw-state-db-readonly.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
+import { runOpenClawStateWorkerOperation } from "../state/openclaw-state-worker-store.js";
 import {
   readPluginMetadataStateRowSync,
   type PluginMetadataStateSelector,
@@ -25,8 +26,6 @@ export async function readPluginMetadataStateRow(
         context.admission.assertCurrent();
         return readPluginMetadataStateRowSync(selector, options, true);
       }
-      const { runOpenClawStateWorkerOperation } =
-        await import("../state/openclaw-state-worker-store.js");
       context.admission.assertCurrent();
       return await runOpenClawStateWorkerOperation(
         context,

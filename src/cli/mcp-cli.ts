@@ -10,6 +10,7 @@ import {
 } from "@openclaw/normalization-core/string-coerce";
 import { normalizeCsvOrLooseStringList } from "@openclaw/normalization-core/string-normalization";
 import { Command } from "commander";
+import { disposeAllSessionMcpRuntimes } from "../agents/agent-bundle-mcp-manager-api.js";
 import type { SessionMcpRuntime } from "../agents/agent-bundle-mcp-types.js";
 import {
   setConfiguredMcpServer,
@@ -19,14 +20,7 @@ import {
 } from "../agents/mcp-config-mutation.js";
 import { operatorMcpOAuthIdentity } from "../agents/mcp-oauth-identity.js";
 import { readMcpOAuthStoreReadOnly } from "../agents/mcp-oauth-store.js";
-import {
-  clearMcpOAuthCredentials,
-  completeMcpOAuthAuthorization,
-  countMcpOAuthPrincipals,
-  readMcpOAuthCredentialsStatus,
-  startMcpOAuthAuthorization,
-  type McpOAuthPrincipalStatus,
-} from "../agents/mcp-oauth.js";
+import type { McpOAuthPrincipalStatus } from "../agents/mcp-oauth.js";
 import { resolveMcpTransportConfig } from "../agents/mcp-transport-config.js";
 import { parseConfigValue } from "../auto-reply/reply/config-value.js";
 import { listConfiguredMcpServers } from "../config/mcp-config.js";
@@ -51,10 +45,6 @@ import { applyParentDefaultHelpAction } from "./program/parent-default-help.js";
 const createSessionMcpRuntime = createLazyRuntimeMethod(
   () => import("../agents/agent-bundle-mcp-runtime.js"),
   (runtime) => runtime.createSessionMcpRuntime,
-);
-const disposeAllSessionMcpRuntimes = createLazyRuntimeMethod(
-  () => import("../agents/agent-bundle-mcp-manager-api.js"),
-  (runtime) => runtime.disposeAllSessionMcpRuntimes,
 );
 
 function fail(message: string, json?: boolean): never {
@@ -400,6 +390,7 @@ async function collectMcpDoctorIssues(params: {
     if (resolved?.kind === "http") {
       if (server.auth === "oauth") {
         if (asRecord(server.oauth)?.identity !== "per-requester") {
+          const { readMcpOAuthCredentialsStatus } = await import("../agents/mcp-oauth.js");
           const authStatus = await readMcpOAuthCredentialsStatus(
             operatorMcpOAuthIdentity(name, resolved.url),
           );
@@ -513,6 +504,7 @@ async function countConnectedMcpPrincipals(
   ) {
     return undefined;
   }
+  const { countMcpOAuthPrincipals } = await import("../agents/mcp-oauth.js");
   return countMcpOAuthPrincipals(operatorMcpOAuthIdentity(name, resolved.url));
 }
 
@@ -545,6 +537,7 @@ async function buildMcpStatusEntries(
         resolved?.kind === "http" &&
         asRecord(server.oauth)?.identity !== "per-requester"
       ) {
+        const { readMcpOAuthCredentialsStatus } = await import("../agents/mcp-oauth.js");
         const identity = operatorMcpOAuthIdentity(name, resolved.url);
         // Documented `mcp status --json` contract: the six legacy authStatus
         // booleans stay for existing scripts; `state` is the additive shape.
@@ -1251,6 +1244,8 @@ export function registerMcpCli(program: Command) {
     .argument("<name>", "MCP server name")
     .option("--code <code>", "Authorization code from the OAuth redirect")
     .action(async (name: string, opts: { code?: string }) => {
+      const { completeMcpOAuthAuthorization, startMcpOAuthAuthorization } =
+        await import("../agents/mcp-oauth.js");
       const loaded = await loadMcpConfig();
       const server = requireMcpServer(loaded, name);
       if (asRecord(server.oauth)?.identity === "per-requester") {
@@ -1333,6 +1328,7 @@ export function registerMcpCli(program: Command) {
     .description("Clear stored OAuth credentials for an MCP server")
     .argument("<name>", "MCP server name")
     .action(async (name: string) => {
+      const { clearMcpOAuthCredentials } = await import("../agents/mcp-oauth.js");
       const loaded = await loadMcpConfig();
       const server = requireMcpServer(loaded, name);
       if (asRecord(server.oauth)?.identity === "per-requester") {

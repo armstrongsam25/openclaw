@@ -7,6 +7,7 @@ import {
   MEMORY_SEARCH_DEADLINE_CONTROL,
   type MemorySearchDeadlineControl,
 } from "../../packages/memory-host-sdk/src/host/search-deadline-control.js";
+import { resolveAgentDir, tryResolveAmbientOwnerAgentId } from "../agents/agent-scope-config.js";
 import {
   createProviderHttpError,
   readProviderJsonArrayFieldResponse,
@@ -188,8 +189,6 @@ async function resolveConfiguredProviderApiKey(params: {
   if (!apiKey) {
     return undefined;
   }
-  const { resolveAgentDir, tryResolveAmbientOwnerAgentId } =
-    await import("../agents/agent-scope-config.js");
   const agentId = tryResolveAmbientOwnerAgentId(params.options.config);
   const agentDir =
     params.options.agentDir?.trim() ||

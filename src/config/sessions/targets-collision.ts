@@ -2,20 +2,14 @@ import path from "node:path";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { normalizeAgentId } from "../../routing/session-key.js";
 import { createOpenClawAgentDatabasePathMatcher } from "../../state/openclaw-agent-db.paths.js";
+import type { ResolvedSqliteStoreTarget } from "./session-accessor.sqlite-contract.js";
 import { resolveUnsuffixedSqliteTargetFromSessionStorePath } from "./session-sqlite-target-paths.js";
 import {
   readSessionStoreRegistryRows,
   resolveSqliteTargetFromSessionStorePath,
-  type ResolvedSqliteStoreTarget,
-  type SessionStoreRegistryRead,
 } from "./session-sqlite-target.js";
 import type { SessionStoreReadCandidate } from "./session-store-read-candidates.js";
-
-/** One session store path paired with its owning agent id. */
-export type SessionStoreTarget = {
-  agentId: string;
-  storePath: string;
-};
+import type { SessionStoreRegistryRead, SessionStoreTarget } from "./session-store-target.types.js";
 
 type SessionStoreTargetCollisionDiagnostic = {
   message: string;

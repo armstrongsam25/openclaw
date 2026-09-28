@@ -420,7 +420,8 @@ export async function getOpenClawStateDatabaseTerminalFailureAsync(
   const failure = await terminalOpenLatch.getAsync(
     context.admission.databasePath,
     async (_path, generation) => {
-      const { inspectOpenClawStateDatabase } = await import("./openclaw-state-worker-store.js");
+      const { inspectOpenClawStateDatabase } =
+        await import("./openclaw-state-maintenance.runtime.js");
       const matches = await inspectOpenClawStateDatabase(context, {
         type: "database.generationMatches",
         input: { generation },

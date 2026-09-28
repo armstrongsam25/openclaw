@@ -846,7 +846,6 @@ describe("EmbeddedTuiBackend", () => {
     projectSessionsPatchEntryMock,
     applySessionPatchProjectionMock,
     deferred,
-    flushMicrotasks,
   });
 
   it("rejects a missing harness-owned session before a local patch can create it", async () => {

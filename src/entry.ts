@@ -3,7 +3,6 @@
 // CLI process entrypoint for OpenClaw command execution.
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { format } from "node:util";
 import { resolveCliArgvInvocation } from "./cli/argv-invocation.js";
 import { isRootHelpInvocation } from "./cli/argv.js";
 import { parseCliContainerArgs, resolveCliContainerTarget } from "./cli/container-target.js";
@@ -80,16 +79,8 @@ async function prepareCliDiagnosticBlockWriter(): Promise<
     const { loadCliDotEnv } = await import("./cli/dotenv.js");
     loadCliDotEnv({ quiet: true });
     await configureGatewayStartupTraceConsoleFormatting(gatewayEntryStartupTrace);
-    const { formatConsoleDiagnosticBlock } = await import("./logging/json-console-line.js");
-    return (message, error) => {
-      const formatted = error === undefined ? message : format(message, error);
-      process.stderr.write(
-        formatConsoleDiagnosticBlock({
-          level: "error",
-          message: formatted.endsWith("\n") ? formatted : `${formatted}\n`,
-        }),
-      );
-    };
+    const { writeConsoleDiagnosticError } = await import("./logging/diagnostic.runtime.js");
+    return writeConsoleDiagnosticError;
   };
   // Explicit traces flush before spawn; successful untraced parents need no diagnostics.
   return gatewayEntryStartupTrace.enabled

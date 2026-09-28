@@ -5,7 +5,7 @@ import type { LegacyConfigUpdatePlan } from "../../commands/doctor/legacy-config
 import { cloneEnvWithPlatformSemantics } from "../../config/env-vars.js";
 import { createConfigIO } from "../../config/io.js";
 import { resolveConfigPath } from "../../config/paths.js";
-import { resolveConfiguredAgentDatabaseCandidatePaths } from "../../config/sessions/targets.js";
+import { resolveConfiguredAgentDatabaseCandidatePaths } from "../../config/sessions/targets-configured-agents.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { formatErrorMessage } from "../../infra/errors.js";
 import {

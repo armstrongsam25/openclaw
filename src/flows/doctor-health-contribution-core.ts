@@ -8,6 +8,7 @@ import {
   renderStructuredHealthFindings,
 } from "./doctor-health-contribution.js";
 import { copyHealthChecks } from "./health-check-adapter.js";
+import { listExtensionHealthChecksForDoctor } from "./health-check-registry.js";
 import type { DoctorHealthCheck } from "./health-check-runner-types.js";
 import { isHealthCheckEnabledByDefault, type HealthFinding } from "./health-checks.js";
 
@@ -49,7 +50,6 @@ export async function runStructuredHealthRepairs(
     return;
   }
   const { registerBundledHealthChecks } = await import("./bundled-health-checks.js");
-  const { listExtensionHealthChecksForDoctor } = await import("./health-check-registry.js");
   const { runDoctorHealthRepairs } = await import("./doctor-repair-flow.js");
   const { note } = await import("../../packages/terminal-core/src/note.js");
 

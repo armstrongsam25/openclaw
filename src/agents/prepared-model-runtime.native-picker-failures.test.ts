@@ -24,11 +24,11 @@ import {
   acquireAgentRunPreparedModelRuntime,
   getPreparedModelRuntimeSnapshot,
   markPreparedModelRuntimeSnapshotsStale,
-  publishPreparedModelRuntimeSnapshot,
   refreshPreparedModelRuntimeSnapshots,
 } from "./prepared-model-runtime.js";
 import { resolvePreparedModelRuntimeOwnerBySnapshot } from "./prepared-model-runtime.owner.js";
 import { registerPreparedModelRuntimePublicationListener } from "./prepared-model-runtime.publication-events.js";
+import { publishPreparedModelRuntimeSnapshot } from "./prepared-model-runtime.test-support.js";
 import type { PreparedModelRuntimeSnapshot } from "./prepared-model-runtime.types.js";
 
 const runtimeFixture = usePreparedModelRuntimeHarness({ label: "native-picker" }, () => {

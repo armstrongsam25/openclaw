@@ -65,7 +65,8 @@ import {
   getGatewayToolCallerIdentity,
   withGatewayToolCallerIdentity,
 } from "./gateway-caller-context.js";
-import { callGatewayTool, readGatewayCallOptions, type GatewayCallOptions } from "./gateway.js";
+import type { GatewayCallOptions } from "./gateway-options.js";
+import { callGatewayTool, readGatewayCallOptions } from "./gateway.js";
 import { resolveInternalSessionKey, resolveMainSessionAlias } from "./sessions-helpers.js";
 
 export type { CronCreatorToolAllowlistEntry, CronToolsAllowCaptureRef } from "./cron-tool.types.js";

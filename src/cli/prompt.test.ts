@@ -1,7 +1,8 @@
 // Prompt tests cover CLI prompt input handling and cancellation behavior.
 import readline from "node:readline/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { isYes, setVerbose, setYes } from "../globals.js";
+import { setYes } from "../global-state.js";
+import { isYes, setVerbose } from "../globals.js";
 import { PromptInputClosedError, promptYesNo } from "./prompt.js";
 
 const readlineState = vi.hoisted(() => {

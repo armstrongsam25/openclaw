@@ -2,13 +2,12 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
-import { truncateUtf16Safe } from "@openclaw/normalization-core/utf16-slice";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { resolveGlobalSingleton } from "../shared/global-singleton.js";
 import { resolveRealpathOrAbsolute } from "./boundary-path.js";
 import { hasErrnoCode } from "./errno.js";
 import { formatErrorMessage } from "./errors.js";
-import { runBestEffortCleanup } from "./non-fatal-cleanup.js";
+import { removeTemporaryArtifacts } from "./temp-artifact-removal.js";
 
 const log = createSubsystemLogger("infra:temp-artifacts");
 const retainedRuntimes = resolveGlobalSingleton(
@@ -172,25 +171,4 @@ export async function maintainRetainedUpdateRuntimes(params: {
     }
   }
   return messages;
-}
-
-// Only disposable filesystem artifacts are advisory. Call after resource release;
-// failed deletion must preserve the primary result, including cancellation/timeouts.
-export function removeTemporaryArtifacts(
-  directory: string,
-  owner: string,
-  onError: (error: unknown) => void = (error) =>
-    log.warn(
-      truncateUtf16Safe(
-        formatErrorMessage(
-          `${owner} cleanup failed; files may remain in ${directory}. After the worker or session stops, check permissions and remove the retained directory: ${formatErrorMessage(error)}`,
-        ),
-        1_024,
-      ),
-    ),
-): Promise<void> {
-  return runBestEffortCleanup({
-    cleanup: () => fs.rm(directory, { recursive: true, force: true }),
-    onError,
-  });
 }

@@ -8,7 +8,6 @@ import {
 } from "../../../packages/gateway-protocol/src/index.js";
 import { CronHistoryResultSchema } from "../../../packages/gateway-protocol/src/schema/cron.js";
 import { resolveSessionStorePathCore } from "../../config/sessions/paths.js";
-import { readSessionHistoryPageInWorker } from "../../config/sessions/session-history-worker-runtime.js";
 import { cronRunRecordToRunLogEntry } from "../../cron/run-history-detail.js";
 import { cronStoreKey } from "../../cron/store/key.js";
 import { readCronRunRecords } from "../../cron/store/read-only.js";
@@ -145,6 +144,8 @@ export const cronHistoryHandler: GatewayRequestHandler = async (opts) => {
       }
       assertAllowed(transcriptSessionKey, agentId);
     };
+    const { readSessionHistoryPageInWorker } =
+      await import("../../config/sessions/session-history-worker-runtime.js");
     assertCurrent();
     const physical = await readSessionHistoryPageInWorker(
       {

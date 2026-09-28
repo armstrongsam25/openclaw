@@ -38,8 +38,8 @@ import {
   captureGatewayToolCallerAssertion,
   resolveGatewayToolOperatorSelection,
 } from "./gateway-caller-context.js";
+import { callInProcessGatewayToolWithCreation } from "./gateway.js";
 import {
-  callInProcessGatewayToolWithCreation,
   hasInProcessGatewayToolContext,
   type AgentToolGatewayRequestCaller,
 } from "./in-process-gateway.js";

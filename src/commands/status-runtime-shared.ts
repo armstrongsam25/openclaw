@@ -4,6 +4,7 @@
 import type { Result } from "@openclaw/normalization-core/result";
 import { sanitizeTerminalText } from "../../packages/terminal-core/src/safe-text.js";
 import type { OpenClawConfig } from "../config/types.js";
+import { callGateway } from "../gateway/call.js";
 import type { HeartbeatEventPayload } from "../infra/heartbeat-events.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { createLazyImportLoader } from "../shared/lazy-promise.js";
@@ -16,7 +17,6 @@ const statusUsageModuleLoader = createLazyImportLoader(() => import("./status-us
 const securityAuditModuleLoader = createLazyImportLoader(
   () => import("../security/audit.runtime.js"),
 );
-const gatewayCallModuleLoader = createLazyImportLoader(() => import("../gateway/call.js"));
 
 /** Runs the lightweight security audit used by status JSON/all output. */
 export async function resolveStatusSecurityAudit(params: {
@@ -49,7 +49,6 @@ export async function resolveStatusGatewayHealth(params: {
   timeoutMs?: number;
   gatewayProbeDeadlineMs: number;
 }) {
-  const { callGateway } = await gatewayCallModuleLoader.load();
   const timeoutMs = resolveStatusGatewayProbeTimeoutMs(params);
   if (timeoutMs === 0) {
     throw new Error("Gateway probe budget exhausted before health check.");
@@ -79,7 +78,6 @@ export async function resolveStatusGatewayHealthSafe(params: {
     // Preserve the probe error so status-all can explain why health was not called.
     return { error: params.gatewayProbeError ?? "gateway unreachable" };
   }
-  const { callGateway } = await gatewayCallModuleLoader.load();
   const timeoutMs = resolveStatusGatewayProbeTimeoutMs(params);
   if (timeoutMs === 0) {
     return { error: "Gateway probe budget exhausted before health check." };
@@ -111,7 +109,6 @@ export async function resolveStatusGatewayDiagnosticsSafe(params: {
   if (!params.gatewayReachable) {
     return { ok: false, error: "gateway unreachable" };
   }
-  const { callGateway } = await gatewayCallModuleLoader.load();
   const timeoutMs = resolveStatusGatewayProbeTimeoutMs(params);
   if (timeoutMs === 0) {
     return { ok: false, error: "Gateway probe budget exhausted before diagnostics." };
@@ -138,7 +135,6 @@ async function resolveStatusLastHeartbeat(params: {
   if (!params.gatewayReachable) {
     return null;
   }
-  const { callGateway } = await gatewayCallModuleLoader.load();
   const timeoutMs = resolveStatusGatewayProbeTimeoutMs(params);
   if (timeoutMs === 0) {
     return null;

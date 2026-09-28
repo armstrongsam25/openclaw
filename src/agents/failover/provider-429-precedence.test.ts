@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { classifyFailoverSignal } from "./classify.js";
-import type { PreparedProviderFailoverOwner } from "./provider-patterns.js";
+import type { PreparedProviderFailoverOwner } from "./signal.js";
 
 function expect429Reason(
   message: string,

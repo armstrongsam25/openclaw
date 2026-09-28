@@ -153,7 +153,6 @@ vi.mock("./model-discovery-context.js", () => ({
 
 vi.mock("./embedded-agent-runner/model.js", () => ({
   resolveModelAsync: (...args: unknown[]) => resolveModelAsyncMock(...args),
-  resolveModelWithRegistry: (...args: unknown[]) => resolveModelWithRegistryMock(...args),
 }));
 
 vi.mock("./model-auth.js", () => ({

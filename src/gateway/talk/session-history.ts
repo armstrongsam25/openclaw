@@ -1,3 +1,4 @@
+import { readRestoredSessionTranscript } from "../../config/sessions/session-cold-storage-read.js";
 import { resolveClientVoiceAgentSessionId } from "../../talk/client-voice-session.js";
 import { readSessionPreviewItemsFromTranscriptAsync } from "../session-transcript-preview.js";
 import type { PreparedTalkSessionTarget } from "./session-target.types.js";
@@ -22,8 +23,6 @@ export async function readTalkRealtimeInitialItems(
   if (!sessionId) {
     return [];
   }
-  const { readRestoredSessionTranscript } =
-    await import("../../config/sessions/session-cold-storage-read.js");
   return await readRestoredSessionTranscript(
     { ...sessionTarget, sessionId },
     async () => {

@@ -4,6 +4,7 @@ import {
   tryResolveAmbientOwnerAgentId,
   tryResolveLegacyCompatibilityAgentId,
 } from "../agents/agent-scope-config.js";
+import { resolveConfiguredAgentDatabaseCandidatePaths } from "../config/sessions/targets-configured-agents.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { collectNestedErrorCandidates } from "../infra/error-graph-internal.js";
 import { formatErrorMessage } from "../infra/errors.js";
@@ -391,8 +392,6 @@ export async function evaluateAgentDatabaseAdmissions(
   options: AdmissionOptions = {},
 ): Promise<AgentDatabaseAdmissionRefusal[]> {
   const { preflightOpenClawDatabaseSchemas } = await import("./openclaw-database-preflight.js");
-  const { resolveConfiguredAgentDatabaseCandidatePaths } =
-    await import("../config/sessions/targets.js");
   const env = options.env ?? process.env;
   const result = await preflightOpenClawDatabaseSchemas({
     env,

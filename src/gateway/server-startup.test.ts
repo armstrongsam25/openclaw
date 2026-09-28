@@ -149,7 +149,7 @@ describe("gateway startup model runtime publication", () => {
       }),
     ).rejects.toBe(error);
   });
-  it("passes a current-config supplier after loading the prepared runtime", async () => {
+  it("passes a current-config supplier to the publication owner", async () => {
     const initialConfig = { ui: { theme: "light" } } as never;
     const nextConfig = { ui: { theme: "dark" } } as never;
     let currentConfig = initialConfig;
@@ -197,15 +197,11 @@ describe("gateway startup model runtime publication", () => {
     expect(hydrate).toHaveBeenCalledWith(nextConfig, "/tmp/default-agent", ["openai"]);
   });
 
-  it("drops a stale plugin generation after loading the prepared runtime", async () => {
-    let current = true;
-    const publication = publishConfiguredModelRuntimeSnapshots({
+  it("drops an already stale plugin generation before publication", async () => {
+    await publishConfiguredModelRuntimeSnapshots({
       cfg: {},
-      isCurrent: () => current,
-    } as never);
-    current = false;
-
-    await publication;
+      isCurrent: () => false,
+    });
 
     expect(refreshPreparedModelRuntimeSnapshotsMock).not.toHaveBeenCalled();
   });

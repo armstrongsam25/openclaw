@@ -17,7 +17,6 @@ import { hasAuthProfileForProvider } from "../../agents/tools/model-config.helpe
 import { resolveWebSearchToolPolicy } from "../../agents/web-search-tool-policy.js";
 import { getRuntimeConfigSourceSnapshot } from "../../config/runtime-snapshot.js";
 import { resolveSecretInputRef } from "../../config/types.secrets.js";
-import { listSearchProviderOptions } from "../../flows/search-setup.js";
 import { resolvePluginCredentialDescriptors } from "../../plugins/credential-descriptors.js";
 import { resolveManagedPluginMetadata } from "../../plugins/management-service.js";
 import type { PluginWebSearchProviderEntry } from "../../plugins/web-provider-types.js";
@@ -69,6 +68,7 @@ export async function prepareWebSearchStatus(
   request: WebSearchStatusParams,
   requesterProfileId?: string,
 ) {
+  const { listSearchProviderOptions } = await import("../../flows/search-setup.js");
   const config = context.getRuntimeConfig();
   const scope = resolveModelAuthAgentScope(config, request.agentId);
   if (!scope.ok) {

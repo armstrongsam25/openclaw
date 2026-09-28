@@ -34,8 +34,9 @@ import { CommandLane } from "../process/lanes.js";
 import { createOutboundTestPlugin, createTestRegistry } from "../test-utils/channel-plugins.js";
 import { getAgentEventLifecycleGeneration } from "./agent-events.js";
 import { getLastHeartbeatEvent, resetHeartbeatEventsForTest } from "./heartbeat-events.js";
-import { type HeartbeatDeps, runHeartbeatOnce } from "./heartbeat-runner.js";
+import { runHeartbeatOnce } from "./heartbeat-runner-run.js";
 import {
+  type HeartbeatDeps,
   type HeartbeatReplySpy,
   seedHeartbeatScratchForTest,
   seedMainSessionStore,

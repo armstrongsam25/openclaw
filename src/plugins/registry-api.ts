@@ -15,6 +15,7 @@ import {
   schedulePluginSessionTurn,
   unschedulePluginSessionTurnsByTag,
 } from "./host-hook-scheduled-turns.js";
+import { enqueuePluginNextTurnInjection } from "./host-hook-state.js";
 import { getPluginRuntimeEntrySource } from "./plugin-runtime-artifact-binding.js";
 import {
   capturePluginLifecycleAuthority,
@@ -40,9 +41,8 @@ type BoundRegistrars = {
     : never;
 };
 
-// Registration exposes these async operations without loading session storage or delivery.
+// Delivery stays deferred until an attachment is sent.
 const loadAttachments = createLazyRuntimeModule(() => import("./host-hook-attachments.js"));
-const loadHookState = createLazyRuntimeModule(() => import("./host-hook-state.js"));
 
 function resolvePluginPath(input: string, rootDir: string | undefined): string {
   const trimmed = input.trim();
@@ -151,7 +151,8 @@ export function createPluginApiFactory(
                     sessionKey: injection.sessionKey,
                   };
                 }
-                const { enqueuePluginNextTurnInjection } = await loadHookState();
+                // Preserve async admission before reading live config and registry authority.
+                await Promise.resolve();
                 if (
                   registryParams.activateGlobalSideEffects === false ||
                   !shouldCommitWorkflowSideEffect()

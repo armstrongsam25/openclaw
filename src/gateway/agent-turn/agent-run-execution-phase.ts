@@ -14,10 +14,8 @@ import {
 } from "../../agents/agent-run-terminal-outcome.js";
 import { repairMainSessionRecoveryMutation } from "../../agents/main-session-recovery/main-session-recovery-lifecycle.js";
 import { scheduleMainSessionRecoveryPendingTarget } from "../../agents/main-session-recovery/main-session-recovery-owner-release.js";
-import {
-  releaseMainSessionRecoveryOwner,
-  type MainSessionRecoveryPendingTarget,
-} from "../../agents/main-session-recovery/main-session-recovery-store.js";
+import { releaseMainSessionRecoveryOwner } from "../../agents/main-session-recovery/main-session-recovery-store.js";
+import type { MainSessionRecoveryPendingTarget } from "../../agents/main-session-recovery/main-session-recovery-types.js";
 import { withPreparedModelRuntimePluginGenerationScope } from "../../agents/prepared-model-runtime-generation-scope.js";
 import { resolveScheduledToolPolicyContext } from "../../agents/scheduled-tool-policy.js";
 import { isExecutionIdentityCollectionEnabled } from "../../audit/audit-config.js";

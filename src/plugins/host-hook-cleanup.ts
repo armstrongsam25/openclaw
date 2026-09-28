@@ -2,10 +2,10 @@ import { normalizeOptionalAgentRuntimeId } from "../agents/agent-runtime-id.js";
 import { getRuntimeConfig } from "../config/config.js";
 import { getRuntimeConfigSnapshot } from "../config/runtime-snapshot.js";
 import { cleanupPluginHostSessionStore } from "../config/sessions/session-accessor.js";
+import type { SessionStoreTarget } from "../config/sessions/session-store-target.types.js";
 import {
   isConfiguredSessionStoreAgentId,
   resolveAllAgentSessionStoreTargetsSync,
-  type SessionStoreTarget,
 } from "../config/sessions/targets.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";

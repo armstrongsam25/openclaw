@@ -13,7 +13,7 @@ import { releaseWorkerNativeSectionsOnExit } from "./worker-task-native-sections
 import type { Slot, WorkerTaskPoolOptions } from "./worker-task-pool.types.js";
 
 export const prepareWorkerTaskResources = createLazyRuntimeModule(
-  () => import("./temp-artifact-cleanup.js"),
+  () => import("./temp-artifact-removal.js"),
 );
 
 /** Physical construction and listeners share the pool's detached creation scope. */

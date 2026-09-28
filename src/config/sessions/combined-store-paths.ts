@@ -9,7 +9,8 @@ import { resolveSessionStoreCompatibilityAgentId } from "../legacy.default-agent
 import type { OpenClawConfig } from "../types.openclaw.js";
 import { resolveSessionStorePathCore } from "./paths.js";
 import { resolvePersistedSessionStoreOwner } from "./session-store-owner.js";
-import { resolveConfiguredAgentDatabaseTargets, type SessionStoreTarget } from "./targets.js";
+import type { SessionStoreTarget } from "./session-store-target.types.js";
+import { resolveConfiguredAgentDatabaseTargets } from "./targets.js";
 
 export function storeTargetKey(target: SessionStoreTarget): string {
   return `${target.agentId}\0${target.storePath}`;

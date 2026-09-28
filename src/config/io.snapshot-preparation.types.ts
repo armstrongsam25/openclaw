@@ -1,4 +1,4 @@
-import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import type { OpenClawConfig, RuntimeConfig } from "./types.openclaw.js";
 import type {
   PreparedConfigValidationPluginMetadata,

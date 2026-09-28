@@ -24,7 +24,7 @@ import {
   loadPersistedPluginModelCatalogsReadOnly,
 } from "../agents/plugin-model-catalog.js";
 import { resolveStateDir } from "../config/paths.js";
-import { resolveConfiguredAgentDatabaseCandidatePaths } from "../config/sessions/targets.js";
+import { resolveConfiguredAgentDatabaseCandidatePaths } from "../config/sessions/targets-configured-agents.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { listAgentModelsJsonPaths } from "../secrets/storage-scan.js";

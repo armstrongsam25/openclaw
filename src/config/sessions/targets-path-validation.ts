@@ -9,7 +9,7 @@ import {
 import { dedupeByKey } from "../../shared/dedupe-by-key.js";
 import { resolveAgentsDirFromSessionStorePath, resolveSessionStorePathCore } from "./paths.js";
 import { resolveSqliteTargetFromSessionStorePath } from "./session-sqlite-target.js";
-import type { SessionStoreTarget } from "./targets-collision.js";
+import type { SessionStoreTarget } from "./session-store-target.types.js";
 
 const NON_FATAL_DISCOVERY_ERROR_CODES = new Set([
   "EACCES",

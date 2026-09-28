@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA } from "../config/bundled-channel-config-metadata.generated.js";
 import type { OpenClawConfig } from "../config/types.js";
+import type { CallGatewayOptions } from "../gateway/call.js";
 import { createUnreachableGatewayProbe } from "./gateway-status/test-support.js";
 import { createSqliteWalHealth } from "./sqlite-wal-health.test-support.js";
 import { createStatusGatewayProbeBudget } from "./status.gateway-probe-budget.js";
@@ -18,7 +19,7 @@ import {
 const mocks = {
   ...createStatusScanSharedMocks("status-scan"),
   buildChannelsTable: vi.fn(),
-  callGateway: vi.fn(),
+  callGateway: vi.fn<(options: CallGatewayOptions) => Promise<unknown>>(),
   collectChannelStatusIssues: vi.fn(),
   getStatusCommandSecretTargetIds: vi.fn(() => new Set<string>()),
   resolveMemorySearchConfig: vi.fn(),
@@ -226,34 +227,46 @@ describe("status scans", () => {
     });
   });
 
-  it("collects memory and plugin evidence with network updates for JSON --all", async () => {
-    const notice = {
-      pluginId: "legacy-plugin",
-      code: "hook-only",
-      severity: "warn",
-      message: "legacy hooks",
-    };
-    mocks.buildPluginCompatibilityNotices.mockReturnValue([notice]);
-    mocks.callGateway.mockResolvedValue({ sessions: 1 });
-    const result = await scanStatusJsonFast(
-      { ...createStatusGatewayProbeBudget(), all: true },
-      {} as never,
-    );
-    expect(result.pluginCompatibility).toEqual([notice]);
-    expect(result.memory).toStrictEqual({ agentId: "main", files: 0, chunks: 0, dirty: false });
-    expect(mocks.getMemorySearchManager).toHaveBeenCalledExactlyOnceWith({
-      cfg,
-      agentId: "main",
-      purpose: "status",
-      inspectSources: true,
-    });
-    expect(mocks.callGateway).toHaveBeenCalledWith(
-      expect.objectContaining({ method: "status", timeoutMs: 2000 }),
-    );
-    expect(mocks.getUpdateCheckResult).toHaveBeenCalledWith(
-      expect.objectContaining({ timeoutMs: 10_000, fetchGit: true, includeRegistry: true }),
-    );
-  });
+  it.each([true, false])(
+    "collects JSON --all evidence with reachable Gateway=%s",
+    async (reachable) => {
+      const notice = {
+        pluginId: "legacy-plugin",
+        code: "hook-only",
+        severity: "warn",
+        message: "legacy hooks",
+      };
+      mocks.buildPluginCompatibilityNotices.mockReturnValue([notice]);
+      if (reachable) {
+        mocks.callGateway.mockResolvedValue({ sessions: 1 });
+      } else {
+        mocks.callGateway.mockRejectedValue(new Error("Gateway is unavailable"));
+      }
+      const result = await scanStatusJsonFast(
+        { ...createStatusGatewayProbeBudget(), all: true },
+        {} as never,
+      );
+      expect(result.pluginCompatibility).toEqual([notice]);
+      expect(mocks.buildPluginCompatibilityNotices).toHaveBeenCalledWith({ config: cfg });
+      expect(result.gatewayReachable).toBe(reachable);
+      if (!reachable) {
+        expect(result.gatewayProbe).toMatchObject({ ok: false, error: "timeout" });
+      }
+      expect(result.memory).toStrictEqual({ agentId: "main", files: 0, chunks: 0, dirty: false });
+      expect(mocks.getMemorySearchManager).toHaveBeenCalledExactlyOnceWith({
+        cfg,
+        agentId: "main",
+        purpose: "status",
+        inspectSources: true,
+      });
+      expect(mocks.callGateway).toHaveBeenCalledWith(
+        expect.objectContaining({ method: "status", timeoutMs: 2000 }),
+      );
+      expect(mocks.getUpdateCheckResult).toHaveBeenCalledWith(
+        expect.objectContaining({ timeoutMs: 10_000, fetchGit: true, includeRegistry: true }),
+      );
+    },
+  );
 
   it.each([undefined, "token"])(
     "uses manifest environment credentials for cold-start JSON (%s)",

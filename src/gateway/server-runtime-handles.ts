@@ -1,7 +1,7 @@
 // Gateway mutable runtime handles.
 // Provides stop-safe defaults for timers, sidecars, subscriptions, and services.
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import type { HeartbeatRunner } from "../infra/heartbeat-runner.js";
+import type { HeartbeatRunner } from "../infra/heartbeat-runner-scheduler.js";
 import type { ChannelHealthMonitor } from "./channel-health-monitor.js";
 import type {
   GatewayDeferredChannelReload,

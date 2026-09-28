@@ -20,6 +20,7 @@ import {
   assertAgentDeletionPathFence,
   prepareAgentDeletionPathFence,
 } from "./agent-deletion-journal.js";
+import type { OpenClawAgentDatabaseWorkerLeaseReceipt } from "./openclaw-agent-db-contract.js";
 import { withExistingAgentLeaseWrite } from "./openclaw-agent-db-existing-write.js";
 import type { OpenClawAgentDatabaseValidation } from "./openclaw-agent-db-validation-cache.js";
 import {
@@ -440,16 +441,6 @@ export function assertOpenClawAgentDatabaseLease(
     throw new Error(`Agent database open lost its runtime lease: ${params.path}`);
   }
 }
-
-export type OpenClawAgentDatabaseWorkerLeaseReceipt = {
-  leaseId: string;
-  agentId: string;
-  path: string;
-  ownerPid: number;
-  ownerStartTime: number | null;
-  sharedStatePath: string;
-  sharedStateIdentity: string;
-};
 
 /** Preparation grants no access; claim repeats admission on the captured shared owner. */
 export function prepareOpenClawAgentDatabaseWorkerLease(

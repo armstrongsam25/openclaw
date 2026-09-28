@@ -1,5 +1,5 @@
 import { parseClawHubPluginSpec } from "../infra/clawhub-spec.js";
-import type { NpmSpecResolution } from "../infra/install-source-utils.js";
+import { resolveNpmSpecMetadata, type NpmSpecResolution } from "../infra/install-source-utils.js";
 import {
   isExactSemverVersion,
   parseRegistryNpmSpec,
@@ -156,7 +156,6 @@ export async function resolveNpmInstallSpecsForUpdateChannel(
       recordSpec: params.spec,
     };
   }
-  const { resolveNpmSpecMetadata } = await import("../infra/install-source-utils.js");
   const resolveTag = async (tag: "beta" | "latest") => {
     const result = await resolveNpmSpecMetadata({
       spec: `${target.name}@${tag}`,

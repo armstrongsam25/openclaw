@@ -115,7 +115,7 @@ export async function prepareSubagentSessionCleanupRevocation(
   };
 }
 
-export function scheduleSubagentRegistrySweep(params?: { delayMs?: number }) {
+function scheduleSubagentRegistrySweep(params?: { delayMs?: number }) {
   subagentSweeper.schedule(params);
 }
 
@@ -656,7 +656,6 @@ function addSubagentRunForTests(entry: SubagentRunRecord) {
 }
 
 export const markSubagentRunTerminated = subagentRunManager.markSubagentRunTerminated;
-export const discardSubagentTerminalDelivery = SubagentLifecycleController.discardTerminalDelivery;
 export const cancelSubagentRequesterSettleWake =
   subagentLifecycleController.cancelRequesterSettleWake;
 
@@ -701,7 +700,6 @@ export const settleRequesterAfterSessionSpawns = publicApi.settleRequesterAfterS
 export const markRequesterTurnYielded = publicApi.markRequesterTurnYielded;
 export const markSubagentMessageWait = publicApi.markSubagentMessageWait;
 export const listUnsettledRequesterChildren = publicApi.listUnsettledRequesterChildren;
-export type { UnsettledRequesterChild } from "./subagent-registry-requester-yield.js";
 
 export function adoptSubagentRunForRequesterTurn(
   params: Omit<Parameters<typeof adoptSubagentRunForRequesterTurnInRuns>[0], "runs" | "persist">,
@@ -730,40 +728,6 @@ export function adoptSubagentRunForRequesterTurn(
   });
 }
 
-/** Attaches presentation to an existing wake without changing completion ownership. */
-export function attachRequesterProgressPresentation(params: {
-  operationId: string;
-  members: readonly { runId: string; generation: number; rearmGeneration: number }[];
-  assertCurrent: () => void;
-}): void {
-  params.assertCurrent();
-  const rows = params.members.map((member) => {
-    const entry = subagentRuns.get(member.runId);
-    const wake = entry?.requesterSettleWake;
-    if (
-      !entry ||
-      entry.generation !== member.generation ||
-      wake?.requesterYieldBatch !== true ||
-      wake.status !== "pending" ||
-      wake.rearmGeneration !== member.rearmGeneration
-    ) {
-      throw new Error("Progress handoff batch was replaced");
-    }
-    return { entry, wake, previous: wake.progressOperationId };
-  });
-  for (const { wake } of rows) {
-    wake.progressOperationId = params.operationId;
-  }
-  try {
-    params.assertCurrent();
-    persistSubagentRunsOrThrow(...rows.map(({ entry }) => entry.runId));
-  } catch (error) {
-    for (const { wake, previous } of rows) {
-      wake.progressOperationId = previous;
-    }
-    throw error;
-  }
-}
 
 const bootstrapState = subagentRegistryBootstrapState;
 bootstrapState.restorer = subagentRestorer;
@@ -780,6 +744,7 @@ if (process.env.VITEST || process.env.NODE_ENV === "test") {
     finalizeInterruptedSubagentRun: completionRuntime.finalizeInterruptedSubagentRun,
     releaseSubagentRun: subagentRunManager.releaseSubagentRun,
     resetSubagentRegistryForTests,
+    scheduleSubagentRegistrySweep,
     testing,
   };
 }

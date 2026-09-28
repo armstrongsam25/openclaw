@@ -6,11 +6,6 @@ import {
 } from "../../../packages/gateway-protocol/src/index.js";
 import { operatorMcpOAuthIdentity } from "../../agents/mcp-oauth-identity.js";
 import type { McpOAuthLoginLifecycle } from "../../agents/mcp-oauth-provider.js";
-import {
-  cancelMcpOAuthAuthorization,
-  completeOAuthCallback,
-  startMcpOAuthAuthorization,
-} from "../../agents/mcp-oauth.js";
 import { resolveOperatorMcpOAuthConfig } from "../../agents/mcp-operator-auth.js";
 import { getPluginRuntimeGatewayRequestScope } from "../../plugins/runtime/gateway-request-scope.js";
 import { WizardSession } from "../../wizard/session.js";
@@ -25,6 +20,7 @@ export const mcpAuthLoginHandlers: GatewayRequestHandlers = {
     if (!assertValidParams(params, validateMcpAuthLoginParams, "mcp.authLogin", respond)) {
       return;
     }
+    const oauth = await import("../../agents/mcp-oauth.js");
     const reject = (message: string) =>
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, message));
     if (!client || !client.connect.scopes?.includes("operator.admin")) {
@@ -125,7 +121,7 @@ export const mcpAuthLoginHandlers: GatewayRequestHandlers = {
                 const result = await browser.authorizePrepared<"authorized">({
                   timeoutMs: 10 * 60_000,
                   prepare: async (redirectUrl) => {
-                    const started = await startMcpOAuthAuthorization(identity, config, {
+                    const started = await oauth.startMcpOAuthAuthorization(identity, config, {
                       redirectUrl,
                       login,
                     });
@@ -134,14 +130,15 @@ export const mcpAuthLoginHandlers: GatewayRequestHandlers = {
                 });
                 if (
                   result !== "authorized" &&
-                  (await completeOAuthCallback(identity, config, result, login)) !== "authorized"
+                  (await oauth.completeOAuthCallback(identity, config, result, login)) !==
+                    "authorized"
                 ) {
                   throw failure();
                 }
               } finally {
                 browser.close();
                 if (attemptState) {
-                  await cancelMcpOAuthAuthorization(identity, attemptState);
+                  await oauth.cancelMcpOAuthAuthorization(identity, attemptState);
                 }
               }
             } catch {

@@ -23,7 +23,7 @@ import {
   validateConfigObjectRawWithPlugins,
 } from "../config/validation.js";
 import { visitConfigValueTree } from "../config/value-tree.js";
-import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { loadPluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
 import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";

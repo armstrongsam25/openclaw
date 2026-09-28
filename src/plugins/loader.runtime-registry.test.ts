@@ -42,13 +42,13 @@ import { createEmptyPluginRegistry } from "./registry.js";
 import { setActiveDegradedPlugins } from "./runtime-degraded-state.js";
 import {
   captureActivePluginRegistrySnapshot,
-  clearActivePluginRegistry,
   commitStagedPluginRegistry,
   getActivePluginRegistry,
   rollbackStagedPluginRegistry,
   setActivePluginRegistry,
   stageActivePluginRegistry,
 } from "./runtime.js";
+import { clearActivePluginRegistry } from "./runtime.test-support.js";
 import {
   buildPluginRuntimeLoadOptions,
   getPluginRuntimeLoadContext,

@@ -5,9 +5,11 @@ import { assertOperatorModelAllowed } from "../agents/admitted-run-context.js";
 import { splitTrailingAuthProfile } from "../agents/model-ref-profile.js";
 import type { ModelRef } from "../agents/model-ref-shared.js";
 import type { AgentWaitResult } from "../agents/run-wait.types.js";
+import { resolveSimpleCompletionSelectionForAgent } from "../agents/simple-completion-selection.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { normalizePluginsConfig } from "../plugins/config-state.js";
 import { compileModelAllowlist, type CompiledModelAllowlist } from "../plugins/model-allowlist.js";
+import { resolvePluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
 import { getActivePluginRegistry } from "../plugins/runtime.js";
 import {
   bindGatewayContextResolver,
@@ -239,13 +241,11 @@ export function createGatewaySubagentRuntime(
             assertCurrent();
             const [
               { resolveConfiguredAgentId },
-              { resolveSimpleCompletionSelectionForAgent },
               { runIsolatedCompletion },
               { runWithModelFallback },
               { finalizePluginLlmCompletion },
             ] = await Promise.all([
               import("../agents/agent-scope.js"),
-              import("../agents/simple-completion-runtime.js"),
               import("../agents/isolated-completion.js"),
               import("../agents/model-fallback-runner.js"),
               import("../plugins/runtime/runtime-llm.runtime.js"),
@@ -378,10 +378,9 @@ export function createGatewaySubagentRuntime(
             );
           }
         };
-        const [modelRefs, agentScope, metadata] = await Promise.all([
+        const [modelRefs, agentScope] = await Promise.all([
           import("../agents/command/model-ref.js"),
           import("../agents/agent-scope.js"),
-          import("../plugins/plugin-metadata-snapshot.js"),
         ]);
         sessionMutationCommitGuard();
         const model = expectDefined(params.model, "authorized model override");
@@ -392,7 +391,7 @@ export function createGatewaySubagentRuntime(
         const manifestPlugins =
           cfg.plugins?.enabled === false
             ? []
-            : metadata.resolvePluginMetadataSnapshot({
+            : resolvePluginMetadataSnapshot({
                 config: cfg,
                 env: process.env,
                 workspaceDir: agentScope.resolveAgentWorkspaceDir(cfg, agentId),

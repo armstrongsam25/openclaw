@@ -9,6 +9,7 @@ import { GATEWAY_CONFIG_SELECTION_ENV_KEYS } from "../../config/gateway-env-sele
 import { CONFIG_AUDIT_STORE_LABEL } from "../../config/io.audit.js";
 import { describeConfigSnapshotInputChange } from "../../config/snapshot-inputs.js";
 import type { ConfigFileSnapshot } from "../../config/types.js";
+import { clearShellEnvAppliedKeys } from "../../infra/shell-env.js";
 import { ExitError, type RuntimeEnv } from "../../runtime.js";
 import { withArtifactPreservingStateReads } from "../../state/openclaw-state-db-readonly.js";
 import { formatCliCommand } from "../command-format.js";
@@ -428,12 +429,10 @@ export async function applyFinalGatewayRunConfigEnv(params: {
     },
     { normalizeEnv },
     { normalizeStateDirEnv },
-    { clearShellEnvAppliedKeys },
   ] = await Promise.all([
     import("../../config/config-env-vars.js"),
     import("../../infra/env.js"),
     import("../../config/paths.js"),
-    import("../../infra/shell-env.js"),
   ]);
   const finalConfigEnv = collectConfigRuntimeEnvVars(params.snapshot.sourceConfig);
   if (

@@ -339,9 +339,9 @@ export type AgentHarnessSessionForkParams = {
   upstream: {
     catalogId: string;
     hostId: string;
-    kind: import("../../plugins/session-catalog.js").SessionUpstreamKind;
+    kind: import("../../plugins/session-catalog.types.js").SessionUpstreamKind;
     threadId: string;
-    ref: import("../../plugins/session-catalog.js").SessionUpstreamJsonValue;
+    ref: import("../../plugins/session-catalog.types.js").SessionUpstreamJsonValue;
   };
 };
 
@@ -538,13 +538,13 @@ type AgentHarnessContract<
    * source-compatible through 2026-10-12.
    */
   sessionFork?: {
-    upstreamKinds: readonly import("../../plugins/session-catalog.js").SessionUpstreamKind[];
+    upstreamKinds: readonly import("../../plugins/session-catalog.types.js").SessionUpstreamKind[];
     fork(params: AgentHarnessSessionForkParams): Promise<AgentHarnessSessionForkResult>;
   };
   sessionForkV2?: {
     /** Declares fork initialization that can execute work on the Gateway host. */
     executionEnvironment?: "host-only";
-    upstreamKinds: readonly import("../../plugins/session-catalog.js").SessionUpstreamKind[];
+    upstreamKinds: readonly import("../../plugins/session-catalog.types.js").SessionUpstreamKind[];
     fork(params: AgentHarnessSessionForkParamsV2): Promise<AgentHarnessSessionForkResult>;
   };
 

@@ -1,6 +1,9 @@
 import { withOpenClawAgentDatabaseReadOnly } from "../../state/openclaw-agent-db-readonly.js";
 import { openOpenClawAgentDatabase } from "../../state/openclaw-agent-db.js";
-import type { SessionTranscriptReadScope } from "./session-accessor.sqlite-contract.js";
+import type {
+  SessionTranscriptReadScope,
+  ResolvedTranscriptReadScope,
+} from "./session-accessor.sqlite-contract.js";
 import {
   readCurrentProjectionSnapshot,
   type CurrentTranscriptProjection,
@@ -8,7 +11,6 @@ import {
 import {
   resolveSqliteTranscriptReadScope,
   toDatabaseOptions,
-  type ResolvedTranscriptReadScope,
 } from "./session-accessor.sqlite-scope.js";
 import {
   SessionTranscriptProjectionUnavailableError,

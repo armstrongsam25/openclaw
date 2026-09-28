@@ -617,6 +617,9 @@ vi.mock("./doctor-startup-channel-maintenance.js", async (importOriginal) => {
 
 vi.mock("../commands/onboard-helpers.js", () => ({
   applyWizardMetadata: mocks.applyWizardMetadata,
+}));
+
+vi.mock("../commands/random-token.js", () => ({
   randomToken: vi.fn(() => "generated-gateway-token"),
 }));
 

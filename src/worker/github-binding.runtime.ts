@@ -1,11 +1,11 @@
 import path from "node:path";
 import { inspectPathPermissions } from "@openclaw/fs-safe/permissions";
+import type { PreparedGitHubToolEnvironment } from "../agents/github-tool-identity.js";
 import {
   managedGitHubIdentityEnvironment,
   removeManagedGitHubProfile,
   writeManagedGitHubProfileFiles,
-  type PreparedGitHubToolEnvironment,
-} from "../agents/github-tool-identity.js";
+} from "../agents/github-tool-profile.js";
 import { sha256HexPrefixCore } from "../infra/crypto-digest.js";
 import { executeGitCommand } from "../infra/git-exec.js";
 import { registerSecretValueForRedaction } from "../logging/secret-redaction-registry.js";

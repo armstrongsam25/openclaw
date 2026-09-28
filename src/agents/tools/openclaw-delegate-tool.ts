@@ -11,7 +11,7 @@ import { resolveExecDefaults } from "../exec-defaults.js";
 import type { OpenClawToolsOptions } from "../openclaw-tools.types.js";
 import { jsonResult, readToolStringParam, type AnyAgentTool } from "./common.js";
 import { withGatewayToolCallerIdentity } from "./gateway-caller-context.js";
-import { callInProcessGatewayTool } from "./in-process-gateway.js";
+import { callInProcessGatewayTool } from "./gateway.js";
 
 const OpenClawDelegateSchema = Type.Object({
   message: Type.String({ description: "What system must do." }),

@@ -1,3 +1,4 @@
+export type { SessionIdentityEvidenceResult } from "./session-accessor.sqlite-contract.js";
 /**
  * Stable storage-neutral session and transcript access API.
  *
@@ -167,14 +168,9 @@ export {
   upsertSessionEntryCore,
   withSessionEntryReadOnlyScope,
 } from "./session-accessor.entry.js";
-export {
-  readSessionIdentityEvidenceBatch,
-  type SessionIdentityEvidenceResult,
-} from "./session-accessor.sqlite-entry-availability.js";
-export {
-  loadSessionEntryReadOnlyInScope,
-  updateSessionLastRouteInScope,
-} from "./session-accessor.sqlite-entry.js";
+export { readSessionIdentityEvidenceBatch } from "./session-accessor.sqlite-entry-availability.js";
+export { loadSessionEntryReadOnlyInScope } from "./session-accessor.sqlite-exact-read.js";
+export { updateSessionLastRouteInScope } from "./session-accessor.sqlite-entry.js";
 export {
   createSessionEntryWithTranscript,
   forkSessionEntryFromParentTarget,

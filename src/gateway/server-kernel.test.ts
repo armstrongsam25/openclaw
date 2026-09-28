@@ -951,7 +951,7 @@ describe("createGatewayKernel", () => {
         "computer.runtime-import",
         "runtime.config",
         "control-ui.root",
-        "terminal.launch-import",
+        "terminal.launch-policy",
         "gateway.wizard-imports",
         "tls.runtime",
         "gateway.channel-manager-import",

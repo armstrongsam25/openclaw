@@ -565,3 +565,29 @@ export async function withSystemdDefinitionMutation<T>(
       : withFileLock(targets[index]!, lockOptions(), () => acquire(index + 1));
   return await acquire(0);
 }
+
+/**
+ * Activation admission after the system-scope probe refused. An unverifiable
+ * probe cannot make a loaded user unit whose artifacts this account owns a
+ * competing manager; a proven system owner and an unloaded or foreign user unit
+ * still refuse with the original error.
+ */
+export async function assertNoSystemGatewayOwnershipForActivation(
+  env: GatewayServiceEnv,
+  timeoutMs?: number,
+): Promise<void> {
+  try {
+    await assertNoSystemGatewayOwnership(env, timeoutMs);
+  } catch (error) {
+    if (!isSystemSystemdOwnershipError(error) || error.ownership.status !== "unverifiable") {
+      throw error;
+    }
+    const capability = await readSystemdDefinitionMutationCapability(env, {
+      requireLoaded: true,
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    }).catch(() => undefined);
+    if (capability?.kind !== "writable") {
+      throw error;
+    }
+  }
+}

@@ -16,7 +16,6 @@ import {
 } from "../plugins/official-external-plugin-catalog.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type { OnboardingRecommendationMatch } from "../state/onboarding-recommendations.js";
-import { completeSetupInference } from "./setup-inference.js";
 
 const CLAWHUB_SEARCH_CONCURRENCY = 4;
 const CLAWHUB_SEARCH_LIMIT = 3;
@@ -320,10 +319,10 @@ export async function getSetupAppRecommendations(params: {
   }
   const complete =
     params.deps?.complete ??
-    // Output is bounded by the resolved model's own maxTokens budget (the
-    // stream layer applies it when no explicit cap is passed), so a runaway
-    // completion cannot exceed what the model config already allows.
-    (async (prompt: string) => await completeSetupInference({ prompt, runtime: params.runtime }));
+    (async (prompt: string) => {
+      const { completeSetupInference } = await import("./setup-inference.js");
+      return await completeSetupInference({ prompt, runtime: params.runtime });
+    });
   let completion: Awaited<ReturnType<typeof complete>>;
   try {
     params.onPhase?.({ kind: "matching", appCount: apps.length });

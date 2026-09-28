@@ -20,7 +20,6 @@ import type { PluginHttpRouteRegistration } from "./registry-types.js";
 import { getPluginRegistryState } from "./runtime-state.js";
 import {
   captureActivePluginRegistrySnapshot,
-  clearActivePluginRegistry,
   disposePluginRegistryInstances,
   getActivePluginRegistry,
   listImportedRuntimePluginIds,
@@ -28,6 +27,7 @@ import {
   resetPluginRuntimeStateForTest,
   setActivePluginRegistry,
 } from "./runtime.js";
+import { clearActivePluginRegistry } from "./runtime.test-support.js";
 import { createPluginRecord } from "./status.test-helpers.js";
 
 async function waitForCleanupSignal(signal: Promise<void>, label: string): Promise<void> {
@@ -106,7 +106,7 @@ describe("setActivePluginRegistry", () => {
   it.each(["empty", "loaded"] as const)(
     "keeps a reactivated %s registry live after displaced cleanup",
     async (kind) => {
-      const { withPluginCommandExecution } = await import("./command-execution-lock.js");
+      const { withPluginCommandExecution } = await import("./registry-lifecycle.js");
       const original = createEmptyPluginRegistry();
       if (kind === "loaded") {
         original.plugins.push(createPluginRecord({ id: "reactivated", status: "loaded" }));
@@ -432,7 +432,7 @@ describe("setActivePluginRegistry", () => {
       const { createPluginRegistry } = await import("./registry.js");
       const { createPluginRuntime } = await import("./runtime/index.js");
       const { activatePluginRegistry } = await import("./loader-shared.js");
-      const { withPluginCommandExecution } = await import("./command-execution-lock.js");
+      const { withPluginCommandExecution } = await import("./registry-lifecycle.js");
       const builder = createPluginRegistry({
         logger: { info() {}, warn() {}, error() {}, debug() {} },
         runtime: createPluginRuntime(),
@@ -593,7 +593,7 @@ describe("setActivePluginRegistry", () => {
   it("retains a displaced loaded registry's cleanup through its admitted command", async () => {
     const { loadAndActivateRootPluginRegistry } = await import("./loader.js");
     const { resolvePluginLoadCacheContext } = await import("./loader-load-context.js");
-    const { withPluginCommandExecution } = await import("./command-execution-lock.js");
+    const { withPluginCommandExecution } = await import("./registry-lifecycle.js");
     const { useNoBundledPlugins, writePlugin, resetPluginLoaderTestStateForTest } =
       await import("./loader.test-fixtures.js");
     useNoBundledPlugins();
@@ -676,7 +676,7 @@ describe("setActivePluginRegistry", () => {
       const { createPluginRuntime } = await import("./runtime/index.js");
       const { activatePluginRegistry } = await import("./loader-shared.js");
       const { withPluginCommandExecution, getPluginCommandExecutionCount } =
-        await import("./command-execution-lock.js");
+        await import("./registry-lifecycle.js");
       const builder = createPluginRegistry({
         logger: { info() {}, warn() {}, error() {}, debug() {} },
         runtime: createPluginRuntime(),

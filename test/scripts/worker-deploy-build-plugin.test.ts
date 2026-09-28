@@ -15,7 +15,10 @@ import {
   WORKER_DEPLOY_OPTIONAL_NATIVE_MODULE_ID,
 } from "../../scripts/lib/worker-deploy-build-plugin.mts";
 import { createWorkerBundleProducer } from "../../src/gateway/worker-environments/bundle.js";
-import { WORKER_BUNDLE_ARTIFACT_PATHS } from "../../src/shared/worker-bundle-hash.js";
+import {
+  WORKER_BUNDLE_ARTIFACT_PATHS,
+  isWorkerBundleChunkPath,
+} from "../../src/shared/worker-bundle-hash.js";
 import { createFixtureLifetime } from "../helpers/fixture-lifetime.js";
 import { runNodeScript } from "../helpers/run-node-script.js";
 import { useAutoCleanupTempDirTracker } from "../helpers/temp-dir.js";
@@ -37,22 +40,25 @@ const fail = (message: string): never => {
 const tempDirs = useAutoCleanupTempDirTracker(afterEach);
 
 describe("worker deploy build plugin", () => {
-  it.each(["escaped.mjs", "worker/extra.mjs", "worker/native.node", "worker/runtime.wasm"])(
-    "rejects an unstaged emitted %s before publishing the worker graph",
-    (fileName) => {
-      const plugin = createWorkerDeployBuildPlugin();
-      expect(() =>
-        plugin.generateBundle.call(
-          { error: fail },
-          {},
-          {
-            "worker/worker.mjs": { type: "chunk", fileName: "worker/worker.mjs", isEntry: true },
-            [fileName]: { type: fileName.endsWith(".mjs") ? "chunk" : "asset", fileName },
-          },
-        ),
-      ).toThrow(`Worker deploy artifact emits unstaged runtime asset ${fileName}.`);
-    },
-  );
+  it.each([
+    "escaped.mjs",
+    "worker-chunk-escaped.mjs",
+    "worker/extra.mjs",
+    "worker/native.node",
+    "worker/runtime.wasm",
+  ])("rejects an unstaged emitted %s before publishing the worker graph", (fileName) => {
+    const plugin = createWorkerDeployBuildPlugin();
+    expect(() =>
+      plugin.generateBundle.call(
+        { error: fail },
+        {},
+        {
+          "worker/worker.mjs": { type: "chunk", fileName: "worker/worker.mjs", isEntry: true },
+          [fileName]: { type: fileName.endsWith(".mjs") ? "chunk" : "asset", fileName },
+        },
+      ),
+    ).toThrow(`Worker deploy artifact emits unstaged runtime asset ${fileName}.`);
+  });
 
   describe("portable output", () => {
     const fixtureDirs = useAutoCleanupTempDirTracker(afterAll);
@@ -155,12 +161,53 @@ export { setRuntimeConfigSnapshot } from "../config/runtime-snapshot.js";`;
         const builtEntries = vi
           .mocked(build)
           .mock.calls.flatMap(([options]) => Object.keys(options?.entry ?? {}));
-        expect(builtEntries.length).toBe(workerEntryNames.length);
-        expect(builtEntries.toSorted()).toEqual(workerEntryNames.toSorted());
-        // A dynamic import cycle can leave an unstaged root facade even with code splitting off.
-        expect(bundles.flatMap((bundle) => bundle.chunks.map((chunk) => chunk.fileName))).toEqual([
+        expect(builtEntries.toSorted()).toEqual(
+          [...workerEntryNames, "worker/worker-chunk-highlight"].toSorted(),
+        );
+        const chunks = bundles.flatMap((bundle) => bundle.chunks);
+        expect(chunks.length).toBeGreaterThan(1);
+        for (const chunk of chunks) {
+          expect(
+            chunk.fileName === "worker/worker.mjs" ||
+              (chunk.fileName.startsWith("worker/") &&
+                isWorkerBundleChunkPath(chunk.fileName.slice("worker/".length))),
+          ).toBe(true);
+        }
+        const codeChunks = chunks.filter((chunk) => chunk.type === "chunk");
+        const byName = new Map(codeChunks.map((chunk) => [chunk.fileName, chunk]));
+        const visited = new Set<string>();
+        // Managed idle cleanup loads GitHub binding even without a GitHub assignment.
+        const pending = [
           "worker/worker.mjs",
-        ]);
+          ...codeChunks
+            .filter((chunk) =>
+              Object.keys(chunk.modules).some((id) =>
+                /\/src\/worker\/(?:embedded-agent|github-binding)\.runtime\.ts$/u.test(
+                  id.replaceAll("\\", "/"),
+                ),
+              ),
+            )
+            .map((chunk) => chunk.fileName),
+        ];
+        while (pending.length > 0) {
+          const name = pending.pop()!;
+          if (visited.has(name)) {
+            continue;
+          }
+          visited.add(name);
+          const chunk = byName.get(name);
+          if (!chunk) {
+            continue; // Node builtins are the only external imports.
+          }
+          pending.push(...chunk.imports);
+          for (const [id, module] of Object.entries(chunk.modules)) {
+            if (module.renderedLength > 0) {
+              expect(id).not.toMatch(
+                /playwright-core|photon-node|@google[+/]genai|highlight\.js|tree-sitter-runtime|[\\/]jiti[\\/]|[\\/]openai[\\/]client|@anthropic-ai[\\/]sdk/u,
+              );
+            }
+          }
+        }
         const { collectWorkerDeployArtifactErrors } =
           await import("../../scripts/check-cli-bootstrap-imports.mts");
         expect(

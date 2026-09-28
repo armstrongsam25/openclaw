@@ -18,7 +18,6 @@ export function registerEmbeddedModelCatalogTests({
   projectSessionsPatchEntryMock,
   applySessionPatchProjectionMock,
   deferred,
-  flushMicrotasks,
 }: {
   createBackend: () => EmbeddedTuiBackend;
   getRuntimeConfigMock: Mock<() => object>;
@@ -36,7 +35,6 @@ export function registerEmbeddedModelCatalogTests({
     resolve: (value: T) => void;
     reject: (error?: unknown) => void;
   };
-  flushMicrotasks: () => Promise<void>;
 }) {
   it("lists the published configured replace-mode models without a second catalog read", async () => {
     const config = {
@@ -146,24 +144,24 @@ export function registerEmbeddedModelCatalogTests({
 
   it("keeps the published owner alive through asynchronous model projection", async () => {
     const projection = deferred<{ models: TuiModelChoice[] }>();
-    let current: (() => boolean) | undefined;
+    const projectionEntered = deferred<() => boolean>();
     buildModelsListResultMock.mockImplementation(async ({ source }) => {
       if (source.kind !== "published") {
         throw new Error("Expected published owner");
       }
-      current = source.owner.isCurrent;
+      const current = source.owner.isCurrent;
       expect(current()).toBe(true);
+      projectionEntered.resolve(current);
       const result = await projection.promise;
       expect(current()).toBe(true);
       return result;
     });
     const pending = createBackend().listModels();
-    await flushMicrotasks();
-    await flushMicrotasks();
-    expect(current?.()).toBe(true);
+    const current = await projectionEntered.promise;
+    expect(current()).toBe(true);
     projection.resolve({ models: [] });
     await expect(pending).resolves.toEqual([]);
-    expect(current?.()).toBe(false);
+    expect(current()).toBe(false);
   });
 
   it("patches wildcard replace-mode sessions with raw execution catalog entries", async () => {

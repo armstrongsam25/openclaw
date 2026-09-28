@@ -1,4 +1,37 @@
-import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
+import type { AssistantMessage, ProviderReplayState } from "@openclaw/llm-core";
+import {
+  asOptionalObjectRecord,
+  asOptionalRecord,
+} from "@openclaw/normalization-core/record-coerce";
+
+/** Whether provider replay state is a prefix-bound server compaction checkpoint. */
+export function isCompactionReplayCheckpoint(replay: unknown): replay is ProviderReplayState {
+  const type = asOptionalObjectRecord(replay)?.type;
+  return (
+    type === "anthropic-compaction" ||
+    type === "openai-responses-compaction" ||
+    type === "openai-responses-retained-compaction"
+  );
+}
+
+/** Strip prefix-bound checkpoints after local history rewrites. */
+export function stripCompactionReplayCheckpoint(message: AssistantMessage): AssistantMessage {
+  if (!isCompactionReplayCheckpoint(message.providerReplay)) {
+    return message;
+  }
+  const replaySafeMessage = { ...message };
+  delete replaySafeMessage.providerReplay;
+  return replaySafeMessage;
+}
+
+/** Strip prefix-bound checkpoint state from an in-place message rewrite. */
+export function stripCompactionReplayCheckpointInPlace(message: {
+  providerReplay?: unknown;
+}): void {
+  if (isCompactionReplayCheckpoint(message.providerReplay)) {
+    delete message.providerReplay;
+  }
+}
 
 type AssistantTurnLike = {
   role?: unknown;

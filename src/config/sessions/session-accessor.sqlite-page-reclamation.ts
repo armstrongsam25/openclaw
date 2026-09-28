@@ -31,6 +31,8 @@ import type {
   PublishedSessionTranscriptArchive,
   SessionArchivePruningOperations,
 } from "./session-history-archive-pruning.types.js";
+import { maintenanceLane } from "./session-transcript-worker-resources.js";
+import { withSessionHistoryWorkerDatabase } from "./session-transcript-worker-runtime.js";
 
 export type SqliteSessionPageReclaimer = (maxPages?: number) => Promise<SqliteWalReclamationResult>;
 
@@ -56,8 +58,6 @@ export async function readSqliteSessionArchivePruning(
     physicalIdentity: physical.key.slice("file:".length),
     nativeLocation: physical.canonicalPath,
   };
-  const { withSessionHistoryWorkerDatabase } =
-    await import("./session-transcript-worker-runtime.js");
   assertExistingDatabaseIdentity(options.path, physical.key);
   return withSessionHistoryWorkerDatabase(databaseOptions, async (reader) => {
     assertExistingDatabaseIdentity(options.path, physical.key);
@@ -244,10 +244,6 @@ export async function withSqliteSessionPageReclamation<T>(
       return result.value;
     };
     try {
-      const [{ withSessionHistoryWorkerDatabase }, { maintenanceLane }] = await Promise.all([
-        import("./session-transcript-worker-runtime.js"),
-        import("./session-transcript-worker-resources.js"),
-      ]);
       assertPruningCurrent();
       return await withSessionHistoryWorkerDatabase(
         databaseOptions,

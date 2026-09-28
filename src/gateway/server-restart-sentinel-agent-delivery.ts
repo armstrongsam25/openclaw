@@ -53,6 +53,10 @@ import {
   attachManagedOutgoingMediaToMessage,
   createManagedOutgoingMediaBlocks,
 } from "./managed-image-attachments.js";
+import {
+  enrichAssistantTranscriptMediaForRun,
+  publishAssistantTranscriptRewrite,
+} from "./server-methods/chat-transcript-persistence.js";
 import type { GatewayContextResolver } from "./server-methods/types.js";
 import { dispatchGatewayLifecycleMethod as dispatchGatewayMethodInProcess } from "./server-recovery-runtime-context.js";
 import { loadSessionEntry } from "./session-utils.js";
@@ -444,8 +448,6 @@ export async function deliverQueuedGeneratedMediaAgentTurn(params: {
             : (sessionEntry?.cronRunContinuation?.lifecycleRevision ??
               sessionEntry?.lifecycleRevision ??
               null);
-          const { enrichAssistantTranscriptMediaForRun, publishAssistantTranscriptRewrite } =
-            await import("./server-methods/chat-transcript-persistence.js");
           params.queueContext.admission.assertCurrent();
           let enriched: { messageId: string } | null = null;
           if (transcriptRunId) {

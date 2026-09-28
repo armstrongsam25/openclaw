@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import { getLastHeartbeatEvent, resetHeartbeatEventsForTest } from "./heartbeat-events.js";
-import { startHeartbeatRunner } from "./heartbeat-runner.js";
+import { startHeartbeatRunner } from "./heartbeat-runner-scheduler.js";
 import * as heartbeatWake from "./heartbeat-wake.js";
 
 describe("heartbeat broadcast outcomes", () => {

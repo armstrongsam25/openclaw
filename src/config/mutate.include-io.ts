@@ -2,10 +2,10 @@
 import fsNode from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import {
   withDeferredPluginConfigRollback,
   withDeferredPluginMigrationsCurrent,
-  type DeferredPluginMigration,
 } from "../infra/deferred-plugin-migrations.js";
 import { isMissingPathError } from "../infra/errors.js";
 import { root as createFsRoot, type Root as FsSafeRoot } from "../infra/fs-safe.js";

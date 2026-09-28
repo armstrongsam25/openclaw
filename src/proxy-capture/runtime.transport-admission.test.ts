@@ -11,11 +11,11 @@ import type { OpenClawStateWorkerLease } from "../state/openclaw-state-worker-st
 import { resolveDebugProxySettings, type DebugProxySettings } from "./env.js";
 import { withDeferredDebugProxyCapture } from "./runtime-deferral.js";
 import {
+  captureHttpExchange,
   finalizeDebugProxyCapture,
   finalizeDebugProxyCaptureAsync,
   initializeDebugProxyCapture,
   initializeDebugProxyCaptureAsync,
-  prepareHttpCapture,
   prepareHttpCaptureForTransport,
 } from "./runtime.js";
 
@@ -138,7 +138,7 @@ function stubGuardedCaptureEnv(sessionId: string) {
   }
 }
 
-it.each(["fresh", "cached-legacy", "cached-worker", "saved-fetch"] as const)(
+it.each(["fresh", "direct-legacy", "cached-worker", "saved-fetch"] as const)(
   "defers %s capture writes until the live update owner releases them",
   async (mode) => {
     stubGuardedCaptureEnv(`deferred-${mode}`);
@@ -170,13 +170,16 @@ it.each(["fresh", "cached-legacy", "cached-worker", "saved-fetch"] as const)(
       error: new Error("synthetic transport diagnostic"),
     };
     let exercise: () => Promise<void>;
-    if (mode === "cached-legacy" || mode === "saved-fetch") {
+    if (mode === "direct-legacy" || mode === "saved-fetch") {
       initializeDebugProxyCapture("fixture", settings, deps);
-      const cached = prepareHttpCapture(settings, deps)!;
       const savedFetch = target.fetch;
       exercise = async () => {
-        if (mode === "cached-legacy") {
-          cached(params);
+        if (mode === "direct-legacy") {
+          captureHttpExchange(
+            { ...params, response: new Response(null, { status: 204 }) },
+            settings,
+            deps,
+          );
         } else {
           expect((await savedFetch(params.url)).status).toBe(204);
         }

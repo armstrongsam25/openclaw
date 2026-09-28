@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import type { SessionStoreTarget } from "../config/sessions/targets.js";
+import type { SessionStoreTarget } from "../config/sessions/session-store-target.types.js";
 import { hasDeferredPluginSessionImport } from "../infra/deferred-plugin-session-sources.js";
 import { openNodeSqliteDatabase } from "../infra/node-sqlite.js";
 import {

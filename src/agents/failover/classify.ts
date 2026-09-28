@@ -1,9 +1,11 @@
 import { classifyFailoverReasonCore, classifyFailoverSignalCore } from "./classify-core.js";
-import {
-  classifyProviderPluginError,
-  type PreparedProviderFailoverOwner,
-} from "./provider-patterns.js";
-import type { FailoverClassification, FailoverReason, FailoverSignal } from "./signal.js";
+import { classifyProviderPluginError } from "./provider-patterns.js";
+import type {
+  FailoverClassification,
+  FailoverReason,
+  FailoverSignal,
+  PreparedProviderFailoverOwner,
+} from "./signal.js";
 export { isCloudCodeAssistFormatError } from "./classify-core.js";
 export { isUnclassifiedNoBodyHttpSignal } from "./classification-rules.js";
 export { isContextOverflowError, isLikelyContextOverflowError } from "./context-overflow.js";

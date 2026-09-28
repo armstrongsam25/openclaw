@@ -433,7 +433,7 @@ describe("plugin metadata snapshot", () => {
     vi.resetModules();
     const reloaded = await import("./plugin-metadata-snapshot.js");
     expect(reloaded.restorePluginMetadataSnapshot).not.toBe(restorePluginMetadataSnapshot);
-    expect(reloaded.finalizePluginMetadataSnapshot(first)).toBe(first);
+    expect(reloaded.restorePluginMetadataSnapshot(first).index).toBe(first.index);
     expect(Object.isFrozen(mapValue.nested)).toBe(true);
     expect(Object.isFrozen(setValue.nested)).toBe(true);
     expect(() => sharedMap.clear()).toThrow("Plugin metadata snapshots are immutable");

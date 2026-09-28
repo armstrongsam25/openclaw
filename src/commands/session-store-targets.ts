@@ -5,9 +5,9 @@ import { ExpectedCliError } from "../cli/failure-output.js";
 import {
   resolveSessionStoreTargets,
   type SessionStoreSelectionOptions,
-  type SessionStoreTarget,
 } from "../config/sessions.js";
 import { resolveSqliteTargetFromSessionStorePath } from "../config/sessions/session-sqlite-target.js";
+import type { SessionStoreTarget } from "../config/sessions/session-store-target.types.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { openNodeSqliteDatabase } from "../infra/node-sqlite.js";

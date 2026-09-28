@@ -39,7 +39,7 @@ import {
   SCREENSHOT_QUALITY,
   SCREEN_SNAPSHOT_COMMAND,
 } from "./computer-tool-shared.js";
-import type { GatewayCallOptions } from "./gateway.js";
+import type { GatewayCallOptions } from "./gateway-options.js";
 
 type ComputerState =
   | { kind: "unbound" }

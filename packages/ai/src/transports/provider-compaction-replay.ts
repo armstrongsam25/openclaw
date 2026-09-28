@@ -1,5 +1,9 @@
-import type { AssistantMessage, Model, ProviderReplayState } from "@openclaw/llm-core";
+import type { AssistantMessage, Model } from "@openclaw/llm-core";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
+import {
+  isCompactionReplayCheckpoint,
+  stripCompactionReplayCheckpoint,
+} from "../replay-turn-classification.js";
 import { resolveNewestAnthropicCompaction } from "./anthropic-compaction-replay.js";
 import { resolveAnthropicServerCompactionPlan } from "./anthropic-payload-policy.js";
 import {
@@ -10,6 +14,11 @@ import { resolveResponsesContextUsageBoundary } from "./openai-responses-context
 import { OPENAI_RESPONSES_APIS } from "./openai-responses-contracts.js";
 
 export { CompactionReplayRefreshRequiredError } from "./openai-responses-compaction-replay.js";
+export {
+  isCompactionReplayCheckpoint,
+  stripCompactionReplayCheckpoint,
+  stripCompactionReplayCheckpointInPlace,
+} from "../replay-turn-classification.js";
 
 type ReplayIdentity = { sessionId?: string; authProfileId?: string; enabled?: boolean };
 type ReplayMessage = { role: string };
@@ -231,36 +240,6 @@ export function resolveCompactionReplayPressure<T extends ReplayMessage>(
     ],
     prefixTokens,
   };
-}
-
-/** Whether provider replay state is a prefix-bound server compaction checkpoint. */
-export function isCompactionReplayCheckpoint(replay: unknown): replay is ProviderReplayState {
-  const type =
-    replay && typeof replay === "object" ? (replay as { type?: unknown }).type : undefined;
-  return (
-    type === "anthropic-compaction" ||
-    type === "openai-responses-compaction" ||
-    type === "openai-responses-retained-compaction"
-  );
-}
-
-/** Strip prefix-bound checkpoints after local history rewrites. */
-export function stripCompactionReplayCheckpoint(message: AssistantMessage): AssistantMessage {
-  if (!isCompactionReplayCheckpoint(message.providerReplay)) {
-    return message;
-  }
-  const replaySafeMessage = { ...message };
-  delete replaySafeMessage.providerReplay;
-  return replaySafeMessage;
-}
-
-/** Strip prefix-bound checkpoint state from an in-place message rewrite. */
-export function stripCompactionReplayCheckpointInPlace(message: {
-  providerReplay?: unknown;
-}): void {
-  if (isCompactionReplayCheckpoint(message.providerReplay)) {
-    delete message.providerReplay;
-  }
 }
 
 /** Preserve the covered prefix and reindex checkpoints after known content removals. */

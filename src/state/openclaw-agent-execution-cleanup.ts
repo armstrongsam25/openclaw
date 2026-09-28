@@ -2,7 +2,7 @@ import { throwSqliteLifecycleErrors } from "../infra/sqlite-lifecycle-errors.js"
 import { readDatabasePathIdentity } from "../infra/sqlite-worker-identity.js";
 import { createSqliteWorkerOperationAdmission } from "../infra/sqlite-worker-operation-admission.js";
 import { runSqliteWorkerStoreOperation } from "../infra/sqlite-worker-store.js";
-import type { OpenClawAgentDatabaseWorkerLeaseReceipt } from "./openclaw-agent-db-lease.js";
+import type { OpenClawAgentDatabaseWorkerLeaseReceipt } from "./openclaw-agent-db-contract.js";
 import { invalidateOpenClawAgentDatabaseValidation } from "./openclaw-agent-db-validation-cache.js";
 import type { OpenClawStateWorkerContext } from "./openclaw-state-worker-context.types.js";
 import { openOpenClawStateWorkerCleanupStore } from "./openclaw-state-worker-store.js";

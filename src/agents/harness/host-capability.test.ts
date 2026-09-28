@@ -46,7 +46,12 @@ vi.mock("../agent-tools.before-tool-call.js", async (importOriginal) => ({
   rewrapToolWithBeforeToolCallHook: vi.fn((tool) => tool),
   runBeforeToolCallHook: vi.fn(async ({ params }) => ({ blocked: false, params })),
 }));
-vi.mock("../tools/gateway.js", () => ({ callGatewayTool: vi.fn() }));
+vi.mock("../tools/gateway.js", () => ({
+  callGatewayTool: vi.fn(),
+  callInProcessGatewayTool: vi.fn(() => {
+    throw new Error("Host capability construction must not dispatch a Gateway tool");
+  }),
+}));
 
 const mockRewrap = vi.mocked(rewrapToolWithBeforeToolCallHook);
 const mockRunBefore = vi.mocked(runBeforeToolCallHook);

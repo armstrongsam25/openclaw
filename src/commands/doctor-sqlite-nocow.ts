@@ -9,7 +9,6 @@ import { requireDirectorySync, syncDirectory } from "../infra/directory-durabili
 import { copyFileHandle, sameFileMutationFingerprint } from "../infra/file-descriptor.js";
 import { openNodeSqliteDatabase } from "../infra/node-sqlite.js";
 import { assertSqliteIntegrity } from "../infra/sqlite-integrity.js";
-import { createVerifiedSqliteSnapshot } from "../infra/sqlite-snapshot.js";
 import { isSqlitePathOnBtrfs, setSqliteDirectoryNoCow } from "../infra/sqlite-wal-filesystem.js";
 import type { MigrationMessages } from "../infra/state-migrations.types.js";
 import { DoctorMaintenanceRefusalError } from "../infra/update-doctor-result.js";
@@ -191,6 +190,7 @@ export async function repairDoctorSqliteNoCow(params: {
     let snapshotsCompleted = 0;
     let exchangeAttempted = false;
     try {
+      const { createVerifiedSqliteSnapshot } = await import("../infra/sqlite-snapshot.js");
       params.assertCurrent();
       const relative = path.relative(path.resolve(params.stateDir), path.resolve(directory));
       if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {

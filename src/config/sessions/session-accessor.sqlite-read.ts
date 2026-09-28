@@ -17,13 +17,14 @@ import {
 import { resolveOpenClawAgentSqlitePath } from "../../state/openclaw-agent-db.paths.js";
 import { SessionMetadataUnavailableError } from "../../state/session-metadata-unavailable-error.js";
 import type {
+  SessionTranscriptReadSnapshot,
   LatestTranscriptAssistantMessage,
   LatestTranscriptAssistantText,
-  SessionTranscriptContextVersion,
   SessionTranscriptReadScope,
   SessionTranscriptEventRow,
   SessionTranscriptStats,
   TranscriptEvent,
+  ResolvedTranscriptReadScope,
 } from "./session-accessor.sqlite-contract.js";
 import { readSessionStateDeleteSnapshot } from "./session-accessor.sqlite-delete-snapshot.js";
 import type { SessionStateDeleteSnapshot } from "./session-accessor.sqlite-delete-snapshot.types.js";
@@ -32,7 +33,6 @@ import {
   resolveSqliteTranscriptReadScope,
   toDatabaseOptions,
   type SessionSqliteTargetResolutionCache,
-  type ResolvedTranscriptReadScope,
 } from "./session-accessor.sqlite-scope.js";
 import { canRebasePreparedAssistantInTransaction } from "./session-accessor.sqlite-transcript-parent.js";
 import {
@@ -155,7 +155,7 @@ export function readTranscriptExportSnapshotReadOnlySync(
 export function loadTranscriptReadSnapshotSync(
   scope: SessionTranscriptReadScope,
   options: { readOnly?: boolean; resolvedScope?: ResolvedTranscriptReadScope } = {},
-): { events: TranscriptEvent[]; version: SessionTranscriptContextVersion } {
+): SessionTranscriptReadSnapshot {
   const resolved = options.resolvedScope ?? resolveSqliteTranscriptReadScope(scope);
   const read = (database: Pick<OpenClawAgentDatabase, "db" | "path">) =>
     runSqliteDeferredTransactionSync(

@@ -1,6 +1,7 @@
 import { asPositiveSafeInteger } from "@openclaw/normalization-core/number-coercion";
 import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 import type { SessionEntry } from "../config/sessions.js";
+import type { ReadRecentSessionMessagesResult } from "../config/sessions/session-history-types.js";
 import { SessionTranscriptProjectionUnavailableError } from "../config/sessions/session-transcript-projection-error.js";
 import { resolveTranscriptPageEnd } from "../sessions/transcript-anchor-page.js";
 import type { TranscriptReadWindow } from "../sessions/transcript-read-window.js";
@@ -17,7 +18,6 @@ import {
 import type { CurrentUserProfileDisplayResolver } from "./current-user-profile-display.js";
 import type {
   SessionTranscriptReader,
-  ReadRecentSessionMessagesResult,
   SessionTranscriptReadScope,
 } from "./session-transcript-read-kernel.js";
 

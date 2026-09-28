@@ -348,6 +348,10 @@ function ttsProviderConfigHasApiKey(value: unknown): boolean {
   return isObjectRecord(value) && "apiKey" in value;
 }
 
+export async function runTtsStatus() {
+  return await callGateway({ method: "tts.status", timeoutMs: 30_000 });
+}
+
 export async function runTtsProviders(transport: CapabilityTransport, rawAgentId?: string) {
   const cfg = getRuntimeConfig();
   if (transport === "gateway") {

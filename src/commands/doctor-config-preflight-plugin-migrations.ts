@@ -5,13 +5,13 @@ import type { ConfigSnapshotReadMeasure } from "../config/io.js";
 import { resolveConfigPath } from "../config/paths.js";
 import type { ConfigFileSnapshot } from "../config/types.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import {
   DeferredPluginMigrationConflictError,
   formatDeferredPluginMigration,
   mergeDeferredPluginMigration,
   readDeferredPluginMigrations,
   recordDeferredPluginMigrations,
-  type DeferredPluginMigration,
 } from "../infra/deferred-plugin-migrations.js";
 import type {
   LegacyStateMigrationStepReceipt,

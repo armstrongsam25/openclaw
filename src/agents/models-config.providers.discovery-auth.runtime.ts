@@ -8,7 +8,7 @@ import { secretRefKey } from "../secrets/ref-contract.js";
 import { resolveAuthProfileSecretOwnerId } from "../secrets/runtime-auth-profile-owner.js";
 import { SecretSurfaceUnavailableError } from "../secrets/runtime-degraded-state.js";
 import { hasUsableOAuthCredential } from "./auth-profiles/credential-state.js";
-import { resolveApiKeyForProfile } from "./auth-profiles/oauth.js";
+import { resolveApiKeyForProfile } from "./auth-profiles/oauth.runtime.js";
 import type { AuthProfileStore } from "./auth-profiles/types.js";
 import type {
   ProviderApiKeyResolver,

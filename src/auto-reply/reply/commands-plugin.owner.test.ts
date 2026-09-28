@@ -9,7 +9,8 @@ import { registerPluginCommandInRegistry } from "../../plugins/command-registrat
 import type { PluginGatewayAccessPolicy } from "../../plugins/gateway-access-policy.types.js";
 import { createEmptyPluginRegistry } from "../../plugins/registry-empty.js";
 import { createTestPluginRegistry } from "../../plugins/registry-runtime.test-helpers.js";
-import { clearActivePluginRegistry, setActivePluginRegistry } from "../../plugins/runtime.js";
+import { setActivePluginRegistry } from "../../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../../plugins/runtime.test-support.js";
 import { withPluginRuntimeRegistryScope } from "../../plugins/runtime/gateway-request-scope.js";
 import { createPluginRecord } from "../../plugins/status.test-helpers.js";
 import { createDeferredCore } from "../../shared/deferred.js";

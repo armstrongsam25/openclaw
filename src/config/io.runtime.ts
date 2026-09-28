@@ -1,8 +1,8 @@
 import fs from "node:fs";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import {
   readDeferredPluginMigrations,
   readDeferredPluginMigrationsAsync,
-  type DeferredPluginMigration,
 } from "../infra/deferred-plugin-migrations.js";
 import { loadDotEnvAsync } from "../infra/dotenv.js";
 import { formatErrorMessage } from "../infra/errors.js";

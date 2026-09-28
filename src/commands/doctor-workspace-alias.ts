@@ -8,7 +8,6 @@ import {
   type RepointedWorkspaceAliasFacts,
   type WorkspaceAliasRebindOutcome,
 } from "../agents/workspace-alias-rebind.js";
-import { listWorkspaceStateDirs } from "../agents/workspace-state-dirs.js";
 import { readConfigFileSnapshot } from "../config/io.js";
 import { resolveStateDir } from "../config/paths.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
@@ -18,6 +17,7 @@ import { shortenHomePath } from "../utils.js";
 import type { DoctorPrompter } from "./doctor-prompter.js";
 
 async function configuredWorkspaceDirs(cfg: OpenClawConfig): Promise<string[]> {
+  const { listWorkspaceStateDirs } = await import("../agents/workspace-state-dirs.js");
   return listWorkspaceStateDirs({
     cfg,
     env: process.env,

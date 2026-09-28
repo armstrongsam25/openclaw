@@ -17,7 +17,7 @@ const runtimeModelAuthMocks = vi.hoisted(() => ({
   resolveProviderRuntimeApiKey: vi.fn(),
 }));
 const heartbeatRunnerMocks = vi.hoisted(() => ({ loads: 0, runHeartbeatOnce: vi.fn() }));
-vi.mock("../../infra/heartbeat-runner.js", () => {
+vi.mock("../../infra/heartbeat-runner-run.js", () => {
   heartbeatRunnerMocks.loads++;
   return { runHeartbeatOnce: heartbeatRunnerMocks.runHeartbeatOnce };
 });

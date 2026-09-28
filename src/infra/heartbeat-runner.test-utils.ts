@@ -33,7 +33,7 @@ import { withEnvAsync } from "../test-utils/env.js";
 import { createTestGatewayScheduler } from "../test-utils/gateway-scheduler-clock.js";
 import { normalizeSessionDeliveryState } from "../utils/delivery-context.shared.js";
 import type { DeliveryContext } from "../utils/delivery-context.types.js";
-import type { HeartbeatDeps } from "./heartbeat-runner.js";
+import type { HeartbeatRunOptions } from "./heartbeat-runner-execution.js";
 
 // Heartbeat test utilities seed session stores and temporary heartbeat prompts
 // while keeping plugin registry and environment state isolated per test.
@@ -46,6 +46,7 @@ type HeartbeatSessionSeed = Partial<InternalSessionEntry> & {
   lastThreadId?: string | number;
 };
 
+export type HeartbeatDeps = NonNullable<HeartbeatRunOptions["deps"]>;
 type HeartbeatReplyFn = NonNullable<HeartbeatDeps["getReplyFromConfig"]>;
 export type HeartbeatReplySpy = ReturnType<typeof vi.fn<HeartbeatReplyFn>>;
 

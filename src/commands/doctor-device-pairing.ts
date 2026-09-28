@@ -1,6 +1,7 @@
 import { normalizeUniqueSingleOrTrimmedStringList } from "@openclaw/normalization-core/string-normalization";
 import { note } from "../../packages/terminal-core/src/note.js";
 import { sanitizeTerminalText } from "../../packages/terminal-core/src/safe-text.js";
+import { bindAgentToolGatewayRequest } from "../agents/tools/in-process-gateway.js";
 import { formatCliCommand } from "../cli/command-format.js";
 import { quoteCliArg } from "../cli/quote-cli-arg.js";
 import { resolveStateDir } from "../config/paths.js";
@@ -18,6 +19,7 @@ import {
   type DevicePairingPendingRequest,
   type PairedDevice,
 } from "../infra/device-pairing.js";
+import { detectLegacyDeviceAuth } from "../infra/state-migrations.device-auth.js";
 import { normalizeDeviceAuthScopes } from "../shared/device-auth.js";
 import { roleScopesAllow } from "../shared/operator-scope-compat.js";
 
@@ -61,7 +63,6 @@ async function loadDoctorPairingSnapshot(params: {
 }): Promise<DoctorPairingSnapshot | null> {
   if (params.healthOk) {
     try {
-      const { bindAgentToolGatewayRequest } = await import("../agents/tools/in-process-gateway.js");
       const requestGateway = bindAgentToolGatewayRequest({ hostedOnly: true });
       const payload = await requestGateway<GatewayDevicePairingPayload>({
         method: "device.pair.list",
@@ -359,7 +360,6 @@ export async function collectDevicePairingHealthFindings(params: {
   env?: NodeJS.ProcessEnv;
 }): Promise<HealthFinding[]> {
   const legacyStoreFindings = await collectLegacyPairingStoreFindings(params.cfg);
-  const { detectLegacyDeviceAuth } = await import("../infra/state-migrations.device-auth.js");
   // Retired device auth uses the source env; pairing/token reads keep lint's active state view.
   // Report this debt even without a reachable remote Gateway or local identity.
   const deviceAuth = detectLegacyDeviceAuth({ stateDir: resolveStateDir(params.env) });

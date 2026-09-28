@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
-import { runHeartbeatOnce } from "../infra/heartbeat-runner.js";
+import { runHeartbeatOnce } from "../infra/heartbeat-runner-run.js";
 import {
   seedMainSessionStore,
   setupTelegramHeartbeatPluginRuntimeForTests,

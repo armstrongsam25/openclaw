@@ -10,6 +10,7 @@ import {
   installChromeExtensionBootstrap,
   type BrowserExtensionStatus,
 } from "./extension-install.js";
+import { readExtensionRelayToken } from "./extension-relay/relay-auth.js";
 import { isValidProfileName } from "./profiles.js";
 
 type BrowserExtensionSetupAction = "inspect" | "install" | "verify";
@@ -337,7 +338,6 @@ async function verifyBrowserExtensionSetup(
 ): Promise<BrowserExtensionSetupResult> {
   // Read-only, exact profile/port proof; no key creation, relay start, or remote Gateway.
   try {
-    const { readExtensionRelayToken } = await import("./extension-relay/relay-auth.js");
     const token = readExtensionRelayToken();
     if (!token) {
       result.connection = { state: "unavailable" };

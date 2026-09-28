@@ -62,12 +62,12 @@ import { getPluginInstance } from "../plugin-instance-scope.js";
 import { createEmptyPluginRegistry } from "../registry-empty.js";
 import { createPluginRegistry } from "../registry.js";
 import {
-  clearActivePluginRegistry,
   getActivePluginRegistryVersion,
   disposePluginRegistryInstances,
   setActivePluginRegistry,
   stageActivePluginRegistry,
 } from "../runtime.js";
+import { clearActivePluginRegistry } from "../runtime.test-support.js";
 import type { PluginRuntime } from "../runtime/types.js";
 import { createPluginRecord } from "../status.test-helpers.js";
 import {

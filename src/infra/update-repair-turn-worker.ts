@@ -5,13 +5,13 @@ import {
   withDelegatedUpdateCommandExecutor,
   type UpdateCommandChildGrant,
 } from "../cli/update-cli/update-command-executor.js";
+import { createManagedUpdateRequesterContinuationAuthority } from "../cli/update-cli/update-command-managed-context.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { withSynchronousArtifactPreservingStateSnapshot } from "../state/openclaw-state-db-readonly.js";
 import type { UpdateRepairTurnMessage, UpdateRepairTurnResult } from "./update-repair-protocol.js";
 import { repairSummary, runLocalUpdateRepairTurn } from "./update-repair-turn.js";
 import {
   createManagedUpdateRequesterAuthority,
-  createManagedUpdateRequesterContinuationAuthority,
   resolveManagedUpdateRequester,
   UpdateRequesterRevokedError,
 } from "./update-requester-authority.js";

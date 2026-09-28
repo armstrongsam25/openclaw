@@ -3,9 +3,9 @@ import type { CaptureProtocol } from "./types.js";
 
 // Debug-proxy coverage records which transport seams are fully captured versus
 // merely routed through a proxy, so operators know where packet evidence is weak.
-export type DebugProxyCoverageStatus = "captured" | "proxy-only" | "uncovered";
+type DebugProxyCoverageStatus = "captured" | "proxy-only" | "uncovered";
 
-export type DebugProxyCoverageEntry = {
+type DebugProxyCoverageEntry = {
   id: string;
   label: string;
   modulePath: string;
@@ -14,7 +14,7 @@ export type DebugProxyCoverageEntry = {
   notes: string;
 };
 
-export type DebugProxyCoverageSummary = {
+type DebugProxyCoverageSummary = {
   total: number;
   captured: number;
   proxyOnly: number;

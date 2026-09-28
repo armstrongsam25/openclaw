@@ -19,7 +19,7 @@ import {
   withPluginCache,
 } from "../../plugins/plugin-cache.js";
 import { clearPluginMetadataLifecycleCaches } from "../../plugins/plugin-metadata-lifecycle.js";
-import { finalizePluginMetadataSnapshot } from "../../plugins/plugin-metadata-snapshot.js";
+import { restorePluginMetadataSnapshot } from "../../plugins/plugin-metadata-snapshot.js";
 import { createPluginMetadataSnapshotFixture } from "../../plugins/plugin-metadata.test-support.js";
 import type { PluginRegistry } from "../../plugins/registry-types.js";
 import { disposePluginRegistryInstances } from "../../plugins/runtime.js";
@@ -156,7 +156,7 @@ describe.each([
     const fixture = createFixture();
     await using cache = createPluginCache();
     const { available, empty } = withPluginCache(cache, () => ({
-      available: finalizePluginMetadataSnapshot(
+      available: restorePluginMetadataSnapshot(
         createPluginMetadataSnapshotFixture({
           plugins: [
             {
@@ -170,7 +170,7 @@ describe.each([
           ],
         }),
       ),
-      empty: finalizePluginMetadataSnapshot(createPluginMetadataSnapshotFixture()),
+      empty: restorePluginMetadataSnapshot(createPluginMetadataSnapshotFixture()),
     }));
     const options = { config: fixture.config, trustConfigIdentity: true };
     await withPluginMetadataSnapshotScope(

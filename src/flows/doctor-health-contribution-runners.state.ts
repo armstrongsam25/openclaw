@@ -1,4 +1,5 @@
 import { noteBackupDoctorHint } from "../commands/backup-health.js";
+import { noteDiskSpace } from "../commands/doctor-disk-space.js";
 import { isLegacyParentWritableUpdateDoctorPass } from "../commands/doctor/shared/update-phase.js";
 import { writeConfigMachineState } from "../state/config-machine-state-write.js";
 import type { DoctorHealthFlowContext } from "./doctor-health-contribution-types.js";
@@ -88,7 +89,6 @@ export async function runReleaseConfiguredPluginInstallsHealth(
 }
 
 export async function runDiskSpaceHealth(): Promise<void> {
-  const { noteDiskSpace } = await import("../commands/doctor-disk-space.js");
   noteDiskSpace();
 }
 

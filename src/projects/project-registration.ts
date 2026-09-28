@@ -1,6 +1,7 @@
 import path from "node:path";
 import { cloneEnvWithPlatformSemantics } from "../config/config-env-vars.js";
 import type { OpenClawStateDatabaseOptions } from "../state/openclaw-state-db.js";
+import { runWithOpenClawStateLeaseWorker } from "../state/openclaw-state-lease-worker-storage.js";
 import type { OpenClawStateLeaseContext } from "../state/openclaw-state-lease.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
 import type { OpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.types.js";
@@ -53,8 +54,6 @@ export async function registerPreparedProjectRegistry(
       `project checkout changed while registering: ${prepared.requestedPath}`,
     );
   }
-  const { runWithOpenClawStateLeaseWorker } =
-    await import("../state/openclaw-state-lease-worker-storage.js");
   return await runWithOpenClawStateLeaseWorker(lease, context, async (scope, identity) => {
     const project = await scope.execute({
       type: "projects.insert",

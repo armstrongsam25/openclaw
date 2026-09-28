@@ -8,6 +8,7 @@ import {
   OUTBOUND_DELIVERY_MIGRATION_QUEUE_NAME,
 } from "../infra/outbound/delivery-queue-namespaces.js";
 import { withLegacyMigrationStateLock } from "../infra/state-migrations.lock.js";
+import { migrateLegacyDeliveryQueues } from "../infra/state-migrations.storage.js";
 import type { MigrationMessages } from "../infra/state-migrations.types.js";
 import { hasRetainedPluginRuntimeCloseError } from "../plugins/runtime-close-error.js";
 import { getOpenClawDatabaseMaintenanceScope } from "../state/openclaw-state-db-async-lifecycle.js";
@@ -38,7 +39,6 @@ export async function migrateDoctorDeliveryQueues(params: {
     label: "legacy delivery queues",
     releaseLabel: "Delivery queue",
     run: async (env) => {
-      const { migrateLegacyDeliveryQueues } = await import("../infra/state-migrations.storage.js");
       const imported = await migrateLegacyDeliveryQueues({ stateDir: params.stateDir });
       if (imported.warnings.length > 0 && imported.warningDisposition !== "recoverable") {
         return imported;

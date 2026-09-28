@@ -11,11 +11,11 @@ import {
 import { cloneEnvWithPlatformSemantics } from "../config-env-vars.js";
 import { resolveStateDir } from "../state-dir.js";
 import type { OpenClawConfig } from "../types.openclaw.js";
-import {
-  readSessionIdentityEvidenceBatch,
-  type SessionIdentityEvidenceIdentity,
-  type SessionIdentityEvidenceResult,
-} from "./session-accessor.sqlite-entry-availability.js";
+import type {
+  SessionIdentityEvidenceIdentity,
+  SessionIdentityEvidenceResult,
+} from "./session-accessor.sqlite-contract.js";
+import { readSessionIdentityEvidenceBatch } from "./session-accessor.sqlite-entry-availability.js";
 import { captureCanonicalSessionReaderContinuation } from "./session-canonical-key.js";
 import { resolveUnsuffixedSqliteTargetFromSessionStorePath } from "./session-sqlite-target-paths.js";
 import { captureSessionStoreReadCandidate } from "./session-store-read-candidates.js";

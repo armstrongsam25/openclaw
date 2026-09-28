@@ -12,9 +12,9 @@ import {
 import {
   prepareGitHubToolEnvironment,
   resolveManagedGitHubProfileDir,
-  writeManagedGitHubProfileFiles,
 } from "../../agents/github-tool-identity.js";
 import { cleanupRetiredManagedGitHubProfiles } from "../../agents/github-tool-profile-cleanup.js";
+import { writeManagedGitHubProfileFiles } from "../../agents/github-tool-profile.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { resolveCommandEnv } from "../../process/exec-spawn.js";
 import * as secretsRuntime from "../../secrets/runtime-state.js";

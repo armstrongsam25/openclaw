@@ -4,9 +4,9 @@ import {
   resolveSessionCleanupAction,
   runSessionsCleanup,
   SessionsCleanupFailureError,
-  type SessionStoreTarget,
   type SessionsCleanupOptions,
 } from "../config/sessions.js";
+import type { SessionStoreTarget } from "../config/sessions/session-store-target.types.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { withActivatedPluginIds } from "../plugins/activation-context.js";
 import { resolveManifestActivationPluginIds } from "../plugins/activation-planner.js";

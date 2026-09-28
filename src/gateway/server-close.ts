@@ -11,7 +11,7 @@ import { type ChannelId, listChannelPlugins } from "../channels/plugins/index.js
 import { closeSessionTranscriptReconcileWorkerPool } from "../config/sessions/session-transcript-reconcile-pool.js";
 import { createInternalHookEvent, triggerInternalHook } from "../hooks/internal-hooks.js";
 import { formatErrorMessage } from "../infra/errors.js";
-import type { HeartbeatRunner } from "../infra/heartbeat-runner.js";
+import type { HeartbeatRunner } from "../infra/heartbeat-runner-scheduler.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { closePluginStateDatabaseAsync } from "../plugin-state/plugin-state-store.js";
 import type { GatewayPluginMetadataOwner } from "../plugins/plugin-metadata-lifecycle.js";

@@ -16,7 +16,6 @@ import { hasCommandProcessCleanupError } from "../../process/exec-result.js";
 import { parseOpenClawSchemaVersions } from "../../state/openclaw-schema-versions.js";
 import { createUpdateProgress } from "./progress.js";
 import type { InitializedUpdate } from "./update-command-initialization.js";
-import { withUpdateInitializationCleanup } from "./update-command-initialization.js";
 import { stagePackageInstallUpdate } from "./update-command-package.js";
 
 type StageParams = Parameters<typeof stagePackageInstallUpdate>[0];
@@ -41,6 +40,7 @@ export async function withPrivateStagedPackageInstall<T>(
     manifest: unknown;
   }) => Promise<T>,
 ): Promise<T> {
+  const { withUpdateInitializationCleanup } = await import("./update-command-initialization.js");
   const rootIdentity = await readDirectoryIdentity(resolvePreferredOpenClawTmpDir());
   const root = rootIdentity.realPath;
   const assertRoot = () => assertDirectoryIdentitySync(root, rootIdentity);

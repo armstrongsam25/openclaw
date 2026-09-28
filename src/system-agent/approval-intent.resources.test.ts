@@ -5,10 +5,8 @@ import { expect, it, vi } from "vitest";
 import { createDeferred } from "../../test/helpers/promise.js";
 import { resetPreparedModelRuntimeSnapshotsForTest } from "../agents/prepared-model-runtime.test-support.js";
 import { ModelRegistry } from "../agents/sessions/model-registry.js";
-import {
-  acquireSimpleCompletionModelForAgent,
-  completeWithPreparedSimpleCompletionModel,
-} from "../agents/simple-completion-runtime.js";
+import { completeWithPreparedSimpleCompletionModel } from "../agents/simple-completion-execution.js";
+import { acquireSimpleCompletionModelForAgent } from "../agents/simple-completion-runtime.js";
 import { readConfigFileSnapshot } from "../config/config.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { fetchWithRuntimeDispatcher } from "../infra/net/runtime-fetch.js";

@@ -11,6 +11,7 @@ import { captureOpenClawStateWorkerContext } from "../../state/openclaw-state-wo
 import type {
   SessionTranscriptReadScope,
   TranscriptEvent,
+  ResolvedTranscriptReadScope,
 } from "./session-accessor.sqlite-contract.js";
 import {
   findTranscriptEventInDatabase,
@@ -20,7 +21,6 @@ import {
   prepareSqliteTranscriptReadScope,
   resolveSqliteTranscriptReadScope,
   toDatabaseOptions,
-  type ResolvedTranscriptReadScope,
 } from "./session-accessor.sqlite-scope.js";
 import { readActiveTranscriptEntryAnchorInTransaction } from "./session-accessor.sqlite-transcript-anchor.js";
 import { readRestoredSessionTranscript } from "./session-cold-storage-read.js";

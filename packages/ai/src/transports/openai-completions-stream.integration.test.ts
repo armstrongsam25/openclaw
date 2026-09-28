@@ -81,7 +81,7 @@ describe("openai completions stream", () => {
             reasoning: false,
             cost: { input: 1, output: 2, cacheRead: 0.25, cacheWrite: 1.25 },
           });
-          const stream = await createStream(
+          const stream = createStream(
             model,
             { messages: [{ role: "user", content: "Explain the usage.", timestamp: 1 }] },
             { apiKey: "synthetic-test-key" },

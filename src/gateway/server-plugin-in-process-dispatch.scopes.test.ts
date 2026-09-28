@@ -1,8 +1,8 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { callInProcessGatewayTool } from "../agents/tools/gateway.js";
 import {
   callAgentToolGatewayRequest,
-  callInProcessGatewayTool,
   runWithGatewayToolContinuationContext,
 } from "../agents/tools/in-process-gateway.js";
 import { dispatchGatewayMethod } from "../plugin-sdk/gateway-method-runtime.js";

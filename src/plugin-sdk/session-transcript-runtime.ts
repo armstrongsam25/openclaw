@@ -25,6 +25,7 @@ import {
   type SessionTranscriptRawDeltaResult,
   type SessionTranscriptVisibleMessageDeltaLimits,
 } from "../config/sessions/session-accessor.js";
+import { readRestoredSessionTranscript } from "../config/sessions/session-cold-storage-read.js";
 import { resolveMirroredTranscriptText } from "../config/sessions/transcript-mirror.js";
 import {
   selectVisibleTranscriptEventEntries,
@@ -261,8 +262,6 @@ export async function readSessionTranscriptRawDelta(
 ): Promise<SessionTranscriptRawDeltaResult> {
   const { cursor, maxBytes, maxEvents, ...target } = params;
   const scope = bindSessionTranscriptStoreScope(target);
-  const { readRestoredSessionTranscript } =
-    await import("../config/sessions/session-cold-storage-read.js");
   return readRestoredSessionTranscript(scope, () =>
     readTranscriptRawDelta(scope, {
       ...(cursor !== undefined ? { cursor } : {}),
@@ -278,8 +277,6 @@ export async function readSessionTranscriptVisibleMessageDelta(
 ): Promise<SessionTranscriptVisibleMessageDeltaResult> {
   const { cursor, maxBytes, maxMessages, ...target } = params;
   const scope = bindSessionTranscriptStoreScope(target);
-  const { readRestoredSessionTranscript } =
-    await import("../config/sessions/session-cold-storage-read.js");
   let result: ReturnType<typeof readVisibleMessageDelta>;
   try {
     result = await readRestoredSessionTranscript(scope, () =>
@@ -326,8 +323,6 @@ export async function readLatestAssistantTextByIdentity(
   params: SessionTranscriptTargetParams,
 ): Promise<LatestAssistantTranscriptText | undefined> {
   const scope = bindSessionTranscriptStoreScope(params);
-  const { readRestoredSessionTranscript } =
-    await import("../config/sessions/session-cold-storage-read.js");
   return readRestoredSessionTranscript(scope, () => readLatestTranscriptAssistantText(scope));
 }
 

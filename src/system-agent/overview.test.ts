@@ -6,9 +6,8 @@ import {
   formatSystemAgentOverview,
   formatSystemAgentOnboardingWelcome,
   formatSystemAgentStartupMessage,
-  loadSystemAgentOverview,
-  type SystemAgentOverview,
-} from "./overview.js";
+} from "./overview-format.js";
+import { loadSystemAgentOverview, type SystemAgentOverview } from "./overview.js";
 
 function createConfigSnapshot(runtimeConfig: OpenClawConfig): ConfigFileSnapshot {
   return {

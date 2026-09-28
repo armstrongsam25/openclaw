@@ -8,6 +8,7 @@ import { createDeferredCore } from "../../shared/deferred.js";
 import { resolveGlobalSingleton } from "../../shared/global-singleton.js";
 import { registerOpenClawAgentDatabaseAsyncResource } from "../../state/openclaw-agent-db-resources.js";
 import { captureOpenClawStateWorkerContext } from "../../state/openclaw-state-worker-context.js";
+import { runOpenClawStateWorkerOperation } from "../../state/openclaw-state-worker-store.js";
 import {
   withSqliteWorkerLifecycleCoordination,
   type SqliteMutationWorkerCoordination,
@@ -193,8 +194,6 @@ async function startReconcileWorkerTask(
     input.mode === "disk" ? readDatabasePathIdentitySync(input.path).key : undefined;
   if (owner && input.mode === "disk" && owner.context.admission.identity.key.startsWith("path:")) {
     // Finish canonical first creation before publishing a task that could claim an agent lease.
-    const { runOpenClawStateWorkerOperation } =
-      await import("../../state/openclaw-state-worker-store.js");
     await runOpenClawStateWorkerOperation(owner.context, async () => undefined, {
       assertCurrent: () => signal?.throwIfAborted(),
     });

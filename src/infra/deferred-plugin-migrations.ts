@@ -4,6 +4,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { createSubsystemLogger } from "../logging/subsystem.js";
+import { withPluginLifecycleLease } from "../plugins/plugin-lifecycle-lease.js";
 import { openClawStateDatabaseCache } from "../state/openclaw-state-db-cache.js";
 import { OPENCLAW_SQLITE_BUSY_TIMEOUT_MS } from "../state/openclaw-state-db-contract.js";
 import {
@@ -21,7 +22,16 @@ import { runManagedStateTransaction } from "../state/openclaw-state-db-transacti
 import type { DB } from "../state/openclaw-state-db.generated.js";
 import { runOpenClawStateWriteTransaction } from "../state/openclaw-state-db.js";
 import { resolveOpenClawStateSqlitePath } from "../state/openclaw-state-db.paths.js";
+import { runWithOpenClawStateLeaseWorker } from "../state/openclaw-state-lease-worker-storage.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
+import { runOpenClawStateWorkerOperation } from "../state/openclaw-state-worker-store.js";
+import {
+  deferredPluginMigrationSchema,
+  type DeferredPluginMigration,
+  type DeferredPluginMigrationCompletion,
+  type DeferredPluginMigrationRecordInput,
+  type DeferredPluginMigrationTransitions,
+} from "./deferred-plugin-migrations.contract.js";
 import { isTruthyEnvValue } from "./env.js";
 import { clearNodeSqliteKyselyCacheForDatabase } from "./kysely-sync-cache-state.js";
 import { executeSqliteQuerySync, getNodeSqliteKysely } from "./kysely-sync.js";
@@ -32,17 +42,6 @@ import { withStateDatabaseSchemaMaintenance } from "./state-database-maintenance
 import { recordLegacyMigrationRun } from "./state-migrations.receipts.js";
 
 const RUN_PREFIX = "deferred-plugin-migration:";
-const deferredPluginMigrationSchema = z.object({
-  pluginId: z.string().min(1),
-  reason: z.string().min(1),
-  command: z.string().min(1),
-  requiresStateMigration: z.literal(true).optional(),
-  requiresDoctorInspection: z.literal(true).optional(),
-  configPaths: z.array(z.array(z.string().min(1)).min(1)).optional(),
-  validationExcludedPaths: z.array(z.array(z.string().min(1)).min(1)).optional(),
-});
-
-export type DeferredPluginMigration = z.infer<typeof deferredPluginMigrationSchema>;
 
 type ConfigMigrationCompletion = {
   configPath: string;
@@ -224,8 +223,6 @@ export async function readDeferredPluginMigrationsAsync(
   options: Parameters<typeof readDeferredPluginMigrations>[0] = {},
 ): Promise<readonly DeferredPluginMigration[]> {
   const context = captureOpenClawStateWorkerContext(options);
-  const { runOpenClawStateWorkerOperation } =
-    await import("../state/openclaw-state-worker-store.js");
   context.admission.assertCurrent();
   const pending = await runOpenClawStateWorkerOperation(
     context,
@@ -246,7 +243,7 @@ export async function readDeferredPluginMigrationsAsync(
 /** Completion receipts resolve historical warnings without loading their retired reports. */
 export function readDeferredPluginMigrationCompletions(
   options: Parameters<typeof readDeferredPluginMigrations>[0] = {},
-) {
+): DeferredPluginMigrationCompletion[] {
   return (
     withExistingOpenClawStateDatabaseArtifactPreservingReadOnly(({ db }) => {
       if (!tableExists(db, "migration_runs")) {
@@ -272,8 +269,6 @@ export async function readDeferredPluginMigrationCompletionsAsync(
   options: Parameters<typeof readDeferredPluginMigrations>[0] = {},
 ) {
   const context = captureOpenClawStateWorkerContext(options);
-  const { runOpenClawStateWorkerOperation } =
-    await import("../state/openclaw-state-worker-store.js");
   context.admission.assertCurrent();
   const completed = await runOpenClawStateWorkerOperation(
     context,
@@ -405,18 +400,11 @@ export function formatDeferredPluginMigration(
   return `Plugin "${pending.pluginId}" data/settings upgrade is unfinished: ${pending.reason} Your existing data and settings have been kept. ${next}`;
 }
 
-export type DeferredPluginMigrationRecordInput = {
-  env?: NodeJS.ProcessEnv;
-  pending: readonly DeferredPluginMigration[];
-  resolvedPluginIds?: readonly string[];
-  expectedPending?: readonly DeferredPluginMigration[];
-};
-
 /** Native row transform; the worker owns its transaction and lease grants. */
 export function recordDeferredPluginMigrationsInTransaction(
   db: DatabaseSync,
   params: Omit<DeferredPluginMigrationRecordInput, "env">,
-) {
+): DeferredPluginMigrationTransitions {
   const pendingById = new Map(
     params.pending.map((pending) => [
       pending.pluginId,
@@ -486,9 +474,6 @@ export async function recordDeferredPluginMigrations(
     resolvedPluginIds: params.resolvedPluginIds,
     expectedPending: params.expectedPending,
   });
-  const { withPluginLifecycleLease } = await import("../plugins/plugin-lifecycle-lease.js");
-  const { runWithOpenClawStateLeaseWorker } =
-    await import("../state/openclaw-state-lease-worker-storage.js");
   return withPluginLifecycleLease({ env: params.env }, async (lease) => {
     const context = captureOpenClawStateWorkerContext({
       env: params.env,

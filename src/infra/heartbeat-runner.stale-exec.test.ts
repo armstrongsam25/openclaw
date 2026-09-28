@@ -4,11 +4,8 @@ import { resetGatewayWorkAdmission } from "../process/gateway-work-admission.js"
 import { closeOpenClawStateDatabaseForTest } from "../state/openclaw-state-db.js";
 import { captureEnv, setTestEnvValue } from "../test-utils/env.js";
 import { resetHeartbeatEventsForTest } from "./heartbeat-events.js";
-import {
-  runHeartbeatOnce,
-  setHeartbeatsEnabled,
-  startHeartbeatRunner,
-} from "./heartbeat-runner.js";
+import { runHeartbeatOnce } from "./heartbeat-runner-run.js";
+import { startHeartbeatRunner } from "./heartbeat-runner-scheduler.js";
 import {
   heartbeatTestConfig,
   seedMainSessionStore,
@@ -20,6 +17,7 @@ import {
   requestHeartbeat,
   setHeartbeatWakeHandler as setRuntimeHeartbeatWakeHandler,
 } from "./heartbeat-wake.js";
+import { setSessionEventWakesEnabled } from "./session-event-wake.js";
 import { enqueueSystemEvent, peekSystemEvents, resetSystemEventsForTest } from "./system-events.js";
 
 describe("stale exec heartbeat wakes", () => {
@@ -94,7 +92,7 @@ describe("stale exec heartbeat wakes", () => {
     resetGatewayWorkAdmission();
     resetHeartbeatEventsForTest();
     resetSystemEventsForTest();
-    setHeartbeatsEnabled(true);
+    setSessionEventWakesEnabled(true);
     envSnapshot.restore();
     vi.useRealTimers();
     vi.restoreAllMocks();

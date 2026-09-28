@@ -18,7 +18,10 @@ import {
   usesCandidateUpdateAdmission,
   type UpdateCommandOptions,
 } from "./shared.js";
-import { withPrivateStagedPackageInstall } from "./update-command-artifact.js";
+import {
+  runFreshUpdateArtifact,
+  withPrivateStagedPackageInstall,
+} from "./update-command-artifact.js";
 import {
   applyUpdateCandidateAdmission,
   assertUpdateAdmissionConfigUnchanged,
@@ -30,15 +33,9 @@ import {
   captureUpdateCommandExecutorAuthority,
   withUpdateCommandExecutor,
 } from "./update-command-executor.js";
-import {
-  acquireLegacyUpdateInitializationFence,
-  confirmFreshUpdateDowngrade,
-  initializeUpdateStateFromTarget,
-  withUpdateInitializationCleanup,
-  type InitializedUpdate,
-  type UpdateTargetSelection,
-} from "./update-command-initialization.js";
+import type { InitializedUpdate, UpdateTargetSelection } from "./update-command-initialization.js";
 import { preparePackageUpdateRuntime } from "./update-command-node-runtime.js";
+import { stagePackageInstallUpdate } from "./update-command-package.js";
 import { UnreportedUpdateAdmissionOutcome } from "./update-command-result.js";
 import {
   assertUpdatePackageActivationAdmission,
@@ -69,6 +66,12 @@ export async function initializeAndRunUpdate(
   policy: { needsInitialization: boolean; captureOriginal: boolean },
   executorOptions?: UpdateCommandExecutorOptions,
 ): Promise<void> {
+  const {
+    acquireLegacyUpdateInitializationFence,
+    confirmFreshUpdateDowngrade,
+    initializeUpdateStateFromTarget,
+    withUpdateInitializationCleanup,
+  } = await import("./update-command-initialization.js");
   const targetEnv = resolveUpdateTargetEnv({ baseEnv: env, nodeRunner: process.execPath });
   const runId = env.OPENCLAW_UPDATE_RUN_ID?.trim() || randomUUID();
   let handleFailure: Awaited<ReturnType<typeof prepareUpdateCommandFailureTriage>> | undefined;
@@ -436,7 +439,6 @@ export async function initializeAndRunUpdate(
                   preflight: true,
                   serviceRoot: target.managedServiceRoot,
                 });
-                const { stagePackageInstallUpdate } = await import("./update-command-package.js");
                 fence.assertCurrent();
                 assertUpdatePackageActivationAdmission(target.root, packageAdmission);
                 const legacyFence = acquireLegacyUpdateInitializationFence({
@@ -493,7 +495,6 @@ export async function initializeAndRunUpdate(
                   return await runCapturedInitialization();
                 }
                 if (artifact) {
-                  const { runFreshUpdateArtifact } = await import("./update-command-artifact.js");
                   return await runFreshUpdateArtifact(
                     { initialization, stageParams, json: Boolean(opts.json) },
                     runSelectedTarget,

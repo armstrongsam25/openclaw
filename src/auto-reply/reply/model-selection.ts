@@ -58,6 +58,7 @@ import {
   mergePreparedConfiguredCatalog,
   resolveRuntimeNormalization,
 } from "./model-runtime-normalization.js";
+import { persistReplySessionEntry } from "./session-entry-persistence.js";
 import { isStaleHeartbeatAutoFallbackOverride } from "./stored-model-override.js";
 export {
   resolveModelDirectiveSelection,
@@ -101,9 +102,6 @@ type ModelSelectionState = {
 
 const modelCatalogRuntimeLoader = createLazyImportLoader(
   () => import("../../agents/model-catalog.runtime.js"),
-);
-const sessionPersistenceRuntimeLoader = createLazyImportLoader(
-  () => import("./session-entry-persistence.js"),
 );
 
 /** Resolves provider/model, allowlist, catalog, and thinking defaults for a reply run. */
@@ -341,7 +339,6 @@ export async function createModelSelectionState(params: {
       let resetApplied = updated;
       if (updated) {
         if (storePath) {
-          const { persistReplySessionEntry } = await sessionPersistenceRuntimeLoader.load();
           const persistence = await persistReplySessionEntry({
             storePath,
             sessionKey,

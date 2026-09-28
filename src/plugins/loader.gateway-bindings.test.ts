@@ -27,11 +27,8 @@ import {
 } from "./loader.test-fixtures.js";
 import { bindPluginRegistryRuntime, getPluginRegistryRuntime } from "./registry-runtime-binding.js";
 import { createEmptyPluginRegistry } from "./registry.js";
-import {
-  clearActivePluginRegistry,
-  getActivePluginRegistry,
-  setActivePluginRegistry,
-} from "./runtime.js";
+import { getActivePluginRegistry, setActivePluginRegistry } from "./runtime.js";
+import { clearActivePluginRegistry } from "./runtime.test-support.js";
 import {
   bindGatewayContextResolver,
   getGatewayContextResolver,

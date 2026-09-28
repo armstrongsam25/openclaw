@@ -146,6 +146,10 @@ vi.mock("../infra/restart.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../infra/restart.js")>()),
   scheduleGatewayRestart: mockScheduleGatewayRestart,
 }));
+vi.mock("./overview-format.js", () => ({
+  formatSystemAgentOverview: () => "Default model: openai/gpt-5.5",
+}));
+
 vi.mock("./overview.js", () => ({
   loadSystemAgentOverview: vi.fn(async () => ({
     agents: [

@@ -14,7 +14,10 @@ import {
   resolveOcmUpdateManager,
 } from "../../infra/ocm-update-client.js";
 import type { RestartSentinelPayload } from "../../infra/restart-sentinel.js";
-import { normalizeUpdateChannel } from "../../infra/update-channels.js";
+import {
+  normalizeUpdateChannel,
+  resolveEffectiveUpdateChannel,
+} from "../../infra/update-channels.js";
 import { currentUpdateCheckLifecycle } from "../../infra/update-check-lifecycle.js";
 import {
   getUpdateRunAsync,
@@ -24,7 +27,6 @@ import {
   reconcileAbandonedUpdateRunsAsync,
 } from "../../infra/update-run-ledger.js";
 import { toPublicUpdateRun } from "../../infra/update-run-record.js";
-import { getUpdateEffectiveChannel } from "../../infra/update-startup.js";
 import {
   getGatewayUpdateSchedule,
   refreshGatewayUpdateStatus,
@@ -36,6 +38,7 @@ import {
   tryBeginGatewayRootWorkAdmission,
 } from "../../process/gateway-work-admission.js";
 import { createStageTimingTracker } from "../../shared/stage-timing.js";
+import { VERSION } from "../../version.js";
 import { formatControlPlaneActor, resolveControlPlaneActor } from "../control-plane-audit.js";
 import {
   getLatestUpdateRestartSentinel,
@@ -130,7 +133,12 @@ export const updateStatusHandlers: GatewayRequestHandlers = {
         (currentConfig ? undefined : normalizeUpdateChannel(getUpdateSchedule()?.channel));
       if (!effectiveChannel) {
         try {
-          effectiveChannel = await getUpdateEffectiveChannel();
+          const { status } = await currentUpdateCheckLifecycle().initialize();
+          effectiveChannel = resolveEffectiveUpdateChannel({
+            currentVersion: VERSION,
+            installKind: status.installKind,
+            git: status.git,
+          }).channel;
         } catch (err) {
           context?.logGateway?.warn(
             `update.status install identity failed: ${formatErrorMessage(err)}`,

@@ -24,7 +24,6 @@ import { isPathInside } from "../infra/path-guards.js";
 import { isPidAlive } from "../shared/pid-alive.js";
 import { escapeRegExp } from "../shared/regexp.js";
 import { shortenHomePath } from "../utils.js";
-import { ensureHeartbeatMonitorJobs } from "./doctor-heartbeat-cadence-migration.js";
 
 const HEARTBEAT_SCRATCH_MIGRATION_CHECK_ID = "core/doctor/heartbeat-scratch-migration";
 const LEGACY_HEARTBEAT_FILENAME = "HEARTBEAT.md";
@@ -475,6 +474,7 @@ export async function maybeMigrateHeartbeatFilesToScratch(params: {
 
   let monitors: Map<string, CronJob>;
   try {
+    const { ensureHeartbeatMonitorJobs } = await import("./doctor-heartbeat-cadence-migration.js");
     monitors = await ensureHeartbeatMonitorJobs(params.cfg, storePath, env);
   } catch (error) {
     return {

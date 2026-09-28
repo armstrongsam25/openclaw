@@ -31,6 +31,21 @@ export type TrajectoryEvent = {
   data?: Record<string, unknown>;
 };
 
+export type SqliteTrajectoryRuntimeScope = {
+  agentId?: string;
+  env?: NodeJS.ProcessEnv;
+  maxGlobalRuntimeBytes?: number;
+  maxRuntimeBytes?: number;
+  sessionId: string;
+  storePath: string;
+  assertCommitAllowed?: () => void;
+};
+
+export type SqliteTrajectoryRuntimeAppend = Pick<
+  SqliteTrajectoryRuntimeScope,
+  "sessionId" | "maxRuntimeBytes" | "maxGlobalRuntimeBytes"
+> & { events: readonly TrajectoryEvent[] };
+
 // Bundle manifest written beside events.jsonl in trajectory exports.
 export type TrajectoryBundleManifest = {
   traceSchema: "openclaw-trajectory";

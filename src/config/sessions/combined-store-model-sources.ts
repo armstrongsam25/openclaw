@@ -5,7 +5,7 @@ import { normalizeAgentId, parseAgentSessionKey } from "../../routing/session-ke
 import { readAgentDatabaseAdmissionRefusal } from "../../state/agent-database-admission.js";
 import type { OpenClawConfig } from "../types.openclaw.js";
 import { storeTargetKey } from "./combined-store-paths.js";
-import type { SessionStoreTarget } from "./targets.js";
+import type { SessionStoreTarget } from "./session-store-target.types.js";
 import type { SessionEntry } from "./types.js";
 
 // Model sources retain stored lineage; combined rows may project aliases for display.

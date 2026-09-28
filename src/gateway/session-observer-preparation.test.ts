@@ -15,9 +15,11 @@ const runtimeMocks = vi.hoisted(() => ({
   completeIsolated: vi.fn(),
 }));
 
-vi.mock("../agents/simple-completion-runtime.js", () => ({
-  completeWithPreparedSimpleCompletionModel: runtimeMocks.completeDirect,
+vi.mock("../agents/simple-completion-selection.js", () => ({
   resolveSimpleCompletionSelectionForAgent: runtimeMocks.selectModel,
+}));
+vi.mock("../agents/simple-completion-execution.js", () => ({
+  completeWithPreparedSimpleCompletionModel: runtimeMocks.completeDirect,
 }));
 vi.mock("../agents/utility-completion.js", () => ({
   prepareUtilityCompletionForAgent: runtimeMocks.prepareUtility,

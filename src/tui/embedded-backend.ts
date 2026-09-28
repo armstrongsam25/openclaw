@@ -77,7 +77,6 @@ import {
   CHAT_HISTORY_MAX_SINGLE_MESSAGE_BYTES,
   replaceOversizedChatHistoryMessages,
 } from "../gateway/server-methods/chat.js";
-import { buildModelsListResult } from "../gateway/server-methods/models-list-result.js";
 import { createGatewaySession } from "../gateway/session-create-service.js";
 import { performGatewaySessionReset } from "../gateway/session-reset-service.js";
 import {
@@ -813,6 +812,8 @@ export class EmbeddedTuiBackend implements TuiBackend {
   async listModels(opts?: { agentId?: string }): Promise<TuiModelChoice[]> {
     await this.ready;
     await this.preparedModelRuntime.waitUntilReady();
+    const { buildModelsListResult } =
+      await import("../gateway/server-methods/models-list-result.js");
     const cfg = getRuntimeConfig();
     const agentId = opts?.agentId ?? resolveDefaultAgentId(cfg);
     return await withPreparedModelCatalogOwner(

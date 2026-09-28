@@ -31,12 +31,16 @@ const completionMocks = vi.hoisted(() => ({
   resolveSimpleCompletionSelectionForAgent: vi.fn(),
 }));
 
-vi.mock("../agents/simple-completion-runtime.js", () => ({
-  acquireSimpleCompletionModelForAgent: completionMocks.acquireSimpleCompletionModelForAgent,
-  completeWithPreparedSimpleCompletionModel:
-    completionMocks.completeWithPreparedSimpleCompletionModel,
+vi.mock("../agents/simple-completion-selection.js", () => ({
   resolveSimpleCompletionSelectionForAgent:
     completionMocks.resolveSimpleCompletionSelectionForAgent,
+}));
+vi.mock("../agents/simple-completion-execution.js", () => ({
+  completeWithPreparedSimpleCompletionModel:
+    completionMocks.completeWithPreparedSimpleCompletionModel,
+}));
+vi.mock("../agents/simple-completion-runtime.js", () => ({
+  acquireSimpleCompletionModelForAgent: completionMocks.acquireSimpleCompletionModelForAgent,
 }));
 
 type CommandsModule = typeof import("./commands.js");

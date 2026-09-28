@@ -12,12 +12,13 @@ function readSource(relativePath: string): string {
 
 describe("native hook relay CLI import boundary", () => {
   it("loads only the client relay owner before Gateway fallback", () => {
-    const cli = readSource("src/cli/native-hook-relay-cli.ts");
-
-    expect(cli).toContain('from "../agents/harness/native-hook-relay-client.js"');
-    expect(cli).not.toContain('from "../agents/harness/native-hook-relay.js"');
-    expect(cli).not.toMatch(/import\s+\{\s*callGateway\s*\}\s+from\s+"..\/gateway\/call\.js"/u);
-    expect(cli).toContain('import("../gateway/call.js")');
+    expect(
+      findSourceImportBackedges("src/cli/native-hook-relay-entry.ts", [
+        "src/agents/harness/native-hook-relay.js",
+        "src/gateway/call.ts",
+        "src/logging/subsystem.ts",
+      ]),
+    ).toEqual([]);
   });
 
   it("dispatches the hidden relay before loading the general CLI", () => {

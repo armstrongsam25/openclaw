@@ -1,3 +1,4 @@
+import { refreshPreparedModelRuntimeSnapshots } from "../agents/prepared-model-runtime.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.types.js";
 import type { GatewayStartupTrace } from "./server-startup-trace.js";
@@ -70,8 +71,6 @@ export async function publishConfiguredModelRuntimeSnapshots(params: {
   workspaceDir?: string;
   startupTrace?: GatewayStartupTrace;
 }): Promise<void> {
-  const { refreshPreparedModelRuntimeSnapshots } =
-    await import("../agents/prepared-model-runtime.js");
   if (params.isCurrent?.() === false) {
     return;
   }

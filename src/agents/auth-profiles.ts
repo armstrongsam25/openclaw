@@ -15,7 +15,7 @@ export {
 export {
   refreshOAuthCredentialForRuntime,
   resolveApiKeyForProfile,
-} from "./auth-profiles/oauth.js";
+} from "./auth-profiles/oauth.runtime.js";
 export {
   isConfiguredAwsSdkAuthProfileForProvider,
   resolveAuthProfileEligibility,

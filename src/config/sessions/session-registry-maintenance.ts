@@ -7,9 +7,9 @@ import {
 } from "./session-accessor.js";
 import { withSessionRegistryEntriesInWorker } from "./session-entry-read-runtime.js";
 import { resolveSqliteTargetFromSessionStorePath } from "./session-sqlite-target.js";
+import type { SessionStoreTarget } from "./session-store-target.types.js";
 import { collectActiveSessionWorkAdmissionKeys } from "./store-maintenance-preserve.js";
 import { pruneStaleEntries } from "./store-maintenance.js";
-import type { SessionStoreTarget } from "./targets.js";
 import type { SessionEntry } from "./types.js";
 
 type SessionRegistryMaintenanceStoreSummary = {

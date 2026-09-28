@@ -1,9 +1,7 @@
 // Classifies whether a user's chat message approves a pending OpenClaw proposal.
 import { extractEmbeddedAssistantText } from "../agents/embedded-agent-utils.js";
-import {
-  acquireSimpleCompletionModelForAgent,
-  completeWithPreparedSimpleCompletionModel,
-} from "../agents/simple-completion-runtime.js";
+import { completeWithPreparedSimpleCompletionModel } from "../agents/simple-completion-execution.js";
+import type { acquireSimpleCompletionModelForAgent } from "../agents/simple-completion-runtime.js";
 import { AsyncWorkScope, captureAsyncWorkTracker } from "../shared/async-work-scope.js";
 import { createDeferredCore } from "../shared/deferred.js";
 import {
@@ -71,6 +69,9 @@ export async function classifySystemAgentApprovalIntent(
     return textIntent;
   }
   try {
+    const acquire =
+      deps.acquireSimpleCompletionModelForAgent ??
+      (await import("../agents/simple-completion-runtime.js")).acquireSimpleCompletionModelForAgent;
     const resolveVerifiedRoute =
       deps.resolveVerifiedInferenceRoute ?? resolveSystemAgentVerifiedInferenceRoute;
     const route = await resolveVerifiedRoute(params.verifiedInference);
@@ -86,9 +87,7 @@ export async function classifySystemAgentApprovalIntent(
     const trackOwner = captureAsyncWorkTracker();
     // Reporting a verdict does not settle response callbacks or cancellation work.
     void trackOwner(async () => {
-      const prepared = await (
-        deps.acquireSimpleCompletionModelForAgent ?? acquireSimpleCompletionModelForAgent
-      )({
+      const prepared = await acquire({
         cfg: route.runConfig,
         agentId: route.agentId,
         agentDir: route.agentDir,

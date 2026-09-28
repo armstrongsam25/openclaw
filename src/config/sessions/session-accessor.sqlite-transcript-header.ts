@@ -1,6 +1,7 @@
 import { executeSqliteQueryTakeFirstSync } from "../../infra/kysely-sync.js";
 import type { OpenClawAgentDatabase } from "../../state/openclaw-agent-db.js";
-import { getSessionKysely, type ResolvedTranscriptScope } from "./session-accessor.sqlite-scope.js";
+import type { ResolvedTranscriptScope } from "./session-accessor.sqlite-contract.js";
+import { getSessionKysely } from "./session-accessor.sqlite-scope.js";
 import { appendTranscriptEventInTransaction } from "./session-accessor.sqlite-transcript-store.js";
 import { createSessionTranscriptHeader } from "./transcript-header.js";
 

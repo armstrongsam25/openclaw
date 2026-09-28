@@ -4,7 +4,8 @@ import { normalizeOptionalLowercaseString } from "@openclaw/normalization-core/s
 import { parseNodeList } from "../../shared/node-list-parse.js";
 import type { NodeListNode } from "../../shared/node-list-types.js";
 import { resolveNodeFromNodeList, resolveNodeIdFromNodeList } from "../../shared/node-resolve.js";
-import { callGatewayTool, type GatewayCallOptions } from "./gateway.js";
+import type { GatewayCallOptions } from "./gateway-options.js";
+import { callGatewayTool } from "./gateway.js";
 
 export type { NodeListNode };
 

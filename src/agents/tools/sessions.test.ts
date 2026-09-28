@@ -48,8 +48,11 @@ vi.mock("../../gateway/call.js", async (importOriginal) => {
 });
 vi.mock("./in-process-gateway.js", () => ({
   callAgentToolGatewayRequest: (opts: unknown) => callGatewayMock(opts),
-  callInProcessGatewayToolWithCreation: (method: unknown, params: unknown, creation: unknown) =>
-    inProcessCreationMock(method, params, creation),
+  callInProcessGatewayToolBound: (
+    method: unknown,
+    params: unknown,
+    options: { sessionCreation?: unknown },
+  ) => inProcessCreationMock(method, params, options.sessionCreation),
   hasInProcessGatewayToolContext: () => inProcessGatewayContextAvailable,
   getInProcessGatewayToolContext: () => undefined,
   hasGatewayToolRoutingContext: () => false,

@@ -286,14 +286,21 @@ const copilotRuntimePluginInstall = createRuntimePluginModelSelectionHelpers(
 );
 
 export const ensureCodexRuntimePluginForModelSelection = codexRuntimePluginInstall.ensure;
-export const repairCodexRuntimePluginInstallForModelSelection = codexRuntimePluginInstall.repair;
 const ensureCopilotRuntimePluginForModelSelection = copilotRuntimePluginInstall.ensure;
-export const repairCopilotRuntimePluginInstallForModelSelection =
-  copilotRuntimePluginInstall.repair;
 export const ensureCodexRuntimePluginForSupervision = createRuntimePluginModelSelectionHelpers(
   CODEX_RUNTIME_PLUGIN_DESCRIPTOR,
   () => true,
 ).ensure;
+
+export async function repairModelSelectionRuntimePlugins(params: RuntimePluginRepairParams) {
+  const codex = await codexRuntimePluginInstall.repair(params);
+  const copilot = await copilotRuntimePluginInstall.repair(params);
+  return {
+    required: codex.required || copilot.required,
+    changes: [...codex.changes, ...copilot.changes],
+    warnings: [...codex.warnings, ...copilot.warnings],
+  };
+}
 
 export async function ensureModelSelectionRuntimePlugins(
   params: RuntimePluginEnsureParams,

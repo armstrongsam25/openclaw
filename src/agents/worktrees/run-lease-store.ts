@@ -4,6 +4,7 @@ import type { SqliteWorkerOperationSettlement } from "../../infra/sqlite-worker-
 import { captureOpenClawStateWorkerContext } from "../../state/openclaw-state-worker-context.js";
 import type { OpenClawStateWorkerContext } from "../../state/openclaw-state-worker-context.types.js";
 import type { OpenClawStateWorkerOperations } from "../../state/openclaw-state-worker-contract.js";
+import { runOpenClawStateWorkerOperation } from "../../state/openclaw-state-worker-store.js";
 import type { WorktreeRunLeaseRowInput } from "./run-lease-store.kernel.js";
 
 export async function admitWorktreeRunLeaseRowAsync(
@@ -51,8 +52,6 @@ async function runLeaseCommand(
 ): Promise<void> {
   let settled: Promise<SqliteWorkerOperationSettlement> | undefined;
   try {
-    const { runOpenClawStateWorkerOperation } =
-      await import("../../state/openclaw-state-worker-store.js");
     await runOpenClawStateWorkerOperation(context, (scope) => scope.execute(command), {
       createAdmission: (operation) => {
         settled = operation.settled;

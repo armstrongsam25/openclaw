@@ -4,6 +4,7 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { pathExists, root, type Root } from "../infra/fs-safe.js";
 import { validateSkillProposalRecord } from "../skills/workshop/store-record.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
+import { runOpenClawStateWorkerOperation } from "../state/openclaw-state-worker-store.js";
 import { listLegacyCollectionBackupWorkspaceDirs } from "./doctor-skill-workshop-collection-backups.js";
 import {
   classifyWorkshopRelocation,
@@ -57,8 +58,6 @@ export async function readLegacyWorkshopProposals(
 
 export async function readWorkshopMigrationRecords(env: NodeJS.ProcessEnv, includeEvents = false) {
   const context = captureOpenClawStateWorkerContext({ env });
-  const { runOpenClawStateWorkerOperation } =
-    await import("../state/openclaw-state-worker-store.js");
   context.admission.assertCurrent();
   const stored = await runOpenClawStateWorkerOperation(
     context,

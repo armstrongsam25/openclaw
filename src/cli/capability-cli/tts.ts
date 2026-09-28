@@ -116,11 +116,8 @@ export function registerTtsCapabilityCommands(capability: Command): void {
           supported: ["gateway"],
           defaultTransport: "gateway",
         });
-        const { callGateway } = await import("../../gateway/call.js");
-        const result = await callGateway({
-          method: "tts.status",
-          timeoutMs: 30_000,
-        });
+        const { runTtsStatus } = await import("./tts-runtime.js");
+        const result = await runTtsStatus();
         return { transport, ...result };
       }),
     );

@@ -12,9 +12,9 @@ import {
   withGatewayToolCallerIdentity,
   withoutGatewayToolCallerIdentity,
 } from "../agents/tools/gateway-caller-context.js";
+import { callInProcessGatewayTool } from "../agents/tools/gateway.js";
 import {
   callAgentToolGatewayRequest,
-  callInProcessGatewayTool,
   type InProcessGatewayCaller,
   type AgentToolGatewayRequestCaller,
   runWithGatewayToolCleanupContext,

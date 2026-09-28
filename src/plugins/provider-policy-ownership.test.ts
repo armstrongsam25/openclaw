@@ -6,7 +6,6 @@ import {
   withPluginCache,
 } from "./plugin-cache.js";
 import {
-  finalizePluginMetadataSnapshot,
   projectPluginMetadataSnapshot,
   restorePluginMetadataSnapshot,
 } from "./plugin-metadata-snapshot.js";
@@ -32,7 +31,7 @@ function withRegistry(
       run({ plugins });
       return;
     }
-    const snapshot = finalizePluginMetadataSnapshot(
+    const snapshot = restorePluginMetadataSnapshot(
       createPluginMetadataSnapshotFixture({ plugins }),
     );
     if (mode === "restored") {
@@ -211,7 +210,7 @@ describe("provider policy inventory lifetime", () => {
         providers: ["fixture-provider"],
         trustedOfficialInstall: true,
       });
-      const before = finalizePluginMetadataSnapshot(
+      const before = restorePluginMetadataSnapshot(
         createPluginMetadataSnapshotFixture({ plugins: [owner("before")] }),
       );
       const empty = projectPluginMetadataSnapshot(before, []);
@@ -219,7 +218,7 @@ describe("provider policy inventory lifetime", () => {
         expect(listTrustedExternalProviderPolicyOwners("fixture-provider", registry)).toEqual([]);
       }
       invalidatePluginCacheMetadata(cache);
-      const after = finalizePluginMetadataSnapshot(
+      const after = restorePluginMetadataSnapshot(
         createPluginMetadataSnapshotFixture({ plugins: [owner("after")] }),
       );
       for (const registry of [before, before.manifestRegistry]) {

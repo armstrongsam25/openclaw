@@ -33,11 +33,11 @@ import {
 } from "./prepared-model-runtime-auth.js";
 import {
   getPreparedModelRuntimeSnapshot,
-  publishPreparedModelRuntimeSnapshot,
   prepareModelRuntimeSnapshot,
   refreshPreparedModelRuntimeSnapshots,
 } from "./prepared-model-runtime.js";
 import { registerPreparedModelRuntimePublicationListener } from "./prepared-model-runtime.publication-events.js";
+import { publishPreparedModelRuntimeSnapshot } from "./prepared-model-runtime.test-support.js";
 
 const fixture = usePreparedModelRuntimeHarness(
   { label: "catalog-publication-rows", scenario: "minimal" },

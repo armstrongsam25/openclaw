@@ -140,7 +140,7 @@ describe("native hook relay locator admission", () => {
               stdin: Readable.from([JSON.stringify(rawPayload)]),
               stdout,
               stderr,
-              callGateway: gateway,
+              invokeGateway: gateway,
             },
           );
           if (mode !== "available") {

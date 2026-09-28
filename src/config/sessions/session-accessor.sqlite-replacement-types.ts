@@ -1,4 +1,8 @@
-import type { ResolvedSessionEntryRow } from "./session-accessor.sqlite-entry-read.js";
+import type {
+  SessionEntryReplacementSnapshot,
+  SessionEntryStatus,
+} from "./session-accessor.sqlite-contract.js";
+import type { ResolvedSessionEntryRow } from "./session-accessor.sqlite-entry-cache.types.js";
 import type {
   SessionEntryMaintenanceInput,
   SessionEntryMaintenancePlan,
@@ -6,6 +10,18 @@ import type {
 import type { SessionEntryReplacement, TranscriptEvent } from "./session-accessor.types.js";
 import type { SessionOwnerAssignment } from "./session-entry-provenance.js";
 import type { SessionEntry } from "./types.js";
+
+export type SessionEntryReplacementSelection = {
+  sessionKeys?: readonly string[];
+  statuses?: readonly SessionEntryStatus[];
+  includeLabelOwners?: string;
+};
+
+export type SessionEntryReplacementState = {
+  entries: SessionEntryReplacementSnapshot[];
+  expectedRows: Map<string, ResolvedSessionEntryRow>;
+  labelOwnerKeys: string[];
+};
 
 export type SqliteSessionEntryReplacement = SessionEntryReplacement & {
   previousSessionKeys?: readonly string[];

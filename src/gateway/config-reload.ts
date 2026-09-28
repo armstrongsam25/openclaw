@@ -42,6 +42,7 @@ import {
   type PluginRuntimeApplication,
 } from "../plugins/lifecycle.js";
 import { createPluginCache, withPluginCache } from "../plugins/plugin-cache.js";
+import { inspectPluginGenerationSources } from "../plugins/plugin-generation-source-inspection.js";
 import { getPluginInstance } from "../plugins/plugin-instance-scope.js";
 import {
   runOutsidePluginLifecycleLease,
@@ -545,8 +546,6 @@ export function startGatewayConfigReloader(
       if (entries.length === Object.keys(expected).length) {
         // A completed watcher application can settle this exact committed install.
         // Manual reloads carry no install hashes and always create a replacement.
-        const { inspectPluginGenerationSources } =
-          await import("../plugins/plugin-generation-source-inspection.js");
         await checkpoint();
         assertCurrent();
         const covered = pluginLifecycle.pluginIds.every((id) => {

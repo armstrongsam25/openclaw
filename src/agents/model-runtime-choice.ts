@@ -3,24 +3,22 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import type { ProviderRuntimeModel } from "../plugins/provider-runtime-model.types.js";
 import { createLazyPromise } from "../shared/lazy-promise.js";
+import { resolveModelAsync } from "./embedded-agent-runner/model.js";
 import { FailoverError } from "./failover/error.js";
 import type { AgentHarness } from "./harness/types.js";
 import { findModelInCatalog } from "./model-catalog-lookup.js";
 import { modelKey, type ModelRef } from "./model-ref-shared.js";
 import { createModelCatalogIdentityKeyResolver } from "./openai-model-routes.js";
 import { resolveProviderModelMaterializationAuthMode } from "./provider-model-route-auth.js";
+import { validatePreparedRuntimeModel } from "./runtime-plan/materialize-model.js";
 
 // Cache process-stable modules, not the catalog/auth facts read from each request's owner.
 const loadPreparedModelCatalog = createLazyPromise(() => import("./prepared-model-catalog.js"));
-const loadModelResolver = createLazyPromise(() => import("./embedded-agent-runner/model.js"));
 const loadModelSelection = createLazyPromise(() => import("./model-selection.js"));
 const loadModelRefProfile = createLazyPromise(() => import("./model-ref-profile.js"));
 const loadModelCatalogDecisions = createLazyPromise(() => import("./model-catalog-decisions.js"));
 const loadPreparedRuntimeAuth = createLazyPromise(() => import("./prepared-model-runtime-auth.js"));
 const loadProviderModelRoute = createLazyPromise(() => import("./provider-model-route.js"));
-const loadRuntimeModelMaterializer = createLazyPromise(
-  () => import("./runtime-plan/materialize-model.js"),
-);
 const loadModelFallbackCandidates = createLazyPromise(
   () => import("./model-fallback-candidates.js"),
 );
@@ -47,7 +45,6 @@ export async function prepareModelChoice(params: {
   fallbacks?: string[];
 }): Promise<PreparedModelChoice> {
   const { withPreparedModelCatalogOwner } = await loadPreparedModelCatalog();
-  const { resolveModelAsync } = await loadModelResolver();
   const {
     buildModelAliasIndex,
     resolveAllowedModelRef,
@@ -59,7 +56,6 @@ export async function prepareModelChoice(params: {
     await loadModelCatalogDecisions();
   const { getPreparedModelRuntimeAuthStore } = await loadPreparedRuntimeAuth();
   const { projectProviderModelRouteConfig } = await loadProviderModelRoute();
-  const { validatePreparedRuntimeModel } = await loadRuntimeModelMaterializer();
   const { resolveModelCandidateChain } = await loadModelFallbackCandidates();
   const { resolveProviderIdForAuth } = await loadProviderAuthAliases();
   const { withPluginRuntimeGenerationScope } = await loadPluginGenerationScope();
@@ -355,7 +351,6 @@ export async function preparePublishedModelRuntimeChoice(params: {
   if (!entry) {
     // Explicit selections may be outside finite browse inventory. The normal
     // resolver still owns the requested model's provider and physical route.
-    const { resolveModelAsync } = await loadModelResolver();
     const { modelCatalogRowToEntry } = await loadModelCatalogEntry();
     const requestedEntry = { provider: params.provider, id: params.model, name: params.model };
     const materializationRuntime =

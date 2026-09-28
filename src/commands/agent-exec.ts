@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { parseStrictNonNegativeInteger } from "@openclaw/normalization-core/number-coercion";
 import { findAgentRunTerminalOutcome } from "../agents/agent-run-terminal-error.js";
+import { resolveAgentDir, resolveAmbientOwnerAgentId } from "../agents/agent-scope-config.js";
 import { createAgentToolExecutionBudget } from "../agents/agent-tool-source-execution-guard.js";
 import {
   recordAgentCleanupFailure,
@@ -306,8 +307,6 @@ export async function agentExecCommand(
       deps.timeoutMs === undefined ? opts.timeout : String(Math.ceil(deps.timeoutMs / 1000)),
     );
     const fallbacks = normalizeFallbacks(opts.model, deps.modelFallbacksOverride ?? opts.fallback);
-    const { resolveAgentDir, resolveAmbientOwnerAgentId } =
-      await import("../agents/agent-scope-config.js");
     // Credentials follow the inherited agentDir, which runConfig strips for isolation.
     // Resolve their owner before redirecting state so default paths also stay real.
     const execAgentId = resolveAmbientOwnerAgentId(baseConfig, deps.agentId, {

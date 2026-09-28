@@ -1,4 +1,4 @@
-import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
 import type { ConfigIoDeps, ConfigSnapshotReadMeasure } from "./io.read.types.js";
 import type { ConfigMutationBase } from "./mutation-types.js";

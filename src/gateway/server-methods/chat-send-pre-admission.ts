@@ -34,10 +34,7 @@ import {
   abortChatRunsForSessionKeyWithPartials,
   descendantAbortError,
 } from "./chat-abort-runtime.js";
-import {
-  abortedPartialPersistenceError,
-  withAbortedPartialPersistenceWarning,
-} from "./chat-aborted-partial.js";
+import { withAbortedPartialPersistenceWarning } from "./chat-aborted-partial.js";
 import { resolveDurableChatClaim } from "./chat-restart-recovery.js";
 import {
   ACTIVE_LEAF_CHANGED_ERROR_REASON,
@@ -49,6 +46,7 @@ import {
   SESSION_SETTINGS_CHANGED_ERROR_REASON,
 } from "./chat-send-session-settings.js";
 import type { LoadedChatSendSession } from "./chat-send-session.js";
+import { abortedPartialPersistenceError } from "./chat-transcript-persistence.js";
 import type { GatewayRequestHandlerOptions } from "./types.js";
 
 export function respondChatSessionRoutingChanged(respond: GatewayRequestHandlerOptions["respond"]) {

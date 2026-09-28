@@ -1,3 +1,4 @@
+import { executeOpenClawStateWorker } from "../../state/openclaw-state-worker-store.js";
 import { captureSkillWorkshopStoreOptions, executeSkillWorkshopOperation } from "./store-client.js";
 import type { RecordSkillProposalEvaluationInput } from "./store-evaluation.kernel.js";
 import { assertProposalId } from "./store-record.js";
@@ -32,7 +33,6 @@ export async function readSkillProposalEvents(
     afterSequence: input.afterSequence,
     limit: input.limit,
   };
-  const { executeOpenClawStateWorker } = await import("../../state/openclaw-state-worker-store.js");
   return await executeOpenClawStateWorker(context, {
     type: "workshop.events.list",
     input: query,

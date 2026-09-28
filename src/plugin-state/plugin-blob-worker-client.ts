@@ -7,6 +7,7 @@ import {
 import { executeExistingOpenClawStateRead } from "../state/openclaw-state-db-readonly.js";
 import { resolveOpenClawStateSqlitePath } from "../state/openclaw-state-db.paths.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
+import { runOpenClawStateWorkerOperation } from "../state/openclaw-state-worker-store.js";
 import { wrapPluginBlobError } from "./plugin-blob-store.sqlite.js";
 import type { PluginBlobEntry, PluginBlobEntryInfo } from "./plugin-blob-store.types.js";
 import {
@@ -31,8 +32,6 @@ async function execute<Key extends keyof PluginBlobWorkerOperations>(
   try {
     preparation = prepare?.();
     const context = captureOpenClawStateWorkerContext({ path: databasePath, env });
-    const { runOpenClawStateWorkerOperation } =
-      await import("../state/openclaw-state-worker-store.js");
     return await runOpenClawStateWorkerOperation(
       context,
       async (scope: Scope) => {

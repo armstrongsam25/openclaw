@@ -7,6 +7,7 @@ import {
   withDelegatedUpdateCommandExecutor,
   withUpdateCommandExecutor,
 } from "../cli/update-cli/update-command-executor.js";
+import { createManagedUpdateRequesterContinuationAuthority } from "../cli/update-cli/update-command-managed-context.js";
 import type {
   UpdateDoctorInput,
   UpdatePostCoreInput,
@@ -51,7 +52,6 @@ import {
 } from "./update-post-core-context.js";
 import {
   createManagedUpdateRequesterAuthority,
-  createManagedUpdateRequesterContinuationAuthority,
   UpdateRequesterRevokedError,
 } from "./update-requester-authority.js";
 import { adoptUpdateRun, getUpdateRun, recordUpdateRunStep } from "./update-run-ledger.js";

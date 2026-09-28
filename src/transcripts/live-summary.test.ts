@@ -26,13 +26,15 @@ const { complete, select, loadRuntime } = vi.hoisted(() => ({
   select: vi.fn(),
   loadRuntime: vi.fn(),
 }));
-vi.mock("./summary-model.runtime.js", () => {
+vi.mock("../agents/isolated-completion.js", () => {
   loadRuntime();
   return {
     runIsolatedCompletion: complete,
-    resolveSimpleCompletionSelectionForAgent: select,
   };
 });
+vi.mock("../agents/simple-completion-selection.js", () => ({
+  resolveSimpleCompletionSelectionForAgent: select,
+}));
 const tempDirs = useAutoCleanupTempDirTracker(afterEach);
 const fiveMinutes = 5 * 60_000;
 const pendingCompletions = new Set<() => void>();

@@ -15,9 +15,9 @@ import {
   readSessionTranscriptHistoryEventsFromProjection,
   readSessionTranscriptHistoryEventByIdFromProjection,
   readSessionTranscriptHistoryAnchorPageFromProjection,
-  type SessionTranscriptMessageByIdOptions,
 } from "./session-accessor.sqlite-history-query.js";
 import type { SessionTranscriptMessageEvent } from "./session-accessor.sqlite-projection-read.js";
+import type { SessionTranscriptMessageByIdOptions } from "./session-history-types.js";
 
 export function useHistoryEventScope() {
   const env: NodeJS.ProcessEnv = {};

@@ -19,6 +19,7 @@ import { DEFAULT_ACCOUNT_ID } from "../../routing/session-key.js";
 import type { RuntimeEnv } from "../../runtime.js";
 import type { WizardPrompter } from "../../wizard/prompts.js";
 import { applyAgentBindings, describeBinding } from "../agents.bindings.js";
+import { resolveChannelSetupEntries } from "../channel-setup/discovery.js";
 import { resolveChannelSetupOwner } from "../channel-setup/owner.js";
 import { withCommandPluginMetadata } from "../config-validation.js";
 import type { ChannelChoice } from "../onboard-types.js";
@@ -81,10 +82,8 @@ export async function resolveInitialWizardChannelTarget(
   if (!normalized) {
     return unresolvedInitialWizardChannelTarget("");
   }
-  const [{ listActiveChannelSetupPlugins }, { resolveChannelSetupEntries }] = await Promise.all([
-    import("../../channels/plugins/setup-registry.js"),
-    import("../channel-setup/discovery.js"),
-  ]);
+  const { listActiveChannelSetupPlugins } =
+    await import("../../channels/plugins/setup-registry.js");
   const resolved = resolveChannelSetupEntries({
     cfg,
     installedPlugins: listActiveChannelSetupPlugins(),

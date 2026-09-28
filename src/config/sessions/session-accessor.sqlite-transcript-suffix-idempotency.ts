@@ -2,12 +2,15 @@ import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { sql } from "kysely";
 import { executeSqliteQuerySync } from "../../infra/kysely-sync.js";
 import type { OpenClawAgentDatabase } from "../../state/openclaw-agent-db.js";
-import type { TranscriptEvent } from "./session-accessor.sqlite-contract.js";
+import type {
+  TranscriptEvent,
+  ResolvedTranscriptScope,
+} from "./session-accessor.sqlite-contract.js";
 import {
   readTranscriptEventId,
   type SqliteTranscriptStorageRow,
 } from "./session-accessor.sqlite-read.js";
-import { getSessionKysely, type ResolvedTranscriptScope } from "./session-accessor.sqlite-scope.js";
+import { getSessionKysely } from "./session-accessor.sqlite-scope.js";
 import { readMessageIdempotencyKey } from "./transcript-message-identity.js";
 import { transcriptEventNavigationSql } from "./transcript-payload.js";
 

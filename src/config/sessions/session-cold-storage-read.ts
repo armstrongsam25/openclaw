@@ -1,7 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
 import { runSqliteDeferredTransactionSync } from "../../infra/sqlite-transaction.js";
-import type { SessionTranscriptReadScope } from "./session-accessor.sqlite-contract.js";
-import type { ResolvedTranscriptReadScope } from "./session-accessor.sqlite-scope.js";
+import type {
+  SessionTranscriptReadScope,
+  ResolvedTranscriptReadScope,
+} from "./session-accessor.sqlite-contract.js";
 import {
   assertSessionTranscriptHot,
   SessionTranscriptColdError,

@@ -6,12 +6,12 @@ import type {
   SessionTranscriptWriteScope,
   TranscriptAppendRefusal,
   TranscriptEvent,
+  ResolvedTranscriptScope,
 } from "./session-accessor.sqlite-contract.js";
 import { readSessionEntryRow } from "./session-accessor.sqlite-entry-store.js";
 import {
   getSessionKysely,
   transcriptWriteScopeIsCurrent,
-  type ResolvedTranscriptScope,
 } from "./session-accessor.sqlite-scope.js";
 import { assertSessionTranscriptHot } from "./session-cold-storage-state.js";
 import {

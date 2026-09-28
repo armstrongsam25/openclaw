@@ -569,8 +569,9 @@ describe("skills-remote", () => {
   });
 
   it.each(["disconnect", "shutdown", "commands", "replacement"] as const)(
-    "rechecks the live node after loading workspace skills (%s)",
+    "rechecks the live node after the connect readiness delay (%s)",
     async (change) => {
+      vi.useFakeTimers();
       const nodeId = `node-${randomUUID()}`;
       const bin = `bin-${randomUUID()}`;
       const { cfg, workspaceDir } = createRemoteSkillWorkspace(bin);
@@ -583,7 +584,13 @@ describe("skills-remote", () => {
       try {
         setTestSkillsRemoteRegistry(nodeId, { get: () => session, invoke });
         recordRemoteNodeInfo(session);
-        refresh = refreshRemoteNodeBins({ nodeId, cfg, readinessSignal: lifetime.signal });
+        refresh = refreshRemoteNodeBins({
+          nodeId,
+          cfg,
+          readinessDelayMs: 1,
+          readinessSignal: lifetime.signal,
+        });
+        expect(invoke).not.toHaveBeenCalled();
         if (change === "disconnect") {
           session = undefined;
           removeRemoteNodeInfo(nodeId);
@@ -597,6 +604,7 @@ describe("skills-remote", () => {
           };
           recordRemoteNodeInfo(session);
         }
+        await vi.advanceTimersByTimeAsync(1);
         await refresh;
 
         if (change === "replacement") {

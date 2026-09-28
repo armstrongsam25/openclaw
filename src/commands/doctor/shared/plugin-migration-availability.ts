@@ -3,7 +3,7 @@ import { resolveDeferredPluginMigrationConfigPaths } from "../../../config/defer
 import { resolveConfigWidePluginMetadataSnapshot } from "../../../config/io.plugin-metadata.js";
 import type { OpenClawConfig } from "../../../config/types.openclaw.js";
 import type { PluginInstallRecord } from "../../../config/types.plugins.js";
-import type { DeferredPluginMigration } from "../../../infra/deferred-plugin-migrations.js";
+import type { DeferredPluginMigration } from "../../../infra/deferred-plugin-migrations.contract.js";
 import { isPathInside } from "../../../infra/path-guards.js";
 import { resolveUpdateRehearsalRoot } from "../../../infra/update-rehearsal-paths.js";
 import { normalizePluginsConfig } from "../../../plugins/config-state.js";

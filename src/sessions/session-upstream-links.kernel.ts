@@ -3,7 +3,10 @@ import { safeParseJson } from "@openclaw/normalization-core";
 import type { Selectable } from "kysely";
 import { executeSqliteQuerySync, getNodeSqliteKysely } from "../infra/kysely-sync.js";
 import { normalizeSqliteNumber } from "../infra/sqlite-number.js";
-import type { SessionUpstreamJsonValue, SessionUpstreamKind } from "../plugins/session-catalog.js";
+import type {
+  SessionUpstreamJsonValue,
+  SessionUpstreamKind,
+} from "../plugins/session-catalog.types.js";
 import type { DB as OpenClawStateKyselyDatabase } from "../state/openclaw-state-db.generated.js";
 
 type SessionUpstreamLinkRow = Selectable<OpenClawStateKyselyDatabase["session_upstream_links"]>;

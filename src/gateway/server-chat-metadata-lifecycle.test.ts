@@ -49,6 +49,11 @@ vi.mock("../agents/auth-profiles/runtime-snapshots.js", async (importOriginal) =
 vi.mock("../agents/prepared-model-runtime.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../agents/prepared-model-runtime.js")>()),
   refreshPreparedModelRuntimeSnapshots: mocks.refreshPreparedModels,
+}));
+vi.mock("../agents/prepared-model-runtime.publication-events.js", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../agents/prepared-model-runtime.publication-events.js")
+  >()),
   registerPreparedModelRuntimePublicationListener: mocks.registerModelListener,
 }));
 vi.mock("../skills/runtime/refresh.js", async (importOriginal) => ({

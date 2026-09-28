@@ -21,11 +21,8 @@ import {
   clearPluginMetadataLifecycleCaches,
   retainGatewayPluginMetadata,
 } from "../plugins/plugin-metadata-lifecycle.js";
-import {
-  clearActivePluginRegistry,
-  createPluginRegistryOwner,
-  resetPluginRuntimeStateForTest,
-} from "../plugins/runtime.js";
+import { createPluginRegistryOwner, resetPluginRuntimeStateForTest } from "../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../plugins/runtime.test-support.js";
 import { withPluginRuntimeRegistryScope } from "../plugins/runtime/gateway-request-scope.js";
 import { startPluginServices, type PluginServicesHandle } from "../plugins/services.js";
 import { resetGatewayWorkAdmission } from "../process/gateway-work-admission.js";

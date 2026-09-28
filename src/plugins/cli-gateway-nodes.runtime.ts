@@ -1,0 +1,72 @@
+/** Provides plugin CLI node APIs by forwarding calls to the Gateway. */
+import { randomUUID } from "node:crypto";
+import { addTimerTimeoutGraceMs } from "@openclaw/normalization-core/number-coercion";
+import {
+  GATEWAY_CLIENT_MODES,
+  GATEWAY_CLIENT_NAMES,
+} from "../../packages/gateway-protocol/src/client-info.js";
+import { callGateway } from "../gateway/call.js";
+import { normalizeOperatorScopeList } from "../gateway/operator-scopes.js";
+import type { NodeListNode } from "../shared/node-list-types.js";
+import { getPluginRuntimeGatewayRequestScope } from "./runtime/gateway-request-scope.js";
+import type { PluginRuntime } from "./runtime/types.js";
+
+/** Adds Gateway timer grace for plugin CLI node invoke calls. */
+function resolvePluginCliNodeInvokeGatewayTimeoutMs(
+  timeoutMs: number | undefined,
+): number | undefined {
+  return typeof timeoutMs === "number" && Number.isFinite(timeoutMs) && timeoutMs > 0
+    ? addTimerTimeoutGraceMs(timeoutMs)
+    : undefined;
+}
+
+function canPluginCliRuntimeRequestScopes(): boolean {
+  const scope = getPluginRuntimeGatewayRequestScope();
+  return Boolean(
+    scope?.pluginId &&
+    (scope.pluginOrigin === "bundled" || scope.pluginTrustedOfficialInstall === true),
+  );
+}
+
+function resolvePluginCliRuntimeNodeInvokeScopes(scopes: string[] | undefined) {
+  const normalizedScopes = normalizeOperatorScopeList(scopes);
+  return normalizedScopes && canPluginCliRuntimeRequestScopes() ? normalizedScopes : undefined;
+}
+
+export const pluginCliGatewayNodesRuntime: Omit<PluginRuntime["nodes"], "openDuplex"> = {
+  async list(params) {
+    const payload = await callGateway<{ nodes: NodeListNode[] }>({
+      method: "node.list",
+      params: {},
+      clientName: GATEWAY_CLIENT_NAMES.CLI,
+      mode: GATEWAY_CLIENT_MODES.CLI,
+    });
+    const nodes = Array.isArray(payload?.nodes) ? payload.nodes : [];
+    const filteredNodes =
+      params?.connected === true
+        ? nodes.filter(
+            (node) => node !== null && typeof node === "object" && node.connected === true,
+          )
+        : nodes;
+    return { nodes: filteredNodes };
+  },
+  async invoke(params) {
+    const scopes = resolvePluginCliRuntimeNodeInvokeScopes(params.scopes);
+    return await callGateway({
+      method: "node.invoke",
+      params: {
+        nodeId: params.nodeId,
+        command: params.command,
+        ...(params.params !== undefined && { params: params.params }),
+        timeoutMs: params.timeoutMs,
+        idempotencyKey: params.idempotencyKey || randomUUID(),
+        ...(params.sessionKey ? { sessionKey: params.sessionKey } : {}),
+      },
+      timeoutMs: resolvePluginCliNodeInvokeGatewayTimeoutMs(params.timeoutMs),
+      clientName: GATEWAY_CLIENT_NAMES.CLI,
+      mode: GATEWAY_CLIENT_MODES.CLI,
+      ...(scopes ? { scopes } : {}),
+      ...(params.signal ? { signal: params.signal } : {}),
+    });
+  },
+};

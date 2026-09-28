@@ -3,7 +3,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import type { ModelProviderConfig } from "../config/types.models.js";
-import type { PluginMetadataSnapshotOwnerMaps } from "../plugins/plugin-metadata-snapshot.js";
+import type { PluginMetadataSnapshotOwnerMaps } from "../plugins/plugin-metadata-snapshot.types.js";
 import {
   createPluginManifestRecordFixture,
   createPluginMetadataSnapshotFixture,

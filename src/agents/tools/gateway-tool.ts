@@ -22,8 +22,8 @@ import {
 } from "./common.js";
 import { getGatewayToolCallerIdentity } from "./gateway-caller-context.js";
 import { gatewayCallOptionSchemaProperties } from "./gateway-schema.js";
-import { callGatewayTool, readGatewayCallOptions } from "./gateway.js";
-import { callInProcessGatewayTool, getInProcessGatewayToolContext } from "./in-process-gateway.js";
+import { callGatewayTool, callInProcessGatewayTool, readGatewayCallOptions } from "./gateway.js";
+import { getInProcessGatewayToolContext } from "./in-process-gateway.js";
 
 // Keep complete JSON below the smallest default tool-result presentation budget.
 const MAX_GATEWAY_CONFIG_GET_TEXT_CHARS = 12_000;

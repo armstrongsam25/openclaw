@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { setImmediate as yieldToEventLoop } from "node:timers/promises";
+import { stripVTControlCharacters } from "node:util";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { setVerbose } from "../global-state.js";
 import {
@@ -54,6 +55,31 @@ afterAll(async () => {
 });
 
 describe("createSubsystemLogger().isEnabled", () => {
+  it.each([
+    { input: "WhatsApp: hello", subsystem: "whatsapp", expected: "hello" },
+    { input: "discord gateway: closed", subsystem: "discord", expected: "gateway: closed" },
+    {
+      input: "[discord] connection stalled",
+      subsystem: "discord",
+      expected: "connection stalled",
+    },
+    { input: "discordant: hello", subsystem: "discord", expected: "discordant: hello" },
+  ])("renders one subsystem prefix for $input", ({ input, subsystem, expected }) => {
+    setLoggerOverride({ level: "silent", consoleLevel: "info", consoleStyle: "compact" });
+    const sink = installConsoleMethodSpy("log");
+    const previousTimestampPrefix = loggingState.consoleTimestampPrefix;
+    loggingState.consoleTimestampPrefix = false;
+    try {
+      createSubsystemLogger(subsystem).info(input);
+      expect(sink).toHaveBeenCalledOnce();
+      expect(stripVTControlCharacters(String(mockCall(sink, 0)[0]))).toBe(
+        `[${subsystem}] ${expected}`,
+      );
+    } finally {
+      loggingState.consoleTimestampPrefix = previousTimestampPrefix;
+    }
+  });
+
   it("omits routine call sites while retaining error and fatal locations", async () => {
     const file = logPathTracker.nextPath();
     setLoggerOverride({ level: "trace", consoleLevel: "silent", file });

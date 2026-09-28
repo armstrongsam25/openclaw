@@ -7,6 +7,20 @@ import { FAILOVER_REASONS as PROTOCOL_FAILOVER_REASONS } from "../../../packages
 // Persisted auth-profile cooldowns — auth-profiles/usage.ts.
 export const FAILOVER_REASONS = PROTOCOL_FAILOVER_REASONS;
 export type FailoverReason = (typeof FAILOVER_REASONS)[number];
+export type ProviderSpecificErrorContext = {
+  provider?: string;
+  modelId?: string;
+  errorMessage: string;
+  status?: number;
+  code?: string;
+  errorType?: string;
+  providerPlugin?: PreparedProviderFailoverOwner | null;
+};
+export type PreparedProviderFailoverOwner = {
+  id: string;
+  matchesContextOverflowError?: (ctx: ProviderSpecificErrorContext) => boolean | undefined;
+  classifyFailoverReason?: (ctx: ProviderSpecificErrorContext) => FailoverReason | null | undefined;
+};
 export type FailoverSignal = {
   status?: number;
   retryAfterMs?: number;

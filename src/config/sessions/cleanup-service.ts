@@ -28,6 +28,7 @@ import {
   inspectSqliteSessionHistoryDiskBudget,
 } from "./session-history-eviction.js";
 import { resolveSqliteTargetFromSessionStorePath } from "./session-sqlite-target.js";
+import type { SessionStoreTarget } from "./session-store-target.types.js";
 import { planSessionEntryMaintenance } from "./store-maintenance-plan.js";
 import { collectSessionMaintenancePreserveKeysForStore } from "./store-maintenance-preserve.js";
 import { resolveMaintenanceConfig } from "./store-maintenance-runtime.js";
@@ -39,7 +40,6 @@ import {
 import {
   resolveSessionStoreCompatibilityAgentId,
   resolveSessionStoreTargets,
-  type SessionStoreTarget,
   type SessionStoreSelectionOptions,
 } from "./targets.js";
 import type { SessionEntry } from "./types.js";

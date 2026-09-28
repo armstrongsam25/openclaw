@@ -11,7 +11,7 @@ import {
   CODEX_APP_SERVER_DEFAULT_MODEL_REF,
   GEMINI_CLI_DEFAULT_MODEL_REF,
   OPENAI_API_DEFAULT_MODEL_REF,
-} from "../commands/onboard-inference.js";
+} from "../commands/onboard-inference-ambient.js";
 import { hasResolvedRosterBeforeMigrations } from "../config/agent-roster-provenance.js";
 import { hashConfigRaw } from "../config/io.read-helpers.js";
 import { materializeRuntimeConfig } from "../config/materialize.js";
@@ -19,7 +19,10 @@ import { applyMergePatch, createMergePatch } from "../config/merge-patch.js";
 import { normalizeAgentModelRefForConfig } from "../config/model-input.js";
 import type { ConfigFileSnapshot, OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
-import { stripPendingPluginInstallRecords } from "../plugins/install-record-commit.js";
+import {
+  stripPendingPluginInstallRecords,
+  transformConfigWithPendingPluginInstalls,
+} from "../plugins/install-record-commit.js";
 import { createPluginCache } from "../plugins/plugin-cache.js";
 import { withPluginLifecycleLease } from "../plugins/plugin-lifecycle-lease.js";
 import { resolvePluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
@@ -565,9 +568,7 @@ async function verifyAndActivateCandidate(
       }),
       write: async (_candidate, { writeOptions, captureUndo }) => {
         const transform =
-          deps.transformConfigWithPendingPluginInstalls ??
-          (await import("../plugins/install-record-commit.js"))
-            .transformConfigWithPendingPluginInstalls;
+          deps.transformConfigWithPendingPluginInstalls ?? transformConfigWithPendingPluginInstalls;
         const committed = await transform({
           base: "source",
           writeOptions,

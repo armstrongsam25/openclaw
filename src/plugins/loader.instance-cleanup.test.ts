@@ -27,11 +27,8 @@ import { getPluginInstance } from "./plugin-instance-scope.js";
 import { PluginInstance } from "./plugin-instance.js";
 import { createInspectionFixture } from "./registry-inspection.test-helpers.js";
 import { hasRetainedPluginRuntimeCloseError } from "./runtime-close-error.js";
-import {
-  clearActivePluginRegistry,
-  disposePluginRegistryInstances,
-  setActivePluginRegistry,
-} from "./runtime.js";
+import { disposePluginRegistryInstances, setActivePluginRegistry } from "./runtime.js";
+import { clearActivePluginRegistry } from "./runtime.test-support.js";
 
 it.each(["settled", "rejected", "pending"] as const)(
   "reports %s inspection disposal without confusing failure with retained custody",

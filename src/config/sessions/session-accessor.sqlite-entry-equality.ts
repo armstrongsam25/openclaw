@@ -1,4 +1,4 @@
-import type { ResolvedSessionEntryRow } from "./session-accessor.sqlite-entry-read.js";
+import type { ResolvedSessionEntryRow } from "./session-accessor.sqlite-entry-cache.types.js";
 import type { SessionEntry } from "./types.js";
 
 export type SqliteLifecycleTargetSnapshot = Array<{

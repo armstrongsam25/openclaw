@@ -50,7 +50,7 @@ function createStressReviewer(params: {
       acquireSimpleCompletionModelForAgent:
         prepare as unknown as typeof import("./simple-completion-runtime.js").acquireSimpleCompletionModelForAgent,
       completeWithPreparedSimpleCompletionModel:
-        complete as unknown as typeof import("./simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel,
+        complete as unknown as typeof import("./simple-completion-execution.js").completeWithPreparedSimpleCompletionModel,
     },
   });
   return { reviewer, prepare, complete };
@@ -544,7 +544,7 @@ describe("exec auto-review concurrency stress", () => {
           acquireSimpleCompletionModelForAgent:
             prepare as unknown as typeof import("./simple-completion-runtime.js").acquireSimpleCompletionModelForAgent,
           completeWithPreparedSimpleCompletionModel:
-            complete as unknown as typeof import("./simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel,
+            complete as unknown as typeof import("./simple-completion-execution.js").completeWithPreparedSimpleCompletionModel,
         },
       });
       return { reviewer, prepare, complete };

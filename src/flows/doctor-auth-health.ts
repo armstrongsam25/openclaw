@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { emitDoctorNotes } from "../commands/doctor/emit-notes.js";
+import { buildGatewayConnectionDetails } from "../gateway/call.js";
 import type { DoctorHealthFlowContext } from "./doctor-health-contribution-types.js";
 
 export async function runAuthProfileMigration(ctx: DoctorHealthFlowContext): Promise<void> {
@@ -18,7 +19,6 @@ export async function runAuthProfileMigration(ctx: DoctorHealthFlowContext): Pro
     await import("../commands/doctor-auth-oauth-sidecar.js");
   const { maybeMigrateLegacyPluginModelCatalogs } =
     await import("../commands/doctor-plugin-model-catalog.js");
-  const { buildGatewayConnectionDetails } = await import("../gateway/call.js");
   const { note } = await import("../../packages/terminal-core/src/note.js");
   await maybeRepairLegacyOAuthSidecarProfiles({
     cfg: ctx.cfg,

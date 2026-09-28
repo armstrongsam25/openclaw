@@ -3,13 +3,13 @@
 /** Run cleanup and swallow failures after invoking the optional error hook. */
 export async function runBestEffortCleanup<T>(params: {
   cleanup: () => Promise<T>;
-  onError?: (error: unknown) => void;
+  onError?: (error: unknown) => void | Promise<void>;
 }): Promise<T | undefined> {
   try {
     return await params.cleanup();
   } catch (error) {
     try {
-      params.onError?.(error);
+      await params.onError?.(error);
     } catch {
       // A failed warning sink must not replace the result that cleanup preserves.
     }

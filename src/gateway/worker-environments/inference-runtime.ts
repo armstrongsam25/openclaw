@@ -33,7 +33,6 @@ import {
 import { projectProviderModelRouteConfig } from "../../agents/provider-model-route.js";
 import { registerProviderStreamForModel } from "../../agents/provider-stream.js";
 import type { BoundAgentRunSessionTarget } from "../../agents/run-session-target.types.js";
-import { prepareSimpleCompletionModel } from "../../agents/simple-completion-runtime.js";
 import { normalizeUsage, hasObservedModelUsage, toDiagnosticUsage } from "../../agents/usage.js";
 import { getRuntimeConfig } from "../../config/config.js";
 import { loadSessionEntry } from "../../config/sessions/session-accessor.js";
@@ -205,6 +204,9 @@ async function resolveApprovedModel(params: {
 }) {
   const { target, request, signal, runtimeSnapshot } = params;
   return await withPluginRuntimeGenerationScope(runtimeSnapshot, async () => {
+    const { prepareSimpleCompletionModel } =
+      await import("../../agents/simple-completion-runtime.js");
+    params.assertCurrent();
     const lifecycleConfig = runtimeSnapshot.config;
     const agentDir = runtimeSnapshot.agentDir;
     const workspaceDir =

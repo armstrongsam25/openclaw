@@ -16,6 +16,7 @@ import {
 import * as schtasksExec from "../../daemon/schtasks-exec.js";
 import * as taskLayout from "../../daemon/schtasks-layout.js";
 import * as taskRuntime from "../../daemon/schtasks-runtime.js";
+import * as systemdDefinition from "../../daemon/systemd-definition-mutation.js";
 import * as systemdExec from "../../daemon/systemd-exec.js";
 import { startSystemdService } from "../../daemon/systemd-lifecycle.js";
 import * as systemdScope from "../../daemon/systemd-scope.js";
@@ -82,7 +83,7 @@ it.each(["user", "system"] as const)(
     });
     vi.spyOn(process, "geteuid").mockReturnValue(0);
     vi.spyOn(systemdExec, "assertSystemdAvailable").mockResolvedValue();
-    vi.spyOn(systemdScope, "assertNoSystemGatewayOwnershipForActivation").mockResolvedValue();
+    vi.spyOn(systemdDefinition, "assertNoSystemGatewayOwnershipForActivation").mockResolvedValue();
     const native = vi.spyOn(systemdExec, "execSystemctl").mockResolvedValue(success);
     const user = vi.spyOn(systemdExec, "execSystemctlUser").mockResolvedValue(success);
     await expect(owned(async (fence) => startSystemdService(serviceArgs(fence)))).rejects.toThrow(
@@ -100,7 +101,7 @@ it("refuses systemd start after reset-failed revokes its real executor", async (
     unitPath: path.join(root, "gateway.service"),
   });
   vi.spyOn(systemdExec, "assertSystemdAvailable").mockResolvedValue();
-  vi.spyOn(systemdScope, "assertNoSystemGatewayOwnershipForActivation").mockResolvedValue();
+  vi.spyOn(systemdDefinition, "assertNoSystemGatewayOwnershipForActivation").mockResolvedValue();
   const calls: string[] = [];
   vi.spyOn(systemdExec, "execSystemctlUser").mockImplementation(async (_env, args) => {
     calls.push(args[0]!);

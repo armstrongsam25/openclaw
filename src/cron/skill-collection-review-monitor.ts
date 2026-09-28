@@ -24,8 +24,10 @@ import {
 import { resolveSessionStorePathCore } from "../config/sessions/paths.js";
 import { loadSessionEntryReadOnly } from "../config/sessions/session-accessor.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import { resolveHeartbeatSchedulerSeed } from "../infra/heartbeat-runner.js";
-import { resolveHeartbeatPhaseMs } from "../infra/heartbeat-schedule.js";
+import {
+  resolveHeartbeatSchedulerSeed,
+  resolveHeartbeatPhaseMs,
+} from "../infra/heartbeat-schedule.js";
 import { getCurrentPluginMetadataSnapshot } from "../plugins/current-plugin-metadata-snapshot.js";
 import type { ManifestModelIdNormalizationSource } from "../plugins/manifest-model-id-normalization.js";
 import { resolveSkillWorkshopConfig } from "../skills/workshop/config.js";

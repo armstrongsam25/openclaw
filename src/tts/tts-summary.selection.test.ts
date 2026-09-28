@@ -3,10 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { requireApiKey } from "../agents/model-auth.js";
 import { acquireAgentRunPreparedModelRuntime } from "../agents/prepared-model-runtime.js";
 import { resetPreparedModelRuntimeSnapshotsForTest } from "../agents/prepared-model-runtime.test-support.js";
-import {
-  acquireSimpleCompletionModelWithSelection,
-  completeWithPreparedSimpleCompletionModel,
-} from "../agents/simple-completion-runtime.js";
+import { completeWithPreparedSimpleCompletionModel } from "../agents/simple-completion-execution.js";
+import { acquireSimpleCompletionModelWithSelection } from "../agents/simple-completion-runtime.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { summarizeText } from "../plugin-sdk/speech-core.js";
 import { resetPluginLoaderTestStateForTest } from "../plugins/loader.test-fixtures.js";

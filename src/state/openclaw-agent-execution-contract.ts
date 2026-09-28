@@ -12,11 +12,11 @@ import type {
   SessionEntryReplacementCommit,
   SessionEntryReplacementCommitted,
 } from "../config/sessions/session-accessor.sqlite-replacement-types.js";
+import type { SessionPendingInputWithdrawal } from "../config/sessions/session-accessor.types.js";
 import type {
   PublishedSessionTranscriptArchive,
   SessionLegacyArchiveRemovalResult,
 } from "../config/sessions/session-history-archive-pruning.types.js";
-import type { SessionPendingInputWithdrawal } from "../config/sessions/session-pending-input-withdrawal.worker.js";
 import type { InternalSessionEntry, SessionEntry } from "../config/sessions/types.js";
 import type { SqliteWalReclamationResult } from "../infra/sqlite-wal-reclamation.js";
 import type {
@@ -29,7 +29,7 @@ import type {
   SqliteWorkerAdmissionRequest,
 } from "../infra/sqlite-worker-operation-admission.js";
 import type { SqliteWorkerStateContext } from "../infra/sqlite-worker-state-context.js";
-import type { SqliteTrajectoryRuntimeAppend } from "../trajectory/runtime-store.sqlite.js";
+import type { SqliteTrajectoryRuntimeAppend } from "../trajectory/types.js";
 import type { AgentDatabaseRegistryChange } from "./openclaw-agent-db-registry-listing.js";
 import type { AgentDatabaseDomainOperations } from "./openclaw-agent-execution-domain.js";
 

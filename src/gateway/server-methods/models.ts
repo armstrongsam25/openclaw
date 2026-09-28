@@ -23,7 +23,6 @@ import type { ChatMetadataReadParams } from "./chat-metadata-contract.js";
 import { resolveChatMetadataReadParams } from "./chat-metadata-handler.js";
 import { projectSessionModelCatalog } from "./chat-metadata-session-projection.js";
 import { UnknownModelCatalogProviderError } from "./models-list-capabilities.js";
-import { buildModelsListResult } from "./models-list-result.js";
 import type { GatewayRequestHandlers } from "./types.js";
 import { preparePersonalModelAccountSelection } from "./users-model-account-access.js";
 import { assertValidParams } from "./validation.js";
@@ -38,6 +37,7 @@ export const modelsHandlers: GatewayRequestHandlers = {
     let scope: ChatMetadataReadParams | undefined;
     let publicationScope: ChatMetadataReadParams | undefined;
     try {
+      const { buildModelsListResult } = await import("./models-list-result.js");
       const scoped = Boolean(params.sessionKey || params.authProfileId);
       const draftAccountSelection =
         !params.sessionKey && params.authProfileId

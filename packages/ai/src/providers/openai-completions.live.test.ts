@@ -81,9 +81,10 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY ?? "";
           sentEffort = (payload as { reasoning_effort?: unknown }).reasoning_effort;
         },
       };
-      const stream = await (transport === "direct"
-        ? streamSimpleOpenAICompletions(model, toolContext, options)
-        : createOpenAICompletionsTransportStreamFn()(model, toolContext, options));
+      const stream =
+        transport === "direct"
+          ? streamSimpleOpenAICompletions(model, toolContext, options)
+          : createOpenAICompletionsTransportStreamFn()(model, toolContext, options);
       const result = await stream.result();
       expect(result.errorMessage).toBeUndefined();
       expect(sentEffort).toBe(effort);

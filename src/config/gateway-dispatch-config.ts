@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
+import {
+  loadShellEnvFallback,
+  resolveShellEnvFallbackTimeoutMs,
+  shouldDeferShellEnvFallback,
+  shouldEnableShellEnvFallback,
+} from "../infra/shell-env.js";
 import { parseJsonWithJson5Fallback } from "../utils/parse-json-compat.js";
 import { applyConfigEnvVars } from "./config-env-vars.js";
 import { resolveConfigEnvVars } from "./env-substitution.js";
@@ -91,12 +97,6 @@ export async function readGatewayDispatchConfigWithShellEnvFallback(
 ): Promise<OpenClawConfig> {
   const env = options.env ?? process.env;
   const firstRead = readRawGatewayDispatchConfig(options);
-  const {
-    loadShellEnvFallback,
-    resolveShellEnvFallbackTimeoutMs,
-    shouldDeferShellEnvFallback,
-    shouldEnableShellEnvFallback,
-  } = await import("../infra/shell-env.js");
   const enabled =
     shouldEnableShellEnvFallback(env) || firstRead.config.env?.shellEnv?.enabled === true;
   if (enabled && !shouldDeferShellEnvFallback(env)) {

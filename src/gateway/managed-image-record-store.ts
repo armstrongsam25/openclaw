@@ -1,5 +1,4 @@
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
-// Canonical shared-SQLite store for managed outgoing image metadata.
 import { cloneEnvWithPlatformSemantics } from "../config/config-env-vars.js";
 import {
   createSqliteWorkerOperationAdmission,
@@ -10,6 +9,10 @@ import { captureChannelReadAuthority } from "../shared/channel-read-authority.js
 import { createKeyedFifoLeaseRegistry } from "../shared/keyed-fifo-lease.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
 import type { OpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.types.js";
+import {
+  executeOpenClawStateWorker,
+  runOpenClawStateWorkerOperation,
+} from "../state/openclaw-state-worker-store.js";
 import type {
   ManagedImageRecord,
   ManagedImageRecordAttachment,
@@ -43,7 +46,6 @@ export async function readManagedImageRecord(
   stateDir?: string,
   context = captureManagedImageContext(stateDir),
 ): Promise<ManagedImageRecord | null> {
-  const { executeOpenClawStateWorker } = await import("../state/openclaw-state-worker-store.js");
   return await executeOpenClawStateWorker(context, {
     type: "managedImages.read",
     input: { attachmentId },
@@ -56,7 +58,6 @@ export async function listManagedImageRecordEntries(params: {
 }): Promise<ManagedImageRecordEntry[]> {
   const context = captureManagedImageContext(params.stateDir);
   const sessionKey = params.sessionKey;
-  const { executeOpenClawStateWorker } = await import("../state/openclaw-state-worker-store.js");
   return await executeOpenClawStateWorker(context, {
     type: "managedImages.entries",
     input: { sessionKey },
@@ -65,7 +66,6 @@ export async function listManagedImageRecordEntries(params: {
 
 export async function listManagedImageOriginalMediaIds(stateDir?: string): Promise<string[]> {
   const context = captureManagedImageContext(stateDir);
-  const { executeOpenClawStateWorker } = await import("../state/openclaw-state-worker-store.js");
   return await executeOpenClawStateWorker(context, {
     type: "managedImages.originalMediaIds",
     input: undefined,
@@ -86,8 +86,6 @@ function mutateManagedImageRecords(
     );
     try {
       await lease?.wait();
-      const { runOpenClawStateWorkerOperation } =
-        await import("../state/openclaw-state-worker-store.js");
       let result = true;
       for (const command of prepared) {
         let admission: SqliteWorkerOperationAdmission | undefined;

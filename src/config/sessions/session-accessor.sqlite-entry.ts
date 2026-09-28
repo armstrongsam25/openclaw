@@ -34,6 +34,7 @@ import type {
   SessionTranscriptInstanceListOptions,
   SessionEntryTargetPatchScope,
   SessionTranscriptReadScope,
+  ResolvedSqliteScope,
 } from "./session-accessor.sqlite-contract.js";
 import type { SqliteLifecycleTargetSnapshot } from "./session-accessor.sqlite-entry-equality.js";
 import { listSqliteSessionEntriesFromDatabase } from "./session-accessor.sqlite-entry-list.read.js";
@@ -63,7 +64,6 @@ import {
   resolveSqliteTranscriptReadScope,
   runExclusiveSqliteSessionWrite,
   toDatabaseOptions,
-  type ResolvedSqliteScope,
 } from "./session-accessor.sqlite-scope.js";
 import {
   hasSessionEntriesByStatus,
@@ -116,17 +116,6 @@ export function loadSessionEntryReadOnly(scope: SessionEntryReadScope): SessionE
 }
 
 export { loadSessionEntryReadOnlyResultInScope } from "./session-accessor.sqlite-exact-read.js";
-
-/** Private prepared reads must reject a different physical owner at the captured path. */
-export function loadSessionEntryReadOnlyInScope(
-  scope: SessionEntryReadScope & { databaseAgentId: string },
-): SessionEntry | undefined {
-  return resolveSessionEntry(scope, {
-    readOnly: true,
-    databaseAgentId: scope.databaseAgentId,
-    projection: scope.projection,
-  }).existing;
-}
 
 /** Lists persisted session keys without materializing their entry JSON. */
 export async function listSessionEntryKeysReadOnly(

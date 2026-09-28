@@ -21,6 +21,7 @@ import type { PreparedAgentDatabaseMigrationDiscovery } from "../infra/state-mig
 import { withoutPluginInstallRecords } from "../plugins/installed-plugin-index-records.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { createPluginCapabilityConsentPrompter } from "../wizard/plugin-capability-consent.js";
+import { readConfigPreflightSnapshot } from "./config-preflight-snapshot.js";
 import {
   noteDoctorHookConfigWarnings,
   noteImplicitFallbackClobberWarnings,
@@ -35,6 +36,7 @@ import { runDoctorConfigPreflight } from "./doctor-config-preflight.js";
 import type { DoctorOptions, DoctorPrompter } from "./doctor-prompter.js";
 import { createWorkspaceAliasMigrationRepair } from "./doctor-workspace-alias.js";
 import { createDoctorChangesPanelSink } from "./doctor/changes-panel-sink.js";
+import { repairCronCodexRuntimePolicies } from "./doctor/cron/runtime-policy-migration.js";
 import { cronCodexRuntimePolicyTargetKey } from "./doctor/cron/store-migration.js";
 import { emitDoctorNotes, sanitizeDoctorNote } from "./doctor/emit-notes.js";
 import { finalizeDoctorConfigFlow } from "./doctor/finalize-config-flow.js";
@@ -51,7 +53,9 @@ import {
 } from "./doctor/shared/config-mutation-state.js";
 import { listDoctorConfiguredChannelIds } from "./doctor/shared/configured-channel-ids.js";
 import { containsAuthoredInclude } from "./doctor/shared/include-migration-ownership.js";
+import { recoverInstalledPluginConfigIds } from "./doctor/shared/installed-plugin-id-recovery.js";
 import { normalizeCompatibilityConfigValues } from "./doctor/shared/legacy-config-core-migrate.js";
+import { createDoctorPluginMetadataSnapshotScope } from "./doctor/shared/plugin-metadata-snapshot-scope.js";
 import type { DoctorPluginMetadataSnapshotState } from "./doctor/shared/plugin-metadata-snapshot-scope.js";
 import { canWriteDoctorInclude } from "./doctor/shared/roster-include-write.js";
 import { shouldSkipLegacyUpdateDoctorConfigWrite } from "./doctor/shared/update-phase.js";
@@ -112,7 +116,6 @@ export async function loadAndMaybeMigrateDoctorConfig(params: {
       ? await importShippedPluginInstallConfigForDoctor(preflight.snapshot)
       : undefined;
   if (pluginInstallConfigImport?.pluginInventoryChanged) {
-    const { readConfigPreflightSnapshot } = await import("./config-preflight-snapshot.js");
     const refreshed = await readConfigPreflightSnapshot({
       allowCurrentPluginMetadata: false,
       includePluginMetadata: true,
@@ -132,8 +135,6 @@ export async function loadAndMaybeMigrateDoctorConfig(params: {
     current: preflight.pluginMetadataSnapshot,
     inventoryChanged: pluginInstallConfigImport?.pluginInventoryChanged,
   };
-  const { createDoctorPluginMetadataSnapshotScope } =
-    await import("./doctor/shared/plugin-metadata-snapshot-scope.js");
   const pluginMetadataSnapshotScope = createDoctorPluginMetadataSnapshotScope({
     getBaseSnapshot: () => pluginMetadataSnapshotState.current,
     env: process.env,
@@ -271,8 +272,6 @@ export async function loadAndMaybeMigrateDoctorConfig(params: {
   const blockedCodexProviderPlan = collectBlockedLegacyOpenAICodexProviderPlan(state.candidate);
   const blockedCodexModelIdentities = new Set(blockedCodexProviderPlan.blockedModelIdentities);
   if (preflight.cronCodexRuntimePolicyTargets?.length) {
-    const { repairCronCodexRuntimePolicies } =
-      await import("./doctor/cron/runtime-policy-migration.js");
     const cronRuntimeRepair = repairCronCodexRuntimePolicies({
       cfg: state.candidate,
       targets: preflight.cronCodexRuntimePolicyTargets,
@@ -362,7 +361,7 @@ export async function loadAndMaybeMigrateDoctorConfig(params: {
   });
 
   const { repairUnownedChannelAccountBindings } =
-    await import("./doctor/shared/legacy-config-binding-repair.js");
+    await import("./doctor/shared/legacy-config-binding-repair.runtime.js");
   applyConfigMutation(
     runWithCurrentPluginMetadata(state.candidate, () =>
       repairUnownedChannelAccountBindings({
@@ -411,8 +410,6 @@ export async function loadAndMaybeMigrateDoctorConfig(params: {
     );
   }
 
-  const { recoverInstalledPluginConfigIds } =
-    await import("./doctor/shared/installed-plugin-id-recovery.js");
   const installedPluginRecovery = await recoverInstalledPluginConfigIds(
     state.candidate,
     process.env,

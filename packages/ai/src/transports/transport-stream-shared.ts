@@ -1,10 +1,4 @@
-import type {
-  AssistantMessage,
-  Model,
-  ProviderResponse,
-  StreamOptions,
-  Usage,
-} from "@openclaw/llm-core";
+import type { AssistantMessage, Model, ProviderResponse, StreamOptions } from "@openclaw/llm-core";
 import { asNonArrayRecord, asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 import { getAiTransportHost } from "../host.js";
 import {
@@ -19,20 +13,7 @@ import { repairJson } from "../utils/json-parse.js";
 import { projectProviderError, type ProviderErrorProjection } from "../utils/provider-error.js";
 import { isTransientNetworkError } from "../utils/retryable-network-errors.js";
 import { sanitizeSurrogates } from "../utils/sanitize-unicode.js";
-import { createZeroUsage } from "../utils/usage.js";
 import { parseJsonObjectPreservingUnsafeIntegers } from "./json-unsafe-integers.js";
-
-type ContextUsage = NonNullable<Usage["contextUsage"]>;
-
-type TransportUsage = {
-  input: number;
-  output: number;
-  cacheRead: number;
-  cacheWrite: number;
-  contextUsage?: ContextUsage;
-  totalTokens: number;
-  cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
-};
 
 export type WritableTransportStream = Pick<
   ReturnType<typeof createAssistantMessageEventStream>,
@@ -188,9 +169,7 @@ export function mergeTransportHeaders(
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
-export function createEmptyTransportUsage(): TransportUsage {
-  return createZeroUsage();
-}
+export { createEmptyTransportUsage } from "./assistant-output.js";
 
 export function createWritableTransportEventStream() {
   const eventStream = createAssistantMessageEventStream();

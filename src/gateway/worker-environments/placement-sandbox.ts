@@ -1,7 +1,6 @@
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { resolveSandboxConfigForAgent } from "../../agents/sandbox/config.js";
-import { createSandboxFsBridge } from "../../agents/sandbox/fs-bridge.js";
 import { createPreprovisionedSshSandboxBackend } from "../../agents/sandbox/ssh-backend.js";
 import type { SandboxConfig, SandboxContext } from "../../agents/sandbox/types.js";
 import { resolveSessionSkillResourceMounts } from "../../agents/session-placement-skill-resources.js";
@@ -57,6 +56,7 @@ export async function createRemoteExecPlacementSandbox(params: {
   workspaceDir: string;
   placement: ActiveRemoteExecPlacement;
 }): Promise<RemoteExecPlacementSandbox> {
+  const { createSandboxFsBridge } = await import("../../agents/sandbox/fs-bridge.js");
   const { placement } = params;
   if (placement.executionMode !== "remote-exec") {
     throw new Error(`Cloud placement ${placement.sessionId} is not a remote-exec placement`);

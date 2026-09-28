@@ -31,12 +31,12 @@ import { appendTranscriptMessage, resetSessionEntryLifecycle } from "./session-a
 import * as archiveStore from "./session-accessor.sqlite-archive-store.js";
 import * as archives from "./session-accessor.sqlite-archive.js";
 import { patchSessionEntryCore, replaceSessionEntrySync } from "./session-accessor.sqlite-entry.js";
+import * as entryEviction from "./session-accessor.sqlite-lifecycle-delete.js";
 import * as reclamation from "./session-accessor.sqlite-reclamation-run.js";
 import {
   joinSessionHistoryBudgetSweeps,
   type SessionHistoryBudgetQueueObservation,
 } from "./session-history-budget.test-support.js";
-import * as entryEviction from "./session-history-entry-eviction.runtime.js";
 import {
   enforceSqliteSessionHistoryDiskBudget,
   inspectSqliteSessionHistoryDiskBudget,
@@ -186,8 +186,8 @@ it.each([
     closeOpenClawAgentDatabasesForTest(state.root);
 
     let capEntryCalls = 0;
-    const deleteEntry = entryEviction.deleteDiskBudgetArchivedSessionEntry;
-    vi.spyOn(entryEviction, "deleteDiskBudgetArchivedSessionEntry").mockImplementation(
+    const deleteEntry = entryEviction.deleteDiskBudgetSessionEntryLifecycle;
+    vi.spyOn(entryEviction, "deleteDiskBudgetSessionEntryLifecycle").mockImplementation(
       async (...args) => {
         if (victim === "cap-entry" && args[0].target.canonicalKey === sessionKey) {
           capEntryCalls += 1;
@@ -198,7 +198,7 @@ it.each([
               sessionKey,
             ),
           ).toEqual({ current_session_id: originalId });
-          // Evict the host handle before the lazy loader without revoking this active sweep's workers.
+          // Evict the host handle without revoking this active sweep's workers.
           const databaseOptions = {
             agentId: target.agentId ?? "main",
             path: databasePath,

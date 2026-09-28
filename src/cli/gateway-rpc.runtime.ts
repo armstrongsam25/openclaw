@@ -3,8 +3,17 @@ import {
   GATEWAY_CLIENT_NAMES,
 } from "../../packages/gateway-protocol/src/client-info.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import { callGateway, isImplicitLocalGatewayTarget } from "../gateway/call.js";
+import {
+  callGateway,
+  formatGatewayAuthErrorJson,
+  formatGatewayClientRequestErrorJson,
+  formatGatewayTransportErrorJson,
+  isGatewayClientRequestError,
+  isGatewayCredentialsRequiredError,
+  isImplicitLocalGatewayTarget,
+} from "../gateway/call.js";
 import { assertGatewayCliMessageContext } from "../gateway/operator-cli-message-input.js";
+import { isGatewayRpcUnavailableError } from "../gateway/transport-error.js";
 import { resolveGatewayLocalPortOverride } from "./gateway-port-option.js";
 import type { GatewayRpcOpts } from "./gateway-rpc.types.js";
 import { parseTimeoutMsWithFallback } from "./parse-timeout.js";
@@ -39,6 +48,14 @@ type GatewayCliTransportRpcOpts = Omit<GatewayRpcOpts, "timeout"> & {
 };
 
 const DEFAULT_GATEWAY_RPC_TIMEOUT_MS = 30_000;
+
+export function formatGatewayErrorJsonFromCliRuntime(error: unknown) {
+  return (
+    formatGatewayAuthErrorJson(error) ??
+    formatGatewayClientRequestErrorJson(error) ??
+    formatGatewayTransportErrorJson(error)
+  );
+}
 
 export async function isImplicitLocalGatewayTargetFromCliRuntime(
   opts: GatewayCliTransportRpcOpts,
@@ -99,5 +116,30 @@ export async function callGatewayFromCliRuntime<T = Record<string, unknown>>(
         clientName: extra?.clientName ?? GATEWAY_CLIENT_NAMES.CLI,
         mode: extra?.mode ?? GATEWAY_CLIENT_MODES.CLI,
       }),
+  );
+}
+
+/** Local fallback is safe only for unavailable or explicitly supported older local Gateways. */
+export async function canFallbackToImplicitLocalGateway(params: {
+  config: OpenClawConfig;
+  error: unknown;
+  legacyMethod?: string;
+  legacyAgentId?: boolean;
+}): Promise<boolean> {
+  const { config, error, legacyMethod, legacyAgentId } = params;
+  const isLegacyError =
+    legacyMethod !== undefined &&
+    isGatewayClientRequestError(error) &&
+    error.gatewayCode === "INVALID_REQUEST" &&
+    (error.message === `unknown method: ${legacyMethod}` ||
+      (legacyAgentId === true &&
+        (error.message === `invalid ${legacyMethod} params: unexpected property agentId` ||
+          error.message ===
+            `invalid ${legacyMethod} params: at root: unexpected property 'agentId'`)));
+  return (
+    (isGatewayCredentialsRequiredError(error) ||
+      isGatewayRpcUnavailableError(error) ||
+      isLegacyError) &&
+    (await isImplicitLocalGatewayTarget({ config }))
   );
 }

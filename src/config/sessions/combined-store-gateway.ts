@@ -47,6 +47,7 @@ import { resolveSessionStorePathCore } from "./paths.js";
 import { listSessionEntriesCore, listSessionEntriesReadOnly } from "./session-accessor.js";
 import type { SessionEntryListScope, SessionEntrySummary } from "./session-accessor.types.js";
 import { canonicalSessionKeyMigrationRequiredError } from "./session-canonical-key.js";
+import type { SessionStoreTarget } from "./session-store-target.types.js";
 import { withSessionHistoryWorkerDatabases } from "./session-transcript-worker-runtime.js";
 import {
   dedupeSessionStoreTargetsBySqliteTarget,
@@ -54,7 +55,6 @@ import {
   listKnownSessionStoreAgentIds,
   resolveAgentSessionStoreTargetsSync,
   resolveAllAgentSessionStoreTargetsSync,
-  type SessionStoreTarget,
 } from "./targets.js";
 import type { SessionEntry } from "./types.js";
 

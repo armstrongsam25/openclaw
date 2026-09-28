@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import * as replyModule from "../auto-reply/reply/get-reply-from-config.runtime.js";
 import { resolveMainSessionKey } from "../config/sessions.js";
-import { runHeartbeatOnce } from "./heartbeat-runner.js";
+import { runHeartbeatOnce } from "./heartbeat-runner-run.js";
 import { installHeartbeatRunnerTestRuntime } from "./heartbeat-runner.test-harness.js";
 import {
   heartbeatTestConfig,

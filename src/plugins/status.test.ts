@@ -5,6 +5,10 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInfoWarnErrorLogger } from "../../test/helpers/mock-logger.js";
 import { clearPluginMetadataLifecycleCaches } from "./plugin-metadata-lifecycle.js";
 import {
+  buildPluginCompatibilityNotices,
+  buildPluginCompatibilityWarnings,
+} from "./status-compatibility.js";
+import {
   createAutoEnabledStatusConfig,
   createCompatChainFixture,
   createCompatibilityNotice,
@@ -47,8 +51,6 @@ let buildPluginSnapshotReport: typeof import("./status.js").buildPluginSnapshotR
 let withPluginDiagnosticsReport: typeof import("./status.js").withPluginDiagnosticsReport;
 let buildPluginInspectReport: typeof import("./status.js").buildPluginInspectReport;
 let buildAllPluginInspectReports: typeof import("./status.js").buildAllPluginInspectReports;
-let buildPluginCompatibilityNotices: typeof import("./status.js").buildPluginCompatibilityNotices;
-let buildPluginCompatibilityWarnings: typeof import("./status.js").buildPluginCompatibilityWarnings;
 let buildPluginCompatibilitySnapshotNotices: typeof import("./status.js").buildPluginCompatibilitySnapshotNotices;
 let formatPluginCompatibilityNotice: typeof import("./status.js").formatPluginCompatibilityNotice;
 let summarizePluginCompatibility: typeof import("./status.js").summarizePluginCompatibility;
@@ -254,8 +256,6 @@ describe("plugin status reports", () => {
   beforeAll(async () => {
     ({
       buildAllPluginInspectReports,
-      buildPluginCompatibilityNotices,
-      buildPluginCompatibilityWarnings,
       buildPluginCompatibilitySnapshotNotices,
       withPluginDiagnosticsReport,
       buildPluginInspectReport,

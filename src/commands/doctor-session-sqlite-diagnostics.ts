@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { resolveSessionFilePathCore } from "../config/sessions/paths.js";
-import type { SessionStoreTarget } from "../config/sessions/targets.js";
+import type { SessionStoreTarget } from "../config/sessions/session-store-target.types.js";
 import { resolveRealpathOrAbsolute as canonicalFilePath } from "../infra/boundary-path.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import {

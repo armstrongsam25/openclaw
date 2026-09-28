@@ -10,10 +10,12 @@ export type {
   SessionCatalogStartTerminalProviderParams,
   SessionCatalogTerminalPlan,
   SessionUpstreamActivity,
-  SessionUpstreamJsonValue,
-  SessionUpstreamKind,
   SessionUpstreamProbe,
 } from "../plugins/session-catalog.js";
+export type {
+  SessionUpstreamJsonValue,
+  SessionUpstreamKind,
+} from "../plugins/session-catalog.types.js";
 export {
   createSessionCatalogAdoptionCoordinator,
   isExternalUserText,

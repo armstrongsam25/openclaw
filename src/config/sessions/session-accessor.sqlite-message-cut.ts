@@ -9,7 +9,7 @@ import {
   type OpenClawAgentDatabase,
 } from "../../state/openclaw-agent-db.js";
 import { invalidateSessionBranchCache } from "./session-accessor.sqlite-branches.js";
-import type { TranscriptEvent } from "./session-accessor.sqlite-contract.js";
+import type { TranscriptEvent, ResolvedSqliteScope } from "./session-accessor.sqlite-contract.js";
 import {
   commitSqliteSessionDeletion,
   runSqliteSessionDeletionTransaction,
@@ -26,7 +26,6 @@ import {
   resolveSqliteScope,
   runExclusiveSqliteSessionWrite,
   toDatabaseOptions,
-  type ResolvedSqliteScope,
 } from "./session-accessor.sqlite-scope.js";
 import { ensureTranscriptSessionRoot } from "./session-accessor.sqlite-transcript-state.js";
 import { appendTranscriptEventsInTransaction } from "./session-accessor.sqlite-transcript-store.js";

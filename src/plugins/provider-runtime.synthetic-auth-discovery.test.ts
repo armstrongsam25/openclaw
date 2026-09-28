@@ -63,8 +63,11 @@ vi.mock("./provider-hook-runtime.js", async (importOriginal) => {
   };
 });
 
-vi.mock("./provider-discovery.runtime.js", () => ({
-  resolvePluginDiscoveryProvidersRuntime,
+vi.mock("./provider-discovery-plan.runtime.js", () => ({
+  planPluginDiscoveryRuntime: () => ({
+    kind: "entries",
+    providers: resolvePluginDiscoveryProvidersRuntime(),
+  }),
 }));
 
 const resolveProviderOwnerIds = vi.hoisted(() =>

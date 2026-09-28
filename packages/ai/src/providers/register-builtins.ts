@@ -1,17 +1,7 @@
 // Built-in provider registration installs lazy protocol adapters.
 import type { ApiRegistry } from "../api-registry.js";
-import type {
-  Api,
-  AssistantMessage,
-  AssistantMessageEvent,
-  Model,
-  SimpleStreamOptions,
-  StreamFunction,
-  StreamOptions,
-} from "../types.js";
-import { AssistantMessageEventStream } from "../utils/event-stream.js";
-import { projectProviderError, type ProviderErrorProjection } from "../utils/provider-error.js";
-import { createZeroUsage } from "../utils/usage.js";
+import type { Api, SimpleStreamOptions, StreamFunction, StreamOptions } from "../types.js";
+import { createLazyStream } from "../utils/lazy-stream.js";
 
 type ProviderStreams<TApi extends Api, TOptions extends StreamOptions> = {
   stream: StreamFunction<TApi, TOptions>;
@@ -22,51 +12,6 @@ type RegisterBuiltIn = (registry: ApiRegistry) => void;
 
 /** Source id used for built-in API provider registrations. */
 export const BUILT_IN_API_PROVIDER_SOURCE_ID = "core:built-in";
-
-async function forwardStream(
-  target: AssistantMessageEventStream,
-  source: AsyncIterable<AssistantMessageEvent>,
-): Promise<void> {
-  for await (const event of source) {
-    target.push(event);
-  }
-  target.end();
-}
-
-function createLazyLoadErrorMessage<TApi extends Api>(
-  model: Model<TApi>,
-  error: unknown,
-  signal?: AbortSignal,
-): AssistantMessage & ProviderErrorProjection {
-  return {
-    role: "assistant",
-    content: [],
-    api: model.api,
-    provider: model.provider,
-    model: model.id,
-    usage: createZeroUsage(),
-    ...projectProviderError(error, signal),
-    timestamp: Date.now(),
-  };
-}
-
-// Provider modules load on first use, while callers still receive a stream synchronously.
-function createLazyStream<TApi extends Api, TOptions extends StreamOptions, TStreams>(
-  load: () => Promise<TStreams>,
-  select: (streams: TStreams) => StreamFunction<TApi, TOptions>,
-): StreamFunction<TApi, TOptions> {
-  return (model, context, options) => {
-    const outer = new AssistantMessageEventStream();
-    load()
-      .then((streams) => forwardStream(outer, select(streams)(model, context, options)))
-      .catch((error: unknown) => {
-        const message = createLazyLoadErrorMessage(model, error, options?.signal);
-        outer.push({ type: "error", reason: message.stopReason, error: message });
-        outer.end(message);
-      });
-    return outer;
-  };
-}
 
 function createLazyRegistration<TApi extends Api, TOptions extends StreamOptions, TModule>(
   api: TApi,

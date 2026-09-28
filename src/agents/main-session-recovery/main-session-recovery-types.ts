@@ -1,5 +1,16 @@
 import type { MainRestartRecoveryState, RestartRecoveryRun } from "../../config/sessions.js";
 
+export type MainSessionRecoveryStoreTarget = {
+  agentId?: string;
+  sessionKey: string;
+  storePath: string;
+};
+
+export type MainSessionRecoveryPendingTarget = MainSessionRecoveryStoreTarget & {
+  sessionId: string;
+  stateDir?: string;
+};
+
 type MainSessionRecoveryExecutionIdentity = NonNullable<
   MainRestartRecoveryState["executionIdentity"]
 >;

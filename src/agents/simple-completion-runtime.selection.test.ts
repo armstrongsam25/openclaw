@@ -4,11 +4,9 @@ import type { OpenClawConfig } from "../config/config.js";
 import { migratePersistedImplicitMainRoster } from "../config/legacy.roster.js";
 import type { ModelDefinitionConfig } from "../config/types.models.js";
 import { createPluginManifestRecordFixture } from "../plugins/plugin-metadata.test-support.js";
-import {
-  acquireSimpleCompletionModelForAgent,
-  resolveSimpleCompletionSelectionForAgent as resolveSimpleCompletionSelectionForAgentBase,
-} from "./simple-completion-runtime.js";
+import { acquireSimpleCompletionModelForAgent } from "./simple-completion-runtime.js";
 import type { SimpleCompletionModelResolver } from "./simple-completion-scope.js";
+import { resolveSimpleCompletionSelectionForAgent as resolveSimpleCompletionSelectionForAgentBase } from "./simple-completion-selection.js";
 
 function resolveSimpleCompletionSelectionForAgent(
   params: Parameters<typeof resolveSimpleCompletionSelectionForAgentBase>[0],

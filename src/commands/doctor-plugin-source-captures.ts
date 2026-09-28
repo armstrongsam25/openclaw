@@ -1,7 +1,6 @@
 import { note } from "../../packages/terminal-core/src/note.js";
 import { quoteCliArg } from "../cli/quote-cli-arg.js";
 import { resolveStateDir } from "../config/state-dir.js";
-import { inspectOtherOpenClawProcesses } from "../infra/openclaw-process-census.js";
 import {
   inspectLegacyPluginSourceCaptureRoots,
   pruneLegacyPluginSourceCaptures,
@@ -15,6 +14,7 @@ export async function noteLegacyPluginSourceCaptures(
   env: NodeJS.ProcessEnv,
   shouldRepair = false,
 ): Promise<void> {
+  const { inspectOtherOpenClawProcesses } = await import("../infra/openclaw-process-census.js");
   const { directories, warnings } = await inspectDoctorTemporaryDirectories(env);
   const report = await inspectLegacyPluginSourceCaptureRoots(resolveStateDir(env), directories);
   warnings.push(...report.warnings);

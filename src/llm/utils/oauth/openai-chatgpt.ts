@@ -1,5 +1,6 @@
 // OpenAI ChatGPT OAuth helpers manage ChatGPT OAuth login and token refresh.
 import { loadActivatedBundledPluginPublicSurfaceModuleSync } from "../../../plugin-sdk/facade-runtime.js";
+import { refreshProviderOAuthCredentialWithPlugin } from "../../../plugins/provider-runtime.runtime.js";
 import type { RuntimeEnv } from "../../../runtime.js";
 import type { WizardPrompter } from "../../../wizard/prompts.js";
 import { throwIfOAuthLoginAborted, withOAuthLoginAbort } from "./abort.js";
@@ -62,8 +63,6 @@ function createLegacyPrompter(callbacks: OAuthLoginCallbacks): WizardPrompter {
 }
 
 async function refreshViaProviderRuntime(refreshToken: string): Promise<OAuthCredentials> {
-  const { refreshProviderOAuthCredentialWithPlugin } =
-    await import("../../../plugins/provider-runtime.runtime.js");
   const refreshed = await refreshProviderOAuthCredentialWithPlugin({
     provider: OPENAI_CODEX_PROVIDER_ID,
     context: {

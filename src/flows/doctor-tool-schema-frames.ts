@@ -6,6 +6,7 @@ import {
 } from "../agents/agent-scope.js";
 import { resolveConversationCapabilityProfile } from "../agents/conversation-capability-profile.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
+import { resolveModelAsync } from "../agents/embedded-agent-runner/model.js";
 import { findModelInCatalog, type ModelCatalogEntry } from "../agents/model-catalog.js";
 import { resolveDefaultModelForAgent } from "../agents/model-selection.js";
 import { supportsModelTools } from "../agents/model-tool-support.js";
@@ -98,7 +99,6 @@ export async function prepareDoctorToolSchemaFrames(
         : resolveDefaultModelForAgent({ cfg, agentId, allowPluginNormalization: true });
       let model: ProviderRuntimeModel;
       if (standalone) {
-        const { resolveModelAsync } = await import("../agents/embedded-agent-runner/model.js");
         const resolution = await resolveModelAsync(
           modelRef.provider,
           modelRef.model,

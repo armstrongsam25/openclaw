@@ -8,7 +8,8 @@ import {
 import type { AnyAgentTool } from "./common.js";
 import { jsonResult } from "./common.js";
 import { getGatewayToolCallerIdentity } from "./gateway-caller-context.js";
-import { callInProcessGatewayTool, type InProcessGatewayCaller } from "./in-process-gateway.js";
+import { callInProcessGatewayTool } from "./gateway.js";
+import type { InProcessGatewayCaller } from "./in-process-gateway.js";
 
 export function createGitHubPublishTool(
   options: {

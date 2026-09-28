@@ -251,11 +251,7 @@ import {
   expectUnknownModelErrorResult,
 } from "./model.forward-compat.test-support.js";
 import { buildInlineProviderModels } from "./model.inline-provider.js";
-import {
-  createEmptyAgentDiscoveryStores,
-  resolveModelAsync,
-  resolveModelWithRegistry,
-} from "./model.js";
+import { createEmptyAgentDiscoveryStores, resolveModelAsync } from "./model.js";
 import type { ProviderRuntimeHooks } from "./model.provider-hooks.js";
 import {
   buildOpenAICodexForwardCompatExpectation,
@@ -1379,12 +1375,8 @@ describe("resolveModel", () => {
       models: [legacy, exact],
     });
     for (const row of [exact, legacy]) {
-      const resolved = await resolveModelWithRegistry({
-        provider: "custom",
-        modelId: row.id,
-        cfg,
-        modelRegistry: createEmptyAgentDiscoveryStores().modelRegistry,
-        agentDir: state.agentDir(),
+      const { model: resolved } = await resolveModelAsync("custom", row.id, state.agentDir(), cfg, {
+        ...createEmptyAgentDiscoveryStores(),
         runtimeHooks: createRuntimeHooks(),
       });
       expect.soft(resolved?.id).toBe(row.id);
@@ -1409,14 +1401,16 @@ describe("resolveModel", () => {
           },
         ],
       });
-      const resolved = await resolveModelWithRegistry({
-        provider: "custom",
-        modelId: "Model",
+      const { model: resolved } = await resolveModelAsync(
+        "custom",
+        "Model",
+        state.agentDir(),
         cfg,
-        modelRegistry: createEmptyAgentDiscoveryStores().modelRegistry,
-        agentDir: state.agentDir(),
-        runtimeHooks: createRuntimeHooks(),
-      });
+        {
+          ...createEmptyAgentDiscoveryStores(),
+          runtimeHooks: createRuntimeHooks(),
+        },
+      );
       expect.soft(resolved).toMatchObject({
         id: "Model",
         api: "openai-completions",
@@ -2043,14 +2037,17 @@ describe("resolveModel", () => {
       },
     } as OpenClawConfig;
 
-    const result = await resolveModelWithRegistry({
-      provider: "openai",
-      modelId: "gpt-5.4",
-      agentDir: state.agentDir("state"),
+    const { model: result } = await resolveModelAsync(
+      "openai",
+      "gpt-5.4",
+      state.agentDir("state"),
       cfg,
-      modelRegistry: discoverModels({ mocked: true } as never, state.agentDir("state")),
-      runtimeHooks,
-    });
+      {
+        authStorage: createEmptyAgentDiscoveryStores().authStorage,
+        modelRegistry: discoverModels({ mocked: true } as never, state.agentDir("state")),
+        runtimeHooks,
+      },
+    );
 
     const dynamicInput = mockCallArg(runProviderDynamicModel);
     expectRecordFields(dynamicInput, {

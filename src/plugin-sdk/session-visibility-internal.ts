@@ -3,6 +3,7 @@ import { redactIdentifier } from "@openclaw/normalization-core/node-crypto";
 import { err, ok, type Result } from "@openclaw/normalization-core/result";
 import { normalizeLowercaseStringOrEmpty } from "../../packages/normalization-core/src/string-coerce.js";
 import { normalizeTrimmedStringList } from "../../packages/normalization-core/src/string-normalization.js";
+import { bindAgentToolGatewayRequest } from "../agents/tools/in-process-gateway.js";
 import {
   GatewayCredentialsRequiredError,
   GatewayExplicitAuthRequiredError,
@@ -346,7 +347,7 @@ export async function listSpawnedSessionKeysWithResult(params: {
   try {
     const callGateway =
       params.callGateway ??
-      (await import("../agents/tools/in-process-gateway.js")).bindAgentToolGatewayRequest({
+      bindAgentToolGatewayRequest({
         hostedOnly: true,
       });
     const list = await callGateway<{

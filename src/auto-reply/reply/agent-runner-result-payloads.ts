@@ -14,6 +14,7 @@ import {
   assertSubagentRegistryWriteSourceCurrent,
   SubagentRegistryWriteError,
 } from "../../agents/subagents/registry/subagent-registry-persistence.js";
+import { settleRequesterAfterSessionSpawns } from "../../agents/subagents/registry/subagent-registry.js";
 import {
   deriveContextPromptTokens,
   hasBillableUsage,
@@ -591,9 +592,6 @@ export async function prepareReplyAgentPayloads(state: {
       settle: (statusDelivered) =>
         (settlementPromise ??= (async () => {
           try {
-            assertRequesterCurrent();
-            const { settleRequesterAfterSessionSpawns } =
-              await import("../../agents/subagents/registry/subagent-registry.js");
             assertRequesterCurrent();
             const transferred = await settleRequesterAfterSessionSpawns({
               requesterSessionKey,

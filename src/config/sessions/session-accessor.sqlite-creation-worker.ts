@@ -2,6 +2,7 @@ import { formatErrorMessage } from "../../infra/errors.js";
 import { hasSqliteWorkerOutcomeUnknown } from "../../infra/sqlite-worker-contract.js";
 import { assertExistingDatabaseIdentity } from "../../infra/sqlite-worker-identity.js";
 import { publishSessionStateArchives } from "./session-accessor.sqlite-archive-store.js";
+import type { ResolvedSqliteScope } from "./session-accessor.sqlite-contract.js";
 import {
   withSessionEntryCreationPublication,
   runWithSessionEntryCreationPublication,
@@ -13,7 +14,6 @@ import {
   prepareSessionEntryReplacementDatabase,
   withSessionEntryWorker,
 } from "./session-accessor.sqlite-replacement-worker.js";
-import type { ResolvedSqliteScope } from "./session-accessor.sqlite-scope.js";
 import {
   runExclusiveSqliteSessionWrite,
   resolveSqliteTranscriptArchiveDirectory,

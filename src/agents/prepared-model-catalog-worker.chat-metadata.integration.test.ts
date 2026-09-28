@@ -16,10 +16,9 @@ import {
 } from "./plugin-model-catalog.js";
 import { createCatalogFixture, PROVIDER_ID } from "./prepared-model-catalog-worker.test-support.js";
 import { getPublishedPreparedModelCatalogOwnerSnapshot } from "./prepared-model-catalog.js";
-import {
-  publishPreparedModelRuntimeSnapshot,
-  type PreparedModelRuntimeSnapshot,
-} from "./prepared-model-runtime.js";
+import "./prepared-model-runtime.js";
+import { publishPreparedModelRuntimeSnapshot } from "./prepared-model-runtime.test-support.js";
+import type { PreparedModelRuntimeSnapshot } from "./prepared-model-runtime.types.js";
 import { usePreparedCatalogWorkerFixtures } from "./test-helpers/prepared-model-catalog-worker-fixture.js";
 
 const { makeTempDir, retireAfterTest } = usePreparedCatalogWorkerFixtures();

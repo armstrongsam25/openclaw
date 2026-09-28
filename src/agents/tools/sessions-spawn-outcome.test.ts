@@ -21,7 +21,7 @@ import { buildPayloads } from "../embedded-agent-runner/run/payloads.test-helper
 import { isToolResultError, registerTrustedToolNoStartError } from "../tool-result-error.js";
 import { snapshotToolSearchTargetTranscriptResult } from "../tool-search-transcript.js";
 import { createToolTerminalObserver } from "../tool-terminal-outcome.js";
-import * as inProcessGateway from "./in-process-gateway.js";
+import * as inProcessGateway from "./gateway.js";
 import { createSessionsSpawnTool } from "./sessions-spawn-tool.js";
 
 const report = "Seven blue boxes remain. Thursday delivery is confirmed.";

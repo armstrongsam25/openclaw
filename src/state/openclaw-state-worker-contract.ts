@@ -47,10 +47,10 @@ import type { WorkspaceJournalWorkerOperations } from "../gateway/worker-environ
 import type { WorkerEnvironmentWorkerOperations } from "../gateway/worker-environments/store-worker-contract.js";
 import type {
   DeferredPluginMigration,
+  DeferredPluginMigrationCompletion,
   DeferredPluginMigrationRecordInput,
-  recordDeferredPluginMigrationsInTransaction,
-  readDeferredPluginMigrationCompletions,
-} from "../infra/deferred-plugin-migrations.js";
+  DeferredPluginMigrationTransitions,
+} from "../infra/deferred-plugin-migrations.contract.js";
 import type { DeliveryQueueWorkerOperations } from "../infra/delivery-queue.worker-contract.js";
 import type * as deviceAuth from "../infra/device-auth-store.kernel.js";
 import type { DeviceIdentity } from "../infra/device-identity-store.js";
@@ -77,7 +77,7 @@ import type {
 } from "../infra/update-run-interruption-contract.js";
 import type { UpdateRunWriteOperations } from "../infra/update-run-mutation.types.js";
 import type { UpdateRunReconciliationOperations } from "../infra/update-run-reconciliation.types.js";
-import type { readRemoteModelCatalog } from "../model-catalog/remote-store.js";
+import type { RemoteModelCatalogStoreRow } from "../model-catalog/remote-store.types.js";
 import type { NodeWorkerJournalWorkerOperations } from "../node-host/node-worker-journal.worker-contract.js";
 import type { PluginBlobWorkerOperations } from "../plugin-state/plugin-blob-worker-contract.js";
 import type { PluginStateWorkerOperations } from "../plugin-state/plugin-state-worker-contract.js";
@@ -109,12 +109,12 @@ import type {
   GitHubSessionReceiptIdentities,
 } from "./github-publication-read.types.js";
 import type { OnboardingRecommendationWriteOperations } from "./onboarding-recommendations.contract.js";
-import type { OpenClawAgentDatabaseWorkerLeaseReceipt } from "./openclaw-agent-db-lease.js";
+import type { OpenClawAgentDatabaseWorkerLeaseReceipt } from "./openclaw-agent-db-contract.js";
 import type { OpenClawStateLeaseLifecycleOperations } from "./openclaw-state-lease-context.js";
 import type { OpenClawStateLeaseIdentity } from "./openclaw-state-lease-store.js";
 import type { RepositoryWorkspaceWorkerOperations } from "./session-repository-workspaces.types.js";
 import type { UserPreferenceWorkerOperations } from "./user-preferences.types.js";
-import type { UserProfileWorkerOperations } from "./user-profiles.worker.js";
+import type { UserProfileWorkerOperations } from "./user-profiles.worker-contract.js";
 
 export type OpenClawStateWorkerOpenPreparation = { type: "deviceIdentity"; identityKey: string };
 
@@ -286,7 +286,7 @@ export type OpenClawStateWorkerOperations = UpdateRunReconciliationOperations &
     };
     "modelCatalog.remote.read": {
       input: { artifactPreservingReadOnly: boolean };
-      output: ReturnType<typeof readRemoteModelCatalog>;
+      output: RemoteModelCatalogStoreRow | undefined;
     };
     "plugins.conversationBindingApprovals.read": {
       input: undefined;
@@ -311,7 +311,7 @@ export type OpenClawStateWorkerOperations = UpdateRunReconciliationOperations &
       output:
         | {
             kind: "recorded";
-            transitions: ReturnType<typeof recordDeferredPluginMigrationsInTransaction>;
+            transitions: DeferredPluginMigrationTransitions;
           }
         | { kind: "conflict"; pending: readonly DeferredPluginMigration[] }
         | { kind: "invalid"; issues: ZodIssue[] };
@@ -322,7 +322,7 @@ export type OpenClawStateWorkerOperations = UpdateRunReconciliationOperations &
     };
     "plugins.deferredMigrations.completions.read": {
       input: undefined;
-      output: ReturnType<typeof readDeferredPluginMigrationCompletions>;
+      output: DeferredPluginMigrationCompletion[];
     };
     "claws.install-schema-versions": {
       input: { artifactPreservingReadOnly: boolean };

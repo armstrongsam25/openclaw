@@ -13,10 +13,12 @@ const mocks = vi.hoisted(() => ({
   resolveSimpleCompletionSelectionForAgent: vi.fn(),
 }));
 
+vi.mock("../../agents/simple-completion-selection.js", () => ({
+  resolveSimpleCompletionSelectionForAgent: mocks.resolveSimpleCompletionSelectionForAgent,
+}));
 vi.mock("../../agents/simple-completion-runtime.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../agents/simple-completion-runtime.js")>()),
   acquireSimpleCompletionModelForAgent: mocks.acquireSimpleCompletionModelForAgent,
-  resolveSimpleCompletionSelectionForAgent: mocks.resolveSimpleCompletionSelectionForAgent,
 }));
 
 const modelId = "gpt-5.6-luna";

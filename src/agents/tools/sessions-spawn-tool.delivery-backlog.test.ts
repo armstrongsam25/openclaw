@@ -4,7 +4,7 @@ import { withTestDir } from "../../test-helpers/temp-dir.js";
 import { createSubagentRunRecord } from "../subagent-test-fixtures.test-helpers.js";
 import { subagentRuns } from "../subagents/registry/subagent-registry-memory.js";
 import { supportedSpawnModelChoice } from "../subagents/spawn/subagent-spawn.test-helpers.js";
-import { callInProcessGatewayTool } from "./in-process-gateway.js";
+import { callInProcessGatewayTool } from "./gateway.js";
 import { createSessionsSpawnTool } from "./sessions-spawn-tool.js";
 
 vi.mock("../subagents/spawn/subagent-spawn.js", () => ({

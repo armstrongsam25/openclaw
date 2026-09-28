@@ -3,6 +3,7 @@ import { normalizeOptionalString } from "@openclaw/normalization-core/string-coe
 import { formatCliCommand } from "../cli/command-format.js";
 import { resolveOnboardingSetupTarget } from "../commands/onboard-agent-target.js";
 import * as firstAgentOnboarding from "../commands/onboard-first-agent.js";
+import * as onboardHelpers from "../commands/onboard-helpers.js";
 import type { OnboardMode, OnboardOptions } from "../commands/onboard-types.js";
 import { hasResolvedRosterBeforeMigrations } from "../config/agent-roster-provenance.js";
 import { ConfigMutationConflictError } from "../config/config.js";
@@ -10,10 +11,7 @@ import { resolveAgentModelPrimaryValue } from "../config/model-input.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { resolveGatewayProbeAuthSafeWithSecretInputs } from "../gateway/probe-auth.js";
 import { formatErrorMessage } from "../infra/errors.js";
-import {
-  buildPluginCompatibilitySnapshotNotices,
-  formatPluginCompatibilityNotice,
-} from "../plugins/status.js";
+import { formatPluginCompatibilityNotice } from "../plugins/status-compatibility.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { defaultRuntime } from "../runtime.js";
 import { createLazyRuntimeModule } from "../shared/lazy-runtime.js";
@@ -74,7 +72,6 @@ async function runSetupWizardOnce(
 ) {
   let opts = initialOpts;
   const runtime = runtimeInput ?? defaultRuntime;
-  const onboardHelpers = await import("../commands/onboard-helpers.js");
   await onboardHelpers.printWizardHeader(runtime);
   await prompter.intro(t("wizard.setup.intro"));
 
@@ -124,6 +121,7 @@ async function runSetupWizardOnce(
 
   baseConfig = await requestTelemetryConsent({ opts, prompter, config: baseConfig });
 
+  const { buildPluginCompatibilitySnapshotNotices } = await import("../plugins/status.js");
   const compatibilityNotices = snapshot.valid
     ? buildPluginCompatibilitySnapshotNotices({ config: baseConfig })
     : [];

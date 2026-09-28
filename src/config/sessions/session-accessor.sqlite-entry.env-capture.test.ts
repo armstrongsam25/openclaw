@@ -4,8 +4,8 @@ import { createDeferredCore } from "../../shared/deferred.js";
 import type { OpenClawAgentDatabaseOptions } from "../../state/openclaw-agent-db-contract.js";
 import { withMockedPlatform } from "../../test-utils/vitest-spies.js";
 import { cloneEnvWithPlatformSemantics } from "../config-env-vars.js";
+import type { ResolvedSqliteScope } from "./session-accessor.sqlite-contract.js";
 import { patchSessionEntryCore } from "./session-accessor.sqlite-entry.js";
-import type { ResolvedSqliteScope } from "./session-accessor.sqlite-scope.js";
 import type { InternalSessionEntry } from "./types.js";
 
 const boundary = vi.hoisted(() => ({

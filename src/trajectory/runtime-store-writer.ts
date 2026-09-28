@@ -37,11 +37,8 @@ import {
   runOpenClawAgentWorkerWrite,
   runOpenClawAgentWriteAdmission,
 } from "../state/openclaw-agent-write-admission.js";
-import {
-  appendSqliteTrajectoryRuntimeEvents,
-  type SqliteTrajectoryRuntimeAppend,
-} from "./runtime-store.sqlite.js";
-import type { TrajectoryEvent } from "./types.js";
+import { appendSqliteTrajectoryRuntimeEvents } from "./runtime-store.sqlite.js";
+import type { SqliteTrajectoryRuntimeAppend, TrajectoryEvent } from "./types.js";
 
 export function createSqliteTrajectoryRuntimeSink(params: {
   env: NodeJS.ProcessEnv;

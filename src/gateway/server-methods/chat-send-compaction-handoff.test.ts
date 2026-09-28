@@ -1,8 +1,8 @@
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { expect, it, vi } from "vitest";
 import { createDeferred } from "../../../test/helpers/promise.js";
+import * as preparedModelRuntime from "../../agents/prepared-model-runtime.js";
 import * as dispatch from "../../auto-reply/dispatch.js";
-import * as dispatchRuntimeLoaders from "../../auto-reply/reply/dispatch-from-config.runtime-loaders.js";
 import type { InternalGetReplyFromConfig } from "../../auto-reply/reply/get-reply.types.js";
 import { finalizeInboundContext } from "../../auto-reply/reply/inbound-context.js";
 import {
@@ -100,17 +100,20 @@ it.each([
       const prepared = createDeferred<DispatchOptions>();
       const releasePreparation = createDeferred();
       const capturedSuccessor = createDeferred();
-      const releaseRuntimePlugins = createDeferred();
+      const releasePreparedRuntime = createDeferred();
       const sharedDispatchSettled = createDeferred();
       const originalDispatch = dispatch.dispatchInboundMessageWithProjectedDispatcher;
-      const originalLoadRuntimePlugins = dispatchRuntimeLoaders.loadRuntimePlugins;
-      const holdRuntimePlugins =
+      const originalLoadPreparedRuntime =
+        preparedModelRuntime.loadPublishedGatewayReplyDispatchRuntime;
+      const holdPreparedRuntime =
         scenario === "successive-compactions"
-          ? vi.spyOn(dispatchRuntimeLoaders, "loadRuntimePlugins").mockImplementation(async () => {
-              capturedSuccessor.resolve();
-              await releaseRuntimePlugins.promise;
-              return await originalLoadRuntimePlugins();
-            })
+          ? vi
+              .spyOn(preparedModelRuntime, "loadPublishedGatewayReplyDispatchRuntime")
+              .mockImplementation(async (params) => {
+                capturedSuccessor.resolve();
+                await releasePreparedRuntime.promise;
+                return await originalLoadPreparedRuntime(params);
+              })
           : undefined;
       const observeChatDispatch = vi.spyOn(chatDispatch, "startChatDispatch");
       let owned: ChatDispatchParams | undefined;
@@ -222,14 +225,14 @@ it.each([
         }
         releasePreparation.resolve();
         if (successor) {
-          // Gather retains this newer owner before its existing plugin-loading await.
+          // Gather retains this newer owner before awaiting the prepared runtime.
           await capturedSuccessor.promise;
           await replaceSessionEntry(scope, { ...entry, sessionId: finalSessionId });
           successor.updateSessionId(finalSessionId);
           successor.complete();
           await successor.ownerSettlement;
           expect(replyRunRegistry.get(sessionKey)).toBeUndefined();
-          releaseRuntimePlugins.resolve();
+          releasePreparedRuntime.resolve();
         }
         await sharedDispatchSettled.promise;
         await vi.waitFor(() => expect(context.chatAbortControllers.has(runId)).toBe(false));
@@ -268,14 +271,14 @@ it.each([
         predecessor.complete();
         successor?.complete();
         releasePreparation.resolve();
-        releaseRuntimePlugins.resolve();
+        releasePreparedRuntime.resolve();
         if (owned) {
           await sharedDispatchSettled.promise;
           await vi.waitFor(() => expect(context.chatAbortControllers.has(runId)).toBe(false));
           owned.admission.cleanupAdmittedRun();
         }
         holdPreparation.mockRestore();
-        holdRuntimePlugins?.mockRestore();
+        holdPreparedRuntime?.mockRestore();
         observeChatDispatch.mockRestore();
       }
     });

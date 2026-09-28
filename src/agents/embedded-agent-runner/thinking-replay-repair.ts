@@ -1,8 +1,6 @@
 /** Repairs persisted provider replay state after provider-confirmed rejection. */
-import {
-  stripCompactionReplayCheckpoint,
-  type OpenAIResponsesCompactionRejection,
-} from "@openclaw/ai/transports";
+import { stripCompactionReplayCheckpoint } from "@openclaw/ai/internal/shared";
+import type { OpenAIResponsesCompactionRejection } from "@openclaw/ai/transports";
 import { emitSessionTranscriptUpdate } from "../../sessions/transcript-events.js";
 import type { AgentMessage } from "../runtime/index.js";
 import { log } from "./logger.js";

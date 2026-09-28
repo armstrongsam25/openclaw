@@ -10,7 +10,6 @@ import {
   legacyWorkspaceSiblingAttestationMayExist,
   resolveLegacyWorkspaceSourcePaths,
 } from "../agents/workspace-legacy-state.js";
-import { listWorkspaceStateDirs } from "../agents/workspace-state-dirs.js";
 import { resolveWorkspaceStateIdentity } from "../agents/workspace-state-identity.js";
 import { readWorkspaceStateSnapshot } from "../agents/workspace-state-store.js";
 import { resolveLegacyStateDirs } from "../config/paths.js";
@@ -217,6 +216,7 @@ export async function detectLegacyWorkspaceState(params: {
     }
   };
 
+  const { listWorkspaceStateDirs } = await import("../agents/workspace-state-dirs.js");
   const workspaceDirs = new Set(
     await listWorkspaceStateDirs({
       cfg: params.cfg,

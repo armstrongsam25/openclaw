@@ -5,9 +5,12 @@ import { hashConfigRaw } from "../../config/io.read-helpers.js";
 import type { ConfigFileSnapshot } from "../../config/types.openclaw.js";
 import type { PluginInstallRecord } from "../../config/types.plugins.js";
 import {
-  createManagedUpdateRequesterContinuationAuthority,
+  prepareManagedUpdateRequesterIdentity,
   UpdateRequesterRevokedError,
+  type UpdateRequester,
+  type UpdateRequesterAuthority,
 } from "../../infra/update-requester-authority.js";
+import type { UpdateRecoveryFence } from "../../infra/update-run-recovery.js";
 import { loadInstalledPluginIndexInstallRecords } from "../../plugins/installed-plugin-index-records.js";
 import { defaultRuntime } from "../../runtime.js";
 import {
@@ -16,13 +19,48 @@ import {
   type TargetDatabaseSchemaContextOptions,
 } from "./schema-preflight.js";
 import type { UpdateCommandOptions } from "./shared.js";
-import type { UpdateCommandExecutor } from "./update-command-executor.js";
+import {
+  assertUpdateRequesterContinuationOwner,
+  type UpdateCommandExecutor,
+} from "./update-command-executor.js";
 import type { PreManagedServiceStop } from "./update-command-service-context-types.js";
 import {
   resolveOwnedManagedUpdateEnv,
   stripGatewayServiceMarkerEnv,
   withOwnedManagedUpdateEnv,
 } from "./update-command-service-env.js";
+
+/** Only a registered native continuation can settle the original Gateway's accepted update. */
+export async function createManagedUpdateRequesterContinuationAuthority(
+  requester: UpdateRequester,
+  operation: { runId: string; executor: UpdateRecoveryFence },
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<UpdateRequesterAuthority> {
+  const { runId, executor } = operation;
+  const admittedRequester = Object.freeze({ ...requester });
+  const authorityEnv = { ...env };
+  const assertOperationCurrent = () => assertUpdateRequesterContinuationOwner(executor, runId);
+  assertOperationCurrent();
+  const { getUpdateRun } = await import("../../infra/update-run-ledger.js");
+  assertOperationCurrent();
+  const run = getUpdateRun(runId, { env: authorityEnv });
+  if (
+    run?.status !== "running" ||
+    !isDeepStrictEqual(run.origin.requester, admittedRequester) ||
+    !admittedRequester.authorizationSource?.startsWith("profile:")
+  ) {
+    throw new UpdateRequesterRevokedError();
+  }
+  const identity = await prepareManagedUpdateRequesterIdentity(admittedRequester, authorityEnv);
+  assertOperationCurrent();
+  return Object.freeze({
+    requester: identity.requester,
+    isCurrent: () => {
+      assertOperationCurrent();
+      return identity.isCurrentIdentity();
+    },
+  });
+}
 
 export type OwnedManagedUpdateContext = {
   env: NodeJS.ProcessEnv;

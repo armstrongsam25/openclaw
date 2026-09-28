@@ -11,7 +11,8 @@ import {
 } from "../../session-cards/progress-card-input.js";
 import type { AnyAgentTool } from "./common.js";
 import { jsonResult, ToolInputError } from "./common.js";
-import { callInProcessGatewayTool, type InProcessGatewayCaller } from "./in-process-gateway.js";
+import { callInProcessGatewayTool } from "./gateway.js";
+import type { InProcessGatewayCaller } from "./in-process-gateway.js";
 import { recordProgressCardToolOutcome } from "./progress-card-tool-outcome.js";
 
 const ProgressCardToolSchema = Type.Object(

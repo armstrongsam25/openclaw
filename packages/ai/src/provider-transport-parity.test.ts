@@ -23,6 +23,11 @@ const openAiMockState = vi.hoisted(() => ({
 
 vi.mock("openai", () => ({
   default: class MockOpenAI {
+    post(url: string, options: { body: Uint8Array }) {
+      expect(url).toBe("/chat/completions");
+      return this.chat.completions.create(JSON.parse(new TextDecoder().decode(options.body)));
+    }
+
     chat = {
       completions: {
         create: (payload: unknown) => {

@@ -14,9 +14,9 @@ import { tryProcessCwd } from "./safe-cwd.js";
 import {
   maintainRetainedUpdateRuntimes,
   registerRetainedUpdateRuntime,
-  removeTemporaryArtifacts,
   reportRetainedUpdateRuntime,
 } from "./temp-artifact-cleanup.js";
+import { removeTemporaryArtifacts } from "./temp-artifact-removal.js";
 import { withUpdateCandidateIoBudget } from "./update-candidate-io.js";
 import { prepareUpdateCandidatePluginTrees } from "./update-candidate-plugin-tree.js";
 import type { ResolvedGlobalInstallTarget } from "./update-global.js";

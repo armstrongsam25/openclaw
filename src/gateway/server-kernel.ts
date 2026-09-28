@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
+import { cancelPreparedModelRuntimeRefresh } from "../agents/prepared-model-runtime.js";
 import { closePreparedModelRuntimeSnapshots } from "../agents/prepared-model-runtime.lifecycle.js";
 import { isNixMode, resolveIsConfigReadOnly } from "../config/paths.js";
 import { GatewayScheduler } from "../infra/gateway-scheduler.js";
@@ -151,8 +152,6 @@ async function createGatewayKernelWithSdkHost(
   const bootId = suppliedBootId ?? randomUUID();
   // Capture before bootstrap yields or creates workers; concurrent downloads need a restart.
   captureRemoteModelCatalogStartupSnapshot();
-  // Retain cancellation before bootstrap owns resources or an update replaces its chunk.
-  const { cancelPreparedModelRuntimeRefresh } = await import("../agents/prepared-model-runtime.js");
   ensureOpenClawCliOnPath();
   const pluginMetadata = retainGatewayPluginMetadata(scheduler, async () => {
     cancelPreparedModelRuntimeRefresh();

@@ -1,6 +1,5 @@
 // Validates the current runtime before OpenClaw startup.
 import process from "node:process";
-import { format } from "node:util";
 import { expectDefined } from "@openclaw/normalization-core/expect";
 import {
   detectCurrentSqliteCapabilities,
@@ -221,17 +220,8 @@ export async function assertSupportedRuntime(
   let runtime = providedRuntime;
   // Healthy starts need no diagnostic graph; a supplied runtime already owns its error sink.
   if (!runtime) {
-    const { formatConsoleDiagnosticBlock } = await import("../logging/json-console-line.js");
-    runtime = {
-      log: (...args) => console.log(...args),
-      error: (...args) => {
-        const message = format(...args);
-        process.stderr.write(
-          formatConsoleDiagnosticBlock({ level: "error", message: `${message}\n` }),
-        );
-      },
-      exit: (code) => process.exit(code),
-    };
+    const { createDiagnosticRuntime } = await import("../logging/diagnostic.runtime.js");
+    runtime = createDiagnosticRuntime();
   }
 
   const versionLabel = details.version ?? "unknown";

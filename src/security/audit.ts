@@ -37,6 +37,7 @@ import {
 } from "../infra/exec-safe-bin-runtime-policy.js";
 import { listRiskyConfiguredSafeBins } from "../infra/exec-safe-bin-semantics.js";
 import { resolvePluginControlPlaneWorkspace } from "../plugins/control-plane-workspace.js";
+import { getPluginRegistryState } from "../plugins/runtime-state.js";
 import { createLazyRuntimeModule } from "../shared/lazy-runtime.js";
 import { collectDeepCodeSafetyFindings } from "./audit-deep-code-safety.js";
 import { collectDeepProbeFindings } from "./audit-deep-probe-findings.js";
@@ -158,8 +159,6 @@ const loadPluginAutoEnableModule = createLazyRuntimeModule(
 const loadChannelPluginIdsModule = createLazyRuntimeModule(
   () => import("../plugins/channel-plugin-ids.js"),
 );
-
-const loadPluginRuntimeModule = createLazyRuntimeModule(() => import("../plugins/runtime.js"));
 
 const loadAuditGatewayProbeModule = createLazyRuntimeModule(
   () => import("./audit-gateway-probe.js"),
@@ -442,8 +441,7 @@ async function collectPluginSecurityAuditFindings(
   if (!context.loadPluginSecurityCollectors) {
     return [];
   }
-  const { getActivePluginRegistry } = await loadPluginRuntimeModule();
-  let collectors = getActivePluginRegistry()?.securityAuditCollectors ?? [];
+  let collectors = getPluginRegistryState()?.activeRegistry?.securityAuditCollectors ?? [];
   if (collectors.length === 0) {
     const { applyPluginAutoEnable } = await loadPluginAutoEnableModule();
     const autoEnabled = applyPluginAutoEnable({

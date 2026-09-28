@@ -4,12 +4,12 @@ import {
 } from "openclaw/plugin-sdk/plugin-test-contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  clearActivePluginRegistry,
   createPluginRegistryOwner,
   getActivePluginRegistryVersion,
   disposePluginRegistryInstances,
   setActivePluginRegistry,
 } from "../../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../../plugins/runtime.test-support.js";
 import { createPluginRecord } from "../../plugins/status.test-fixtures.js";
 import {
   createCoreGatewayMethodDescriptors,

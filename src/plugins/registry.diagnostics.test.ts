@@ -3,11 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { runPluginRegisterSyncInRegistry } from "./loader-module-runtime.js";
 import { createPluginRecord } from "./loader-records.js";
 import { createTestPluginRegistry } from "./registry-runtime.test-helpers.js";
-import {
-  clearActivePluginRegistry,
-  disposePluginRegistryInstances,
-  setActivePluginRegistry,
-} from "./runtime.js";
+import { disposePluginRegistryInstances, setActivePluginRegistry } from "./runtime.js";
+import { clearActivePluginRegistry } from "./runtime.test-support.js";
 import type { OpenClawPluginApi } from "./types.js";
 
 const registries: ReturnType<typeof createTestPluginRegistry>["registry"][] = [];

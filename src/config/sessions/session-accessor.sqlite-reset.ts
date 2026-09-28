@@ -36,7 +36,7 @@ import {
 } from "./session-accessor.sqlite-scope.js";
 import { parseSessionEntryJson } from "./session-accessor.sqlite-status.js";
 import { resolveSessionColdArchivePath } from "./session-cold-storage-codec.js";
-import { collectAdmissionProtectedSessionIds } from "./session-history-eviction.js";
+import { collectAdmissionProtectedSessionIds } from "./session-history-eviction-candidates.js";
 import { deleteSessionTranscriptIndexInTransaction } from "./session-transcript-index.js";
 
 type SessionStoreResetScope = { agentId: string; storePath: string };

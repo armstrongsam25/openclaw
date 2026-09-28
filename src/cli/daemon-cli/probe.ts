@@ -7,6 +7,7 @@ import {
 } from "../../../packages/gateway-protocol/src/connect-error-details.js";
 import type { HelloOk } from "../../../packages/gateway-protocol/src/schema/frames.js";
 import type { OpenClawConfig } from "../../config/types.js";
+import { callGateway } from "../../gateway/call.js";
 import { resolveGatewayProbeTarget } from "../../gateway/probe-target.js";
 import type { GatewayProbeAuthSummary, GatewayProbeServerSummary } from "../../gateway/probe.js";
 import { isGatewayTransportError } from "../../gateway/transport-error.js";
@@ -84,7 +85,6 @@ export async function probeGatewayStatus(opts: {
             );
           }
           const { resolveProbeAuthSummary } = await probeGatewayModuleLoader.load();
-          const { callGateway } = await import("../../gateway/call.js");
           await callGateway({
             ...(opts.urlOverride ? { url: opts.urlOverride } : { serviceTargetUrl: opts.url }),
             localPortOverride: opts.localPortOverride,

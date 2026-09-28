@@ -13,6 +13,7 @@ import type {
   SessionTranscriptWriteScope,
   TranscriptMessageAppendOptions,
   TranscriptMessageAppendResult,
+  ResolvedTranscriptScope,
 } from "./session-accessor.sqlite-contract.js";
 import { readSessionEntryRow } from "./session-accessor.sqlite-entry-store.js";
 import {
@@ -23,7 +24,6 @@ import { readTranscriptIdentityByEventId } from "./session-accessor.sqlite-read.
 import {
   resolveSqliteTranscriptScope,
   toDatabaseOptions,
-  type ResolvedTranscriptScope,
 } from "./session-accessor.sqlite-scope.js";
 import { readActiveTranscriptEntryAnchorInTransaction } from "./session-accessor.sqlite-transcript-anchor.js";
 import { ensureTranscriptHeader } from "./session-accessor.sqlite-transcript-header.js";

@@ -11,12 +11,10 @@ import {
   tracePluginLifecyclePhase,
   tracePluginLifecyclePhaseAsync,
 } from "../plugins/plugin-lifecycle-trace.js";
+import { loadPluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
 import { formatPluginTrustDiagnostic } from "../plugins/plugin-trust.js";
-import type {
-  PluginCompatibilityNotice,
-  PluginInspectReport,
-  PluginStatusReport,
-} from "../plugins/status.js";
+import { formatPluginCompatibilityNotice } from "../plugins/status-compatibility.js";
+import type { PluginInspectReport, PluginStatusReport } from "../plugins/status.js";
 import { defaultRuntime } from "../runtime.js";
 import { shortenHomeInString, shortenHomePath } from "../utils.js";
 import { formatMissingPluginMessage } from "./error-format.js";
@@ -99,9 +97,7 @@ export async function runPluginsInspectCommand(
     withPluginDiagnosticsReportForInspection,
     buildPluginInspectReport,
     buildPluginSnapshotReport,
-    formatPluginCompatibilityNotice,
   } = await import("../plugins/status.js");
-  const { loadPluginMetadataSnapshot } = await import("../plugins/plugin-metadata-snapshot.js");
   const cfg = tracePluginLifecyclePhase("config read", () => getRuntimeConfig(), {
     command: "inspect",
   });
@@ -258,12 +254,7 @@ export async function runPluginsInspectCommand(
       report,
     });
     if (inspect) {
-      return formatPluginInspection(
-        inspect,
-        resolveInstallRecord(inspect.plugin.id),
-        opts,
-        formatPluginCompatibilityNotice,
-      );
+      return formatPluginInspection(inspect, resolveInstallRecord(inspect.plugin.id), opts);
     }
     return undefined;
   };
@@ -295,7 +286,6 @@ function formatPluginInspection(
   inspect: PluginInspectReport,
   install: PluginInstallRecord | undefined,
   opts: PluginInspectOptions,
-  formatPluginCompatibilityNotice: (notice: PluginCompatibilityNotice) => string,
 ): string {
   const runtimeInspect = opts.runtime === true;
 

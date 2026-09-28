@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAccountListHelpers } from "../channels/plugins/account-helpers.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveAgentRoute } from "../routing/resolve-route.js";
-import { repairUnownedChannelAccountBindings } from "./doctor/shared/legacy-config-binding-repair.js";
+import { repairUnownedChannelAccountBindings } from "./doctor/shared/legacy-config-binding-repair.runtime.js";
 
 vi.mock("../channels/plugins/read-only.js", () => ({
   resolveReadOnlyChannelPluginsForConfig: () => {

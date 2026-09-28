@@ -3,7 +3,7 @@ import { listConnectedNodePluginTools } from "../../gateway/node-plugin-tool-sna
 import { NODE_MCP_TOOLS_CALL_COMMAND } from "../../infra/node-commands.js";
 import { addSafeTimeoutDelayGraceMs } from "../../utils/timer-delay.js";
 import { readPositiveIntegerParam } from "./common.js";
-import type { GatewayCallOptions } from "./gateway.js";
+import type { GatewayCallOptions } from "./gateway-options.js";
 import { callGatewayTool } from "./gateway.js";
 
 const DEDICATED_TOOL_INVOKE_COMMANDS = new Map([

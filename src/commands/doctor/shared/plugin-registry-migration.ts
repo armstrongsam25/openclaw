@@ -9,6 +9,7 @@ import {
 } from "../../../config/plugin-install-record-map.js";
 import type { ConfigFileSnapshot, OpenClawConfig } from "../../../config/types.openclaw.js";
 import type { PluginInstallRecord } from "../../../config/types.plugins.js";
+import { commitPluginInstallRecordsOnly } from "../../../plugins/install-record-commit.js";
 import { inspectPersistedInstalledPluginIndexInstallRecordsSync } from "../../../plugins/installed-plugin-index-record-state.js";
 import {
   loadInstalledPluginIndexInstallRecords,
@@ -198,8 +199,6 @@ export async function importShippedPluginInstallConfigForDoctor(
   if (Object.keys(sourceRecords).length === 0) {
     return receipt(resolveInstalledPluginIndexStorePath(), false);
   }
-  const { commitPluginInstallRecordsOnly } =
-    await import("../../../plugins/install-record-commit.js");
   // Installers take the plugin lease before the config lock; retain that order here.
   return await withPluginLifecycleLease({}, async (lease) =>
     withConfigMutationExclusive(async () => {

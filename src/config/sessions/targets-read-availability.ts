@@ -7,7 +7,6 @@ import { iterateSessionEntryKeys } from "./session-accessor.sqlite-entry-store.j
 import {
   resolveSqliteTargetFromSessionStorePath,
   SessionStoreRegistryReadRequired,
-  type SessionStoreRegistryRead,
 } from "./session-sqlite-target.js";
 import { resolvePersistedSessionStoreOwner } from "./session-store-owner.js";
 import {
@@ -16,22 +15,18 @@ import {
   type CapturedSessionStorePaths,
   type SessionStoreReadCandidate,
 } from "./session-store-read-candidates.js";
-import {
-  dedupeSessionStoreTargetsBySqliteTarget,
-  type SessionStoreTarget,
-} from "./targets-collision.js";
+import type {
+  SessionStoreRegistryRead,
+  SessionStoreTarget,
+  SessionStoreTargetsReadResult,
+} from "./session-store-target.types.js";
+import { dedupeSessionStoreTargetsBySqliteTarget } from "./targets-collision.js";
 import {
   isPerAgentSessionStoreConfig,
   resolveConfiguredSessionStoreTargets,
   resolveExistingAgentSessionStoreTargetsSync,
 } from "./targets.js";
 
-export type SessionStoreTargetsReadResult =
-  | { available: true; targets: SessionStoreTarget[] }
-  | {
-      available: false;
-      reason: "database-missing" | "schema-missing" | "read-failed";
-    };
 type FixedSessionStoreReadSnapshot =
   | {
       available: true;

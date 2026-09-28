@@ -12,8 +12,7 @@ import {
 import { classifyFailoverReason, classifyFailoverSignal } from "../failover/classify.js";
 import { isContextOverflowErrorFromTables } from "../failover/context-overflow-tables.js";
 import { matchesFormatErrorPattern, isTimeoutErrorMessage } from "../failover/message-patterns.js";
-import type { PreparedProviderFailoverOwner } from "../failover/provider-patterns.js";
-import type { FailoverSignal } from "../failover/signal.js";
+import type { FailoverSignal, PreparedProviderFailoverOwner } from "../failover/signal.js";
 export type ProviderRuntimeFailureKind =
   | "gateway_storage"
   | "auth_scope"

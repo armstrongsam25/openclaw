@@ -25,12 +25,17 @@ import {
   sameDefaultInferenceRoute,
 } from "../system-agent/inference-route.js";
 import { activateSavedSetupCredential } from "../system-agent/setup-inference-credential-access.js";
-import { isSetupCredentialReplacement } from "../system-agent/setup-inference-credentials.js";
+import {
+  isSetupCredentialReplacement,
+  saveSetupCredential,
+  selectSetupCredential,
+} from "../system-agent/setup-inference-credentials.js";
 import {
   commitSetupInferenceActivation,
   type SetupInferenceConfigTarget,
 } from "../system-agent/setup-inference-transition.js";
 import { revalidateStableSetupInferenceOwner } from "../system-agent/setup-inference-turn.js";
+import { projectSetupInferenceConfig } from "../system-agent/setup-model-selection.js";
 import type { SystemAgentVerifiedInferenceBinding } from "../system-agent/verified-inference.js";
 import { t } from "./i18n/index.js";
 import type { WizardPrompter } from "./prompts.js";
@@ -161,10 +166,6 @@ export async function offerLiveModelVerification(params: {
       let config = migratePersistedImplicitMainRoster(candidate.config).config as OpenClawConfig;
       const agentId = resolveAmbientOwnerAgentId(config);
       if (candidate.authProfiles.length > 0) {
-        const { saveSetupCredential, selectSetupCredential } =
-          await import("../system-agent/setup-inference-credentials.js");
-        const { projectSetupInferenceConfig } =
-          await import("../system-agent/setup-model-selection.js");
         const model = resolveDefaultModelForAgent({ cfg: config, agentId });
         const modelRef = `${model.provider}/${model.model}`;
         const profile = selectSetupCredential(candidate.authProfiles, modelRef, config);

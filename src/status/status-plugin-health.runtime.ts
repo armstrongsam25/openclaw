@@ -8,6 +8,7 @@ import {
   getActiveRuntimePluginRegistry,
   listLoadedRuntimePluginIds,
 } from "../plugins/active-runtime-registry.js";
+import { buildPluginCompatibilityNotices } from "../plugins/status-compatibility.js";
 import {
   dedupeChannelPluginFailures,
   dedupePluginDiagnostics,
@@ -168,8 +169,7 @@ export async function collectInstalledPluginHealthSnapshot(params: {
   config?: OpenClawConfig;
   workspaceDir?: string;
 }): Promise<StatusPluginHealthSnapshot> {
-  const { buildPluginCompatibilityNotices, buildPluginSnapshotReport } =
-    await import("../plugins/status.js");
+  const { buildPluginSnapshotReport } = await import("../plugins/status.js");
   const runtime = await collectRuntimePluginHealthSnapshot();
   const report = buildPluginSnapshotReport({
     config: params.config,

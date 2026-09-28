@@ -8,8 +8,8 @@ import { describe, expect, it, vi } from "vitest";
 import * as preparedModelCatalog from "../agents/prepared-model-catalog.js";
 import type { PublishedModelCatalogOwnerCandidate } from "../agents/prepared-model-catalog.types.js";
 import { withGatewayToolCallerIdentity } from "../agents/tools/gateway-caller-context.js";
+import { callInProcessGatewayTool } from "../agents/tools/gateway.js";
 import {
-  callInProcessGatewayTool,
   hasGatewayToolRoutingContext,
   hasInProcessGatewayToolContext,
 } from "../agents/tools/in-process-gateway.js";

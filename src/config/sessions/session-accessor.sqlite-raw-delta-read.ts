@@ -3,11 +3,11 @@ import { getNodeSqliteKysely, executeSqliteQuerySync } from "../../infra/kysely-
 import { coerceRequiredSqliteNumber as sqliteNumber } from "../../infra/sqlite-number.js";
 import type { DB } from "../../state/openclaw-agent-db.generated.js";
 import type {
+  ResolvedTranscriptReadScope,
   SessionTranscriptRawDeltaLimits,
   SessionTranscriptRawDeltaResult,
 } from "./session-accessor.sqlite-contract.js";
 import type { CurrentTranscriptProjection } from "./session-accessor.sqlite-projection-read.js";
-import type { ResolvedTranscriptReadScope } from "./session-accessor.sqlite-scope.js";
 import { readSessionTranscriptHotWatermark } from "./session-accessor.sqlite-transcript-watermark-read.js";
 import { normalizeVisibleMessageLimit } from "./session-accessor.sqlite-visible-cursor.js";
 import { transcriptEventReadBytesSql } from "./session-transcript-read-bytes.js";

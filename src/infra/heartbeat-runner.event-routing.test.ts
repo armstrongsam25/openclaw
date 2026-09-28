@@ -20,7 +20,8 @@ import { enqueueCommandInLane, type CommandLaneTaskMarker } from "../process/com
 import { CommandLane } from "../process/lanes.js";
 import { racePromiseWithAbortSignal } from "./abort-signal.js";
 import type { HeartbeatConfig } from "./heartbeat-config.js";
-import { runHeartbeatOnce, startHeartbeatRunner } from "./heartbeat-runner.js";
+import { runHeartbeatOnce } from "./heartbeat-runner-run.js";
+import { startHeartbeatRunner } from "./heartbeat-runner-scheduler.js";
 import {
   type HeartbeatReplySpy,
   type HeartbeatReplyContext,

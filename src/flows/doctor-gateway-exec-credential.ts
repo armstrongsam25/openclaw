@@ -1,4 +1,5 @@
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import { buildGatewayProbeConnectionDetails } from "../gateway/call.js";
 
 export async function hasActiveGatewayExecCredential(params: {
   cfg: OpenClawConfig;
@@ -33,10 +34,7 @@ export async function hasActiveGatewayExecCredential(params: {
     return hasExecCredential;
   }
 
-  const [{ buildGatewayProbeConnectionDetails }, edgeAuth] = await Promise.all([
-    import("../gateway/call.js"),
-    import("../gateway/edge-auth.js"),
-  ]);
+  const edgeAuth = await import("../gateway/edge-auth.js");
   const targetUrl =
     params.targetUrl ?? (await buildGatewayProbeConnectionDetails({ config: params.cfg })).url;
   const { gatewayEdgeAuthValueForTarget, normalizeEdgeAuthHeadersConfig } = edgeAuth;

@@ -2,7 +2,7 @@ import { note } from "../../packages/terminal-core/src/note.js";
 import type { ConfigSnapshotReadMeasure } from "../config/io.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { PluginInstallRecord } from "../config/types.plugins.js";
-import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import { resolveUpdateRehearsalRoot } from "../infra/update-rehearsal-paths.js";
 import { normalizePluginsConfig, resolveEffectiveEnableState } from "../plugins/config-state.js";
 import type { PluginPayloadSmokeFailure } from "../plugins/payload-verification.js";
@@ -15,7 +15,10 @@ import {
 } from "../plugins/runtime-degraded-state.js";
 import { resolveCompatibilityHostVersion } from "../version.js";
 import { measureDoctorConfigPreflightStep } from "./doctor-config-preflight-measure.js";
-import type { PluginMigrationInspection } from "./doctor/shared/plugin-migration-availability.js";
+import {
+  inspectPluginMigrationAvailability,
+  type PluginMigrationInspection,
+} from "./doctor/shared/plugin-migration-availability.js";
 import { shouldDeferConfiguredPluginInstallRepair } from "./doctor/shared/update-phase.js";
 
 type StartupPluginConvergenceResult = {
@@ -73,8 +76,6 @@ export async function runDoctorPluginConvergence(params: {
   if (!plan.required) {
     return { quarantinedPlugins: [] };
   }
-  const { inspectPluginMigrationAvailability } =
-    await import("./doctor/shared/plugin-migration-availability.js");
   const isUpdateRehearsal = Boolean(resolveUpdateRehearsalRoot(params.env));
   if (isUpdateRehearsal) {
     // Shipped drivers run this preflight inside their fixed canary deadline.

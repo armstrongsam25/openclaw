@@ -1,27 +1,158 @@
 import type {
-  SessionArtifactReadQuery,
-  SessionArtifactReadResult,
-} from "../../gateway/session-artifact-read.js";
+  ArtifactSummary,
+  ArtifactsListParams,
+} from "../../../packages/gateway-protocol/src/schema/artifacts.js";
+import type { TranscriptDisplayPosition } from "../../chat/transcript-display-position.js";
 import type {
-  ReadRecentSessionMessagesResult,
-  ReadSessionMessageByIdResult,
-  ReadSessionMessagesAroundIdResult,
-  ReadSessionMessagesResult,
-  SessionTranscriptReader,
-} from "../../gateway/session-transcript-read-kernel.js";
+  ArtifactDownloadResponse,
+  ArtifactDownloadResponseRequest,
+  PreparedArtifactDownload,
+} from "../../gateway/artifact-download-projection.js";
+import type { ArtifactRecord } from "../../gateway/server-methods/artifacts-content.js";
 import type { AgentHistoryActivity } from "../../infra/agent-activity-events.js";
 import type { ConversationRecord } from "./conversation-registry.js";
 import type {
-  SessionTranscriptDisplayDeltaResult,
-  SessionTranscriptMessageByIdOptions,
-} from "./session-accessor.sqlite-history-query.js";
+  TranscriptAnchorPageOptions,
+  TranscriptRecentReadLimits,
+} from "../../sessions/transcript-anchor-page.js";
+import type {
+  TranscriptReadWindow,
+  TranscriptReadWindowOptions,
+} from "../../sessions/transcript-read-window.js";
 import type {
   SessionTranscriptRawDeltaLimits,
+  SessionTranscriptRawDeltaResult,
   SessionTranscriptReadScope,
+  TranscriptEvent,
 } from "./session-accessor.types.js";
 import type { StoredMessageReactionSummary } from "./session-reaction-store.types.js";
 import type { SessionTranscriptWorkerReadError } from "./session-transcript-worker-error.types.js";
 import type { InternalSessionEntry, SessionEntry } from "./types.js";
+
+export type ReadRecentSessionMessagesOptions = {
+  maxMessages: number;
+  maxBytes?: number;
+  maxLines?: number;
+};
+
+export type ReadSessionMessagesAsyncOptions =
+  | { mode: "full"; reason: string }
+  | ({ mode: "recent" } & ReadRecentSessionMessagesOptions);
+
+export type SessionTranscriptReadOptions = {
+  allowResetArchiveFallback?: boolean;
+  readOnly?: boolean;
+};
+
+export type SessionTranscriptPageOptions = TranscriptReadWindowOptions &
+  SessionTranscriptReadOptions & {
+    offset: number;
+    maxMessages: number;
+    beforeSeq?: number;
+    recentAtHead?: TranscriptRecentReadLimits;
+    maxBytes?: number;
+    allowOversizedFirst?: boolean;
+  };
+
+export type ReadRecentSessionMessagesResult = {
+  olderOffset?: number;
+  omittedOversized?: boolean;
+  activeLeafEntryId?: string | null;
+  deltaCursor?: string;
+  displaySource?: string;
+  readWindow?: TranscriptReadWindow;
+  windowReset?: boolean;
+  messages: unknown[];
+  transcriptEvents?: TranscriptEvent[];
+  transcriptPath?: string;
+  transcriptSource?: "active" | "reset-archive";
+  totalMessages: number;
+};
+
+export type ReadSessionMessagesResult = {
+  messages: unknown[];
+  transcriptPath?: string;
+};
+
+export type ReadSessionMessageByIdResult = {
+  message?: unknown;
+  seq?: number;
+  oversized: boolean;
+  found: boolean;
+  serializedBytes?: number;
+};
+
+export type ReadSessionMessagesAroundIdResult = ReadRecentSessionMessagesResult & {
+  found: boolean;
+  hasOverreadContext: boolean;
+  offset: number;
+};
+
+export type SessionTranscriptMessageByIdOptions =
+  | { currentOnly?: false; maxBytes?: never }
+  | { currentOnly: true; maxBytes: number };
+
+type SessionTranscriptRawDeltaPage = Extract<SessionTranscriptRawDeltaResult, { kind: "page" }>;
+
+export type SessionTranscriptDisplayDeltaResult =
+  | (Omit<SessionTranscriptRawDeltaPage, "events"> & {
+      activeLeafEntryId: string | null;
+      events: Array<
+        SessionTranscriptRawDeltaPage["events"][number] & {
+          messageSeq?: number;
+          displayPosition?: TranscriptDisplayPosition;
+        }
+      >;
+    })
+  | Exclude<SessionTranscriptRawDeltaResult, { kind: "page" }>;
+
+export type SessionArtifactReadQuery = Pick<ArtifactsListParams, "runId" | "messageRole"> &
+  (
+    | {
+        kind: "list";
+        sessionKey: string;
+        includeDownloadData?: boolean;
+        downloadArtifactIds?: string[];
+      }
+    | {
+        kind: "image-page";
+        sessionKey: string;
+        limit: number;
+        beforeSeq?: number;
+        imageOffset?: number;
+        readWindow?: TranscriptReadWindow;
+      }
+    | {
+        kind: "image";
+        sessionKey: string;
+        artifactId: string;
+        includeData: boolean;
+      }
+    | { kind: "download-grant"; sessionKey: string; artifactId: string }
+    | {
+        kind: "download-response";
+        sessionKey: string;
+        artifactId: string;
+        response: ArtifactDownloadResponseRequest;
+      }
+  );
+
+export type SessionArtifactReadResult =
+  | { kind: "list"; artifacts: ArtifactRecord[] }
+  | {
+      kind: "image-page";
+      artifacts: ArtifactSummary[];
+      next?: { beforeSeq: number; imageOffset: number; readWindow: TranscriptReadWindow };
+      omittedOversized?: boolean;
+    }
+  | { kind: "image"; artifact?: ArtifactRecord }
+  | {
+      kind: "download-grant";
+      selection?:
+        | { kind: "prepared"; download: PreparedArtifactDownload }
+        | { kind: "raw"; artifact: ArtifactRecord };
+    }
+  | { kind: "download-response"; response?: ArtifactDownloadResponse };
 
 export type ChatHistoryResponsePage<Messages extends unknown[] | Uint8Array = unknown[]> = {
   messages: Messages;
@@ -148,23 +279,21 @@ export type SessionHistoryWorkerRequest =
       kind: "message-page";
       params: {
         target: SessionTranscriptReadScope;
-        options: Parameters<SessionTranscriptReader["readSessionMessagesPageWithStatsAsync"]>[1];
+        options: SessionTranscriptPageOptions;
       };
     }
   | {
       kind: "around-id";
       params: {
         target: SessionTranscriptReadScope;
-        options: Parameters<
-          SessionTranscriptReader["readSessionMessagesAroundIdWithStatsAsync"]
-        >[1];
+        options: TranscriptAnchorPageOptions & SessionTranscriptReadOptions;
       };
     }
   | {
       kind: "source-messages";
       params: {
         target: SessionTranscriptReadScope;
-        options: Parameters<SessionTranscriptReader["readSessionMessagesWithSourceAsync"]>[1];
+        options: ReadSessionMessagesAsyncOptions & SessionTranscriptReadOptions;
       };
     }
   | {
@@ -172,7 +301,9 @@ export type SessionHistoryWorkerRequest =
       params: {
         target: SessionTranscriptReadScope;
         exactArchivePath?: string;
-        options: Parameters<SessionTranscriptReader["readRecentSessionMessagesWithStatsAsync"]>[1];
+        options: ReadRecentSessionMessagesOptions &
+          TranscriptReadWindowOptions &
+          SessionTranscriptReadOptions;
       };
     }
   | {

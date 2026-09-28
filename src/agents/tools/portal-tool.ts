@@ -12,9 +12,9 @@ import {
   readToolStringParam,
   ToolInputError,
 } from "./common.js";
+import { callInProcessGatewayTool } from "./gateway.js";
 import {
   callAgentToolGatewayRequest,
-  callInProcessGatewayTool,
   type AgentToolGatewayRequestCaller,
   type InProcessGatewayCaller,
 } from "./in-process-gateway.js";

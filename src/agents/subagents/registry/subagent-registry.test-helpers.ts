@@ -36,6 +36,7 @@ type RegistryTestApi = {
   }): Promise<number>;
   releaseSubagentRun(runId: string): void;
   resetSubagentRegistryForTests(opts?: { persist?: boolean }): Promise<void>;
+  scheduleSubagentRegistrySweep(params?: { delayMs?: number }): void;
   testing: {
     failQueuedSubagentRun(runId: string, error: string): boolean;
     sweepOnceForTests(): Promise<void>;
@@ -52,6 +53,10 @@ function getRegistryTestApi(): RegistryTestApi {
 export function resetSubagentRegistryForTests(opts?: { persist?: boolean }) {
   // Fixture state resets synchronously; the file runner joins accepted sweeps before retirement.
   void getRegistryTestApi().resetSubagentRegistryForTests(opts);
+}
+
+export function scheduleSubagentRegistrySweep(params?: { delayMs?: number }) {
+  getRegistryTestApi().scheduleSubagentRegistrySweep(params);
 }
 
 export function addSubagentRunForTests(entry: SubagentRunRecordOverrides) {

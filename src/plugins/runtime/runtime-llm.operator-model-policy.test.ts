@@ -31,19 +31,23 @@ const mocks = vi.hoisted(() => ({
     >(),
   complete:
     vi.fn<
-      typeof import("../../agents/simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel
+      typeof import("../../agents/simple-completion-execution.js").completeWithPreparedSimpleCompletionModel
     >(),
   select:
     vi.fn<
-      typeof import("../../agents/simple-completion-runtime.js").resolveSimpleCompletionSelectionForAgent
+      typeof import("../../agents/simple-completion-selection.js").resolveSimpleCompletionSelectionForAgent
     >(),
   isolated: vi.fn<typeof import("../../agents/isolated-completion.js").runIsolatedCompletion>(),
 }));
 
+vi.mock("../../agents/simple-completion-selection.js", () => ({
+  resolveSimpleCompletionSelectionForAgent: mocks.select,
+}));
+vi.mock("../../agents/simple-completion-execution.js", () => ({
+  completeWithPreparedSimpleCompletionModel: mocks.complete,
+}));
 vi.mock("../../agents/simple-completion-runtime.js", () => ({
   acquireSimpleCompletionModelForAgent: mocks.acquire,
-  completeWithPreparedSimpleCompletionModel: mocks.complete,
-  resolveSimpleCompletionSelectionForAgent: mocks.select,
 }));
 vi.mock("../../agents/isolated-completion.js", () => ({ runIsolatedCompletion: mocks.isolated }));
 

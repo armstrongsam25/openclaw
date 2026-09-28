@@ -13,6 +13,7 @@ import {
 import { cleanStaleGatewayProcessesSync } from "../infra/restart-stale-pids.js";
 import { resolveUpdateInstallRoot } from "../infra/update-install-root.js";
 import { createManagedHandoffLeaseStore } from "../infra/update-managed-service-handoff-lease.js";
+import { isCurrentManagedServiceUpdateHandoffProcess } from "../infra/update-managed-service-handoff-current.js";
 import {
   getFileLockProcessStartTime,
   isPidAlive,
@@ -195,9 +196,7 @@ export async function stopLaunchAgent({
       const authorized =
         updateOwned &&
         updateHandoff &&
-        (await (
-          await import("../infra/update-managed-service-handoff-current.js")
-        ).isCurrentManagedServiceUpdateHandoffProcess({ ...updateHandoff, env: intentEnv }));
+        (await isCurrentManagedServiceUpdateHandoffProcess({ ...updateHandoff, env: intentEnv }));
       if (!authorized) {
         throw launchAgentStopError(
           serviceTarget,

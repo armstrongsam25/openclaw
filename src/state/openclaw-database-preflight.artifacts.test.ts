@@ -10,7 +10,7 @@ import {
   checkTargetDatabaseSchemasForContexts,
   hasSchemaRefusal,
 } from "../cli/update-cli/schema-preflight.js";
-import { resolveConfiguredAgentDatabaseCandidatePaths } from "../config/sessions/targets.js";
+import { resolveConfiguredAgentDatabaseCandidatePaths } from "../config/sessions/targets-configured-agents.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { requireNodeSqlite } from "../infra/node-sqlite.js";
 import { readMainDatabasePosixLocks } from "../infra/sqlite-posix-locks.test-support.js";

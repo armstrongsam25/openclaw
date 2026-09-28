@@ -17,13 +17,13 @@ import {
   getPreparedModelRuntimeSnapshot,
   loadPublishedGatewayReplyDispatchRuntime,
   prepareModelRuntimeSnapshot,
-  registerPreparedModelRuntimePublicationListener,
   acquireReadOnlyPreparedModelRuntime,
   refreshPreparedModelRuntimeSnapshots,
   type PreparedModelRuntimeInput,
 } from "./prepared-model-runtime.js";
 import { createPreparedModelRuntimeReplacement } from "./prepared-model-runtime.lifecycle.js";
 import * as owners from "./prepared-model-runtime.owner.js";
+import { registerPreparedModelRuntimePublicationListener } from "./prepared-model-runtime.publication-events.js";
 import { PreparedModelRuntimeOwnerRetention } from "./prepared-model-runtime.retention.js";
 
 const fixture = usePreparedModelRuntimeHarness(

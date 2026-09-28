@@ -7,6 +7,7 @@ import { z } from "zod";
 import { createReasoningTagTextPartitioner } from "../../packages/markdown-core/src/reasoning-tags.js";
 import { sanitizeTerminalText } from "../../packages/terminal-core/src/safe-text.js";
 import { resolveNativeModelPrimary } from "../agents/agent-scope.js";
+import { resolveSimpleCompletionSelectionForAgent } from "../agents/simple-completion-selection.js";
 import { resolveUtilityModelRefForAgent } from "../agents/utility-model.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { getAsyncWorkSignal } from "../shared/async-work-scope.js";
@@ -112,8 +113,7 @@ export async function summarizeTranscriptsWithModel(params: {
     }
     // Inference reaches the agent tool graph. Load it only for a selected model,
     // inside the deadline, so fallback-only notes do not load the agent runtime.
-    const { runIsolatedCompletion, resolveSimpleCompletionSelectionForAgent } =
-      await import("./summary-model.runtime.js");
+    const { runIsolatedCompletion } = await import("../agents/isolated-completion.js");
     const prompt = buildSummaryPrompt(params.session, base);
     const seen = new Set<string>();
     for (const modelRef of models) {

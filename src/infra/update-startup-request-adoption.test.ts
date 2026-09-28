@@ -3,6 +3,7 @@ import { createDeferred } from "../../test/helpers/promise.js";
 import { closeOpenClawStateDatabaseForTest } from "../state/openclaw-state-db.js";
 import { createTestGatewayScheduler } from "../test-utils/gateway-scheduler-clock.js";
 import { createOpenClawTestState } from "../test-utils/openclaw-test-state.js";
+import { currentUpdateCheckLifecycle } from "./update-check-lifecycle.js";
 import type { UpdateCheckResult } from "./update-check.js";
 import { createUpdateRun } from "./update-run-ledger.js";
 
@@ -19,12 +20,8 @@ it.each(["complete", "close"] as const)(
   "preserves early status and update admission discovery when the scheduler attaches (%s)",
   async (outcome) => {
     const state = await createOpenClawTestState({ label: "update-request-adoption" });
-    const {
-      createGatewayUpdateCheck,
-      getUpdateEffectiveChannel,
-      initializeGatewayUpdateStatus,
-      resetUpdateAvailableStateForTest,
-    } = await import("./update-startup.js");
+    const { createGatewayUpdateCheck, resetUpdateAvailableStateForTest } =
+      await import("./update-startup.js");
     const scheduler = createTestGatewayScheduler();
     resetUpdateAvailableStateForTest(scheduler);
     const { createGatewayUpdateLifecycle } = await import("./update-check-lifecycle.js");
@@ -36,10 +33,10 @@ it.each(["complete", "close"] as const)(
       started.resolve(signal);
       return probe.promise;
     });
-    const channelRequest = getUpdateEffectiveChannel();
-    const admissionRequest = initializeGatewayUpdateStatus();
+    const statusRequest = currentUpdateCheckLifecycle().initialize();
+    const admissionRequest = currentUpdateCheckLifecycle().initialize();
     let owner: ReturnType<typeof createGatewayUpdateCheck> | undefined;
-    let initialization: ReturnType<typeof initializeGatewayUpdateStatus> | undefined;
+    let initialization: ReturnType<typeof lifecycle.initialize> | undefined;
     try {
       const signal = await started.promise;
       owner = createGatewayUpdateCheck({
@@ -60,7 +57,7 @@ it.each(["complete", "close"] as const)(
         expect(stopped).toBe(false);
         probe.resolve(status);
         await Promise.all([
-          expect(channelRequest).rejects.toMatchObject({ name: "AbortError" }),
+          expect(statusRequest).rejects.toMatchObject({ name: "AbortError" }),
           expect(admissionRequest).rejects.toMatchObject({ name: "AbortError" }),
           expect(initialization).rejects.toMatchObject({ name: "AbortError" }),
           stopping,
@@ -68,14 +65,14 @@ it.each(["complete", "close"] as const)(
         expect(stopped).toBe(true);
       } else {
         probe.resolve(status);
-        await expect(channelRequest).resolves.toBe("stable");
+        await expect(statusRequest).resolves.toMatchObject({ status });
         await expect(admissionRequest).resolves.toMatchObject({ status });
         await expect(initialization).resolves.toMatchObject({ status });
       }
       expect(checkUpdateStatus).toHaveBeenCalledOnce();
     } finally {
       probe.resolve(status);
-      await Promise.allSettled([channelRequest, admissionRequest, initialization, owner?.stop()]);
+      await Promise.allSettled([statusRequest, admissionRequest, initialization, owner?.stop()]);
       resetUpdateAvailableStateForTest(scheduler);
       closeOpenClawStateDatabaseForTest();
       await state.cleanup();
@@ -89,7 +86,7 @@ it("aborts and joins early update requests before the post-ready scheduler loads
     await import("../gateway/server-startup-update-check.js");
   const { resolveGatewayUpdateAdmission } =
     await import("../gateway/server-methods/update-admission.js");
-  const { createGatewayUpdateCheck, getUpdateEffectiveChannel, resetUpdateAvailableStateForTest } =
+  const { createGatewayUpdateCheck, resetUpdateAvailableStateForTest } =
     await import("./update-startup.js");
   const scheduler = createTestGatewayScheduler();
   resetUpdateAvailableStateForTest(scheduler);
@@ -114,7 +111,7 @@ it("aborts and joins early update requests before the post-ready scheduler loads
   });
   owner.start();
   const requests = Promise.allSettled([
-    getUpdateEffectiveChannel(),
+    currentUpdateCheckLifecycle().initialize(),
     resolveGatewayUpdateAdmission(createUpdateRun({ trigger: "api" }).runId),
   ]);
   let stopping: Promise<void> | undefined;

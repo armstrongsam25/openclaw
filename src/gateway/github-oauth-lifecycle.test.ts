@@ -73,10 +73,14 @@ vi.mock("../agents/github-tool-identity.js", async (importOriginal) => {
     createManagedGitHubProfileId: mocks.createProfileId,
     installManagedGitHubProfile: mocks.installProfile,
     refreshManagedGitHubProfile: mocks.refreshProfile,
-    removeManagedGitHubProfile: mocks.removeProfile,
     resolveGitHubToolIdentityStatus: mocks.resolveStatus,
   };
 });
+
+vi.mock("../agents/github-tool-profile.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../agents/github-tool-profile.js")>()),
+  removeManagedGitHubProfile: mocks.removeProfile,
+}));
 
 vi.mock("./github-tool-identity-config.js", () => ({
   updateGitHubToolIdentityConfig: mocks.updateConfig,

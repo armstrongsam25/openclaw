@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import type { Transferable } from "node:worker_threads";
 import { expect, it, vi } from "vitest";
-import type { SessionArtifactReadQuery } from "../../gateway/session-artifact-read.js";
 import { racePromiseWithAbortSignal } from "../../infra/abort-signal.js";
 import * as nodeSqlite from "../../infra/node-sqlite.js";
 import type { UsageCostWorkerReply } from "../../infra/session-cost-usage-worker.types.js";
@@ -10,6 +9,7 @@ import { openOpenClawAgentDatabase } from "../../state/openclaw-agent-db.js";
 import { withOpenClawTestState } from "../../test-utils/openclaw-test-state.js";
 import { replaceSessionEntrySync } from "./session-accessor.js";
 import { appendTranscriptMessageSync } from "./session-accessor.sqlite-transcript-write.js";
+import type { SessionArtifactReadQuery } from "./session-history-types.js";
 import type {
   SessionTranscriptWorkerInput,
   SessionTranscriptWorkerReply,

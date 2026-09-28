@@ -1,4 +1,4 @@
-import { resolveSimpleCompletionSelectionForAgent } from "./simple-completion-runtime.js";
+import { resolveSimpleCompletionSelectionForAgent } from "./simple-completion-selection.js";
 
 /** Keep visible-text retry/fallback in callers; the runtime owns authentication. */
 export async function prepareUtilityCompletionForAgent(

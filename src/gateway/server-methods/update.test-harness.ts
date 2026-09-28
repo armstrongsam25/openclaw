@@ -38,8 +38,11 @@ export const resolveUpdateInstallSurfaceMock =
   vi.fn<
     typeof import("../../infra/update-runner-install-surface.js").resolveUpdateInstallSurface
   >();
-export const resolveStartupInstallStatusMock =
-  vi.fn<typeof import("../../infra/update-install-status.js").resolveStartupInstallStatus>();
+const installStatusMocks = vi.hoisted(() => ({
+  resolve:
+    vi.fn<typeof import("../../infra/update-install-status.js").resolveStartupInstallStatus>(),
+}));
+export const resolveStartupInstallStatusMock = installStatusMocks.resolve;
 const getLatestUpdateRestartSentinelMock = vi.fn<() => RestartSentinelPayload | null>(() => null);
 const refreshLatestUpdateRestartSentinelMock = vi.fn<() => Promise<RestartSentinelPayload | null>>(
   async () => null,
@@ -325,11 +328,7 @@ vi.mock("../../infra/update-status-state.js", () => ({
 }));
 
 vi.mock("../../infra/update-install-status.js", () => ({
-  resolveStartupInstallStatus: resolveStartupInstallStatusMock,
-}));
-
-vi.mock("../../infra/update-startup.js", () => ({
-  getUpdateEffectiveChannel: async () => "stable",
+  resolveStartupInstallStatus: installStatusMocks.resolve,
 }));
 
 vi.mock("../../infra/update-status-schedule.js", () => ({

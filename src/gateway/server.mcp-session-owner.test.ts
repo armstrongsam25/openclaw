@@ -7,7 +7,7 @@ import {
   createAdmittedGatewayToolCallerIdentity,
   withGatewayToolCallerIdentity,
 } from "../agents/tools/gateway-caller-context.js";
-import { callInProcessGatewayToolWithCreation } from "../agents/tools/in-process-gateway.js";
+import { callInProcessGatewayToolWithCreation } from "../agents/tools/gateway.js";
 import { createPersonalInstructionsTool } from "../agents/tools/personal-instructions-tool.js";
 import { resolveCommandAuthorization } from "../auto-reply/command-auth.js";
 import { prepareChannelRunAdmission } from "../auto-reply/reply/channel-run-admission.js";

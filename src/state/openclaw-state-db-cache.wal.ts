@@ -11,7 +11,6 @@ import {
   assertExistingDatabaseIdentity,
   type DatabasePathIdentity,
 } from "../infra/sqlite-worker-identity.js";
-import { createSqliteWorkerOperationAdmission } from "../infra/sqlite-worker-operation-admission.js";
 import {
   getOpenClawDatabaseMaintenanceResourceScope,
   isStateDatabaseReadAdmissionInvalidatedError,
@@ -91,33 +90,19 @@ export function createStateDatabaseWalOwner(
         try {
           assertCurrent();
           releaseIdle = retainForIdle(database);
-          const { runOpenClawStateWorkerOperation } =
-            await import("./openclaw-state-worker-store.js");
+          const { runStateDatabaseWalMaintenance } =
+            await import("./openclaw-state-maintenance.runtime.js");
           assertCurrent();
-          const result = await runOpenClawStateWorkerOperation(
+          const result = await runStateDatabaseWalMaintenance({
             context,
-            (worker) =>
-              worker.execute(
-                { type: "database.walMaintenance", input: request },
-                { signal: controller.signal },
-              ),
-            {
-              existingOnly: true,
-              assertCurrent,
-              createAdmission: () => ({
-                nativeLocations: [database.path, identity.canonicalPath],
-                admission: createSqliteWorkerOperationAdmission((_request, grant) => {
-                  assertCurrent();
-                  if (!grant()) {
-                    throw new StateDatabaseReadAdmissionInvalidatedError(
-                      "Shared-state WAL maintenance authority expired",
-                    );
-                  }
-                  operationStarted = true;
-                }),
-              }),
+            request,
+            signal: controller.signal,
+            nativeLocations: [database.path, identity.canonicalPath],
+            assertCurrent,
+            onStarted() {
+              operationStarted = true;
             },
-          );
+          });
           assertCurrent();
           return result;
         } catch (error) {

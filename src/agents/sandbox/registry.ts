@@ -17,6 +17,7 @@ import type { DB as OpenClawStateKyselyDatabase } from "../../state/openclaw-sta
 import { runOpenClawStateWriteTransaction } from "../../state/openclaw-state-db.js";
 import { resolveOpenClawStateSqlitePath } from "../../state/openclaw-state-db.paths.js";
 import { captureOpenClawStateWorkerContext } from "../../state/openclaw-state-worker-context.js";
+import { runOpenClawStateWorkerOperation } from "../../state/openclaw-state-worker-store.js";
 import {
   assertSandboxRegistryReservationCurrent,
   browserEntryToRow,
@@ -51,8 +52,6 @@ async function writeRegistry(write: SandboxRegistryWrite): Promise<void> {
     context.admission.assertCurrent();
     context.maintenanceScope?.assertAdmission();
   };
-  const { runOpenClawStateWorkerOperation } =
-    await import("../../state/openclaw-state-worker-store.js");
   return runOpenClawStateWorkerOperation(
     context,
     (scope) => scope.execute({ type: "sandboxRegistry.write", input }),

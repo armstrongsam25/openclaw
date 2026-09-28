@@ -8,6 +8,7 @@ import {
 } from "../../packages/gateway-protocol/src/client-info.js";
 import { listAgentEntries } from "../agents/agent-scope-config.js";
 import type { OpenClawConfig } from "../config/types.js";
+import { callGateway } from "../gateway/call.js";
 import { buildGatewayConnectionDetailsWithResolvers } from "../gateway/connection-details.js";
 import { normalizeControlUiBasePath } from "../gateway/control-ui-shared.js";
 import { isLoopbackGatewayUrl } from "../gateway/net.js";
@@ -29,7 +30,6 @@ import {
 
 const gatewayProbeModuleLoader = createLazyImportLoader(() => import("./status.gateway-probe.js"));
 const probeGatewayModuleLoader = createLazyImportLoader(() => import("../gateway/probe.js"));
-const gatewayCallModuleLoader = createLazyImportLoader(() => import("../gateway/call.js"));
 const gatewayReadinessModuleLoader = createLazyImportLoader(
   () => import("../cli/daemon-cli/diagnostic-readiness.js"),
 );
@@ -131,25 +131,20 @@ async function applyLocalStatusRpcFallback(params: {
     return params.gatewayProbe;
   }
   // The fallback uses the gateway status RPC because it can succeed after probe handshake ambiguity.
-  const status = await gatewayCallModuleLoader
-    .load()
-    .then(({ callGateway }) => {
-      const timeoutMs = Math.min(2000, resolveStatusGatewayProbeTimeoutMs(params));
-      if (timeoutMs === 0) {
-        return null;
-      }
-      return callGateway<Partial<StatusSummary>>({
-        config: params.cfg,
-        configPath: params.configPath,
-        method: "status",
-        token: params.gatewayProbeAuth.token,
-        password: params.gatewayProbeAuth.password,
-        timeoutMs,
-        mode: GATEWAY_CLIENT_MODES.BACKEND,
-        clientName: GATEWAY_CLIENT_NAMES.GATEWAY_CLIENT,
-      });
-    })
-    .catch(() => null);
+  const timeoutMs = Math.min(2000, resolveStatusGatewayProbeTimeoutMs(params));
+  if (timeoutMs === 0) {
+    return params.gatewayProbe;
+  }
+  const status = await callGateway<Partial<StatusSummary>>({
+    config: params.cfg,
+    configPath: params.configPath,
+    method: "status",
+    token: params.gatewayProbeAuth.token,
+    password: params.gatewayProbeAuth.password,
+    timeoutMs,
+    mode: GATEWAY_CLIENT_MODES.BACKEND,
+    clientName: GATEWAY_CLIENT_NAMES.GATEWAY_CLIENT,
+  }).catch(() => null);
   if (!status) {
     return params.gatewayProbe;
   }

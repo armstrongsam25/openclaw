@@ -6,10 +6,10 @@ import {
   resolveSessionStorePathCore,
   type InternalSessionEntry as SessionEntry,
   resolveAllAgentSessionStoreTargetsSync,
-  type SessionStoreTarget,
 } from "../../config/sessions.js";
 import { hasSessionEntriesByStatusReadOnly } from "../../config/sessions/session-accessor.js";
 import { resolveSqliteTargetFromSessionStorePath } from "../../config/sessions/session-sqlite-target.js";
+import type { SessionStoreTarget } from "../../config/sessions/session-store-target.types.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { LEGACY_IMPLICIT_AGENT_ID } from "../../routing/session-key.js";

@@ -1335,11 +1335,14 @@ export async function checkPackedTargetBootstrap(
   // Frozen targets can have shared hash helpers without a deploy entrypoint.
   const hasWorkerProducer = existsSync(workerProducerPath);
   let workerArtifactDeclarations: Array<[string, unknown]> = [];
+  let allowWorkerDeployChunks = false;
   if (hasWorkerProducer) {
     const target = await importToolingTypeScript(
       pathToFileURL(workerBundlePath).href,
       import.meta.url,
     );
+    // Frozen entry-only producers cannot stage chunks even when those files exist in dist.
+    allowWorkerDeployChunks = typeof target.isWorkerBundleChunkPath === "function";
     if (Object.hasOwn(target, "WORKER_BUNDLE_ARTIFACT_PATHS")) {
       const paths = target.WORKER_BUNDLE_ARTIFACT_PATHS;
       if (!Array.isArray(paths) || paths.length === 0) {
@@ -1401,6 +1404,7 @@ export async function checkPackedTargetBootstrap(
   checkCliBootstrapExternalImports({
     rootDir: packedRoot,
     workerDeployEntrypoints,
+    allowWorkerDeployChunks,
     legacyGatewayChunkDiscovery: locatorModule === undefined,
     logger: {
       error: (message: string) => console.error(`release-check: ${message}`),

@@ -18,7 +18,7 @@ import {
   shouldIncludeProgressCardToolForOpenClawTools,
 } from "./openclaw-tools.registration.js";
 import { getGatewayToolCallerIdentity } from "./tools/gateway-caller-context.js";
-import * as inProcessGateway from "./tools/in-process-gateway.js";
+import * as inProcessGateway from "./tools/gateway.js";
 
 vi.mock("./openclaw-plugin-tools.js", () => ({
   resolveOpenClawPluginToolsForOptions: () => [],

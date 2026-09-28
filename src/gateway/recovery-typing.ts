@@ -1,3 +1,4 @@
+import { resolveAgentConfig } from "../agents/agent-scope-config.js";
 import { resolveAgentTimeoutMs } from "../agents/timeout.js";
 import { resolveTypingIntervalMs } from "../auto-reply/reply/typing.js";
 import type { ChannelHeartbeatAdapter } from "../channels/plugins/types.adapters.js";
@@ -43,10 +44,7 @@ export function createRecoveryTypingManager(options: {
           stop();
           return;
         }
-        const [adapter, { resolveAgentConfig }] = await Promise.all([
-          options.resolveAdapter(params.channel),
-          import("../agents/agent-scope-config.js"),
-        ]);
+        const adapter = await options.resolveAdapter(params.channel);
         if (!current() || !adapter?.sendTypingGuarded) {
           stop();
           return;

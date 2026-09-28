@@ -10,13 +10,13 @@ import {
   isLegacySessionRecordOwnedByTarget,
   shouldFilterLegacySessionRecordsByTarget,
 } from "../config/sessions/legacy-store-inspection.js";
-import type { SessionStoreTarget as ResolvedSessionStoreTarget } from "../config/sessions/targets.js";
+import type { SessionStoreTarget as ResolvedSessionStoreTarget } from "../config/sessions/session-store-target.types.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import {
   DeferredPluginMigrationConflictError,
   readDeferredPluginMigrations,
   withDeferredPluginMigrationsCurrent,
-  type DeferredPluginMigration,
 } from "../infra/deferred-plugin-migrations.js";
 import {
   captureDeferredPluginSessionSources,

@@ -1,4 +1,4 @@
-import { stripCompactionReplayCheckpoint } from "@openclaw/ai/transports";
+import { stripCompactionReplayCheckpoint } from "@openclaw/ai/internal/shared";
 import type { AgentMessage } from "../../types.js";
 import {
   createBranchSummaryMessage,

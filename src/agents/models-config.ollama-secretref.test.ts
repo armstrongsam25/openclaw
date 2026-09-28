@@ -23,6 +23,9 @@ const discovery = vi.hoisted(() => ({ providers: new Array<ProviderPlugin>() }))
 vi.mock("../plugins/provider-discovery.runtime.js", () => ({
   resolvePluginDiscoveryProvidersRuntime: () => discovery.providers,
 }));
+vi.mock("../plugins/provider-discovery-plan.runtime.js", () => ({
+  planPluginDiscoveryRuntime: () => ({ kind: "entries", providers: discovery.providers }),
+}));
 
 describe("registered Ollama catalog SecretRef ownership", () => {
   const tempDirs = useAutoCleanupTempDirTracker(afterEach);

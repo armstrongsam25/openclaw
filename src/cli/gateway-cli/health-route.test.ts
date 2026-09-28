@@ -1,7 +1,8 @@
 // Gateway health route tests cover the machine-readable fast path and its error contract.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createNonExitingRuntimeEnv } from "../../test-utils/plugin-runtime-env.js";
-import { runGatewayHealthJsonRoute } from "./health-route.js";
+
+let runGatewayHealthJsonRoute: typeof import("./health-route.js").runGatewayHealthJsonRoute;
 
 const mocks = vi.hoisted(() => ({
   callGateway: vi.fn(),
@@ -15,12 +16,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 describe("runGatewayHealthJsonRoute", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules();
     vi.resetAllMocks();
     mocks.readNonObservingHealthConfig.mockResolvedValue({});
     mocks.emitReachableGatewayAuthDiagnostic.mockResolvedValue(false);
-    vi.doMock("../gateway-rpc.js", () => ({ callGatewayFromCliWithTransport: mocks.callGateway }));
+    vi.doMock("../gateway-rpc.js", async (importOriginal) => {
+      const { formatGatewayErrorJsonFromCli } =
+        await importOriginal<typeof import("../gateway-rpc.js")>();
+      return { callGatewayFromCliWithTransport: mocks.callGateway, formatGatewayErrorJsonFromCli };
+    });
     vi.doMock("../../commands/health.js", () => {
       mocks.loadHealth();
       return {
@@ -36,6 +41,7 @@ describe("runGatewayHealthJsonRoute", () => {
         formatGatewayTransportErrorJson: mocks.formatGatewayTransportErrorJson,
       };
     });
+    ({ runGatewayHealthJsonRoute } = await import("./health-route.js"));
   });
   afterEach(() => {
     vi.doUnmock("../gateway-rpc.js");
@@ -108,8 +114,13 @@ describe("runGatewayHealthJsonRoute", () => {
 
   it("preserves structured transport errors", async () => {
     const runtime = createNonExitingRuntimeEnv();
-    mocks.callGateway.mockRejectedValue(new Error("gateway unavailable"));
-    const payload = { ok: false, error: { type: "gateway_transport_error" } };
+    const error = new Error("gateway unavailable");
+    mocks.callGateway.mockRejectedValue(error);
+    const payload = {
+      ok: false,
+      error: { type: "gateway_transport_error", kind: "closed", message: error.message },
+      gateway: { url: "ws://127.0.0.1:18789", urlSource: "local loopback" },
+    };
     mocks.formatGatewayTransportErrorJson.mockReturnValue(payload);
 
     await runGatewayHealthJsonRoute({ rpc: { json: true, timeout: "10000" } }, runtime);
@@ -128,6 +139,7 @@ describe("runGatewayHealthJsonRoute", () => {
         type: "gateway_request_error",
         code: "UNAVAILABLE",
         message: "health snapshot unavailable",
+        retryable: true,
       },
     };
     mocks.formatGatewayClientRequestErrorJson.mockReturnValue(payload);

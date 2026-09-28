@@ -2,12 +2,7 @@ import { note } from "../../packages/terminal-core/src/note.js";
 import { sanitizeTerminalText } from "../../packages/terminal-core/src/safe-text.js";
 import { formatCliCommand } from "../cli/command-format.js";
 import { isDefaultInstallIdentity } from "../config/paths.js";
-import {
-  findForeignLaunchdJobs,
-  formatForeignLaunchdJobs,
-  repairForeignLaunchdJob,
-  type ForeignLaunchdJob,
-} from "../daemon/launchd-foreign-jobs.js";
+import type { ForeignLaunchdJob } from "../daemon/launchd-foreign-jobs.js";
 import { readGatewayForcedRestartSummary } from "../daemon/restart-storm.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import type { RuntimeEnv } from "../runtime.js";
@@ -27,6 +22,8 @@ export async function noteMacForeignLaunchdJobs(
   if (process.platform !== "darwin") {
     return;
   }
+  const { findForeignLaunchdJobs, formatForeignLaunchdJobs, repairForeignLaunchdJob } =
+    await import("../daemon/launchd-foreign-jobs.js");
   let jobs: ForeignLaunchdJob[];
   try {
     jobs = await findForeignLaunchdJobs(env);

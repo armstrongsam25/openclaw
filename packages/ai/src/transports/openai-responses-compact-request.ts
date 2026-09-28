@@ -52,11 +52,17 @@ export async function requestPreparedOpenAIResponsesCompaction(
   const stream = await Promise.resolve(
     streamFn(model, context, preparedOptions as Parameters<StreamFn>[2]),
   );
-  if (!controller.claimed) {
-    throw new Error("Prepared stream did not reach an OpenAI Responses transport");
-  }
   try {
-    return await result;
+    // Lazy transports claim the request after stream construction.
+    return await Promise.race([
+      result,
+      stream.result().then(() => {
+        if (!controller.claimed) {
+          throw new Error("Prepared stream did not reach an OpenAI Responses transport");
+        }
+        return result;
+      }),
+    ]);
   } finally {
     await stream.result().catch(() => undefined);
   }

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { expectDefined } from "@openclaw/normalization-core";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { repairUnownedChannelAccountBindings } from "../../commands/doctor/shared/legacy-config-binding-repair.js";
+import { repairUnownedChannelAccountBindings } from "../../commands/doctor/shared/legacy-config-binding-repair.runtime.js";
 import { createDoctorPluginMetadataSnapshotScope } from "../../commands/doctor/shared/plugin-metadata-snapshot-scope.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { resolveOutboundMediaMaxBytes } from "../../media/configured-max-bytes.js";

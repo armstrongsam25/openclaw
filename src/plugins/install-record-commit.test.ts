@@ -4,8 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
-import { createTestConfigFileStore } from "../commands/test-runtime-config-helpers.js";
+import {
+  createTestConfigFileStore,
+  createTestConfigSnapshot,
+} from "../commands/test-runtime-config-helpers.js";
 import type { ConfigWriteOptions } from "../config/io.js";
+import type { TransformConfigFileWithRetryParams } from "../config/mutate.js";
 import {
   createPluginInstallRecordMap,
   getPluginInstallRecordMapEntry,
@@ -96,13 +100,33 @@ vi.mock("./plugin-lifecycle-lease.js", () => ({
 
 import {
   commitConfigWithPendingPluginInstalls,
-  commitConfigWriteWithPendingPluginInstalls,
   commitPluginInstallRecordsOnly,
   commitPluginInstallRecordsWithConfig,
   stripPendingPluginInstallRecords,
   transformConfigWithPendingPluginInstalls,
-  unchangedPendingPluginInstallRecordIds,
 } from "./install-record-commit.js";
+
+function mockConfigTransformSource(sourceConfig: OpenClawConfig) {
+  const snapshot = createTestConfigSnapshot(sourceConfig);
+  mocks.transformConfigFileWithRetry.mockImplementationOnce(
+    async (params: TransformConfigFileWithRetryParams<void>) => {
+      const transformed = await params.transform(
+        sourceConfig,
+        { snapshot, previousHash: null, attempt: 1 },
+        {},
+      );
+      if (!params.commit) {
+        throw new Error("Plugin config transform did not bind its commit owner");
+      }
+      return await params.commit({
+        nextConfig: transformed.nextConfig,
+        snapshot,
+        afterWrite: { mode: "auto" },
+        writeOptions: params.writeOptions,
+      });
+    },
+  );
+}
 
 function createTestInstalledPluginIndex(params: {
   policyHash: string;
@@ -289,13 +313,11 @@ describe("commitConfigWithPendingPluginInstalls", () => {
         },
       },
     };
-    const commit = vi.fn(async (candidate: OpenClawConfig) => configFiles.write(candidate));
     mocks.loadInstalledPluginIndexInstallRecords.mockResolvedValue(existingRecords);
+    mockConfigTransformSource(sourceConfig);
 
-    const result = await commitConfigWriteWithPendingPluginInstalls({
-      nextConfig,
-      sourceConfig,
-      commit,
+    await transformConfigWithPendingPluginInstalls({
+      transform: () => ({ nextConfig }),
     });
 
     expect(mocks.writePersistedInstalledPluginIndexInstallRecordsWithLease).toHaveBeenCalledWith(
@@ -311,19 +333,16 @@ describe("commitConfigWithPendingPluginInstalls", () => {
         lease: mocks.lease,
       },
     );
-    expect(commit).toHaveBeenCalledWith(
-      {},
-      {
-        unsetPaths: [["plugins", "installs"]],
-      },
-    );
-    expect(result.installRecords).toEqual({
-      stale: existingRecords.stale,
-      missing: sourceConfig.plugins?.installs?.missing,
-      codex: nextConfig.plugins?.installs?.codex,
-      concurrent: nextConfig.plugins?.installs?.concurrent,
+    expect(mocks.replaceConfigFile).toHaveBeenCalledWith({
+      nextConfig: {},
+      snapshot: createTestConfigSnapshot(sourceConfig),
+      writeOptions: { unsetPaths: [["plugins", "installs"]] },
     });
-    expect(Object.getPrototypeOf(result.installRecords)).toBeNull();
+    expect(
+      Object.getPrototypeOf(
+        mocks.writePersistedInstalledPluginIndexInstallRecordsWithLease.mock.calls[0]?.[0],
+      ),
+    ).toBeNull();
   });
 
   it.each([
@@ -395,7 +414,7 @@ describe("commitConfigWithPendingPluginInstalls", () => {
     },
   );
 
-  it("selects only unchanged pending plugin install records for migration stripping", () => {
+  it("retains canonical records when the pending config has not changed them", async () => {
     const baseConfig: OpenClawConfig = {
       plugins: {
         installs: {
@@ -414,10 +433,16 @@ describe("commitConfigWithPendingPluginInstalls", () => {
       },
     };
 
-    expect(unchangedPendingPluginInstallRecordIds(nextConfig, baseConfig)).toEqual(["legacy"]);
+    const canonical = { source: "npm" as const, spec: "legacy@2.0.0" };
+    mocks.loadInstalledPluginIndexInstallRecords.mockResolvedValue({ legacy: canonical });
+    mockConfigTransformSource(baseConfig);
+    await transformConfigWithPendingPluginInstalls({ transform: () => ({ nextConfig }) });
+    expect(
+      mocks.writePersistedInstalledPluginIndexInstallRecordsWithLease.mock.calls[0]?.[0],
+    ).toEqual({ ...nextConfig.plugins?.installs, legacy: canonical });
   });
 
-  it("handles prototype-named pending records with own-key semantics", () => {
+  it("handles prototype-named pending records with own-key semantics", async () => {
     const constructorRecord = { source: "npm" as const, spec: "constructor@1.0.0" };
     const toStringRecord = { source: "path" as const };
     const protoRecord = { source: "git" as const };
@@ -432,11 +457,13 @@ describe("commitConfigWithPendingPluginInstalls", () => {
     const baseConfig = { plugins: { installs: baseInstalls } } satisfies OpenClawConfig;
     const nextConfig = { plugins: { installs: nextInstalls } } satisfies OpenClawConfig;
 
-    expect(unchangedPendingPluginInstallRecordIds(nextConfig, baseConfig)).toEqual([
-      "constructor",
-      "toString",
-      "__proto__",
-    ]);
+    mockConfigTransformSource(baseConfig);
+    await transformConfigWithPendingPluginInstalls({ transform: () => ({ nextConfig }) });
+    expect(
+      Object.keys(
+        mocks.writePersistedInstalledPluginIndexInstallRecordsWithLease.mock.calls[0]?.[0] ?? {},
+      ),
+    ).toEqual(["constructor", "toString", "__proto__"]);
     const stripped = stripPendingPluginInstallRecords(nextConfig, ["__proto__"]);
     const installs = stripped.plugins?.installs;
     expect(Object.getPrototypeOf(installs)).toBeNull();

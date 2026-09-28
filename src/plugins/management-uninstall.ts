@@ -43,13 +43,9 @@ import {
   refreshManagedPluginMetadata,
 } from "./management-service.js";
 import { withPluginLifecycleLease } from "./plugin-lifecycle-lease.js";
-import {
-  tracePluginLifecyclePhase,
-  tracePluginLifecyclePhaseAsync,
-} from "./plugin-lifecycle-trace.js";
+import { tracePluginLifecyclePhaseAsync } from "./plugin-lifecycle-trace.js";
 import { refreshPluginRegistryAfterConfigMutation } from "./registry-refresh.js";
 import { withPluginSourceCleanup } from "./source-cleanup.js";
-import { buildPluginSnapshotReport } from "./status.js";
 import { collectClawPluginUninstallWarnings } from "./uninstall-claw-references.js";
 import {
   prepareConfigForDisabledPluginSet,
@@ -139,10 +135,15 @@ export async function preparePluginUninstall(
           channelIds: manifest?.channels,
         };
       })
-    : tracePluginLifecyclePhase(
-        "plugin registry snapshot",
-        () => buildPluginSnapshotReport({ config }),
-        { command: "uninstall" },
+    : (
+        await tracePluginLifecyclePhaseAsync(
+          "plugin registry snapshot",
+          async () => {
+            const { buildPluginSnapshotReport } = await import("./status.js");
+            return buildPluginSnapshotReport({ config });
+          },
+          { command: "uninstall" },
+        )
       ).plugins;
   const requestedId = metadata
     ? metadata.normalizePluginId(params.pluginId.trim())

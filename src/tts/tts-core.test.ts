@@ -37,8 +37,11 @@ describe("TTS core", () => {
   it("keeps summarization-only LLM modules lazy", () => {
     const source = readFileSync(new URL("./tts-core.ts", import.meta.url), "utf8");
 
-    expect(source).toContain('import("../agents/simple-completion-runtime.js")');
+    expect(source).toMatch(/import\(\s*"\.\/tts-summary\.runtime\.js"\s*\)/u);
+    const runtime = readFileSync(new URL("./tts-summary.runtime.ts", import.meta.url), "utf8");
+    expect(runtime).toContain('import("../agents/simple-completion-runtime.js")');
     expect(source).not.toContain('from "../llm/stream.js"');
+    expect(source).not.toContain('from "../agents/simple-completion-execution.js"');
     expect(source).not.toContain('from "../agents/simple-completion-runtime.js"');
     expect(source).not.toContain('from "../agents/model-auth.js"');
   });

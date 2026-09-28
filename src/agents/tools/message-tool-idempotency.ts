@@ -3,7 +3,7 @@
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import type { ChannelMessageActionName } from "../../channels/plugins/types.public.js";
 import { sha256Base64UrlPrefix } from "../../infra/crypto-digest.js";
-import type { GatewayCallOptions } from "./gateway.js";
+import type { GatewayCallOptions } from "./gateway-options.js";
 
 const MESSAGE_TOOL_IDEMPOTENCY_ENVELOPE_PARAM_KEYS = new Set<string>([
   "gatewayToken",

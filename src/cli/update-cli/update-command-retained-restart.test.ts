@@ -12,6 +12,7 @@ import { withGatewayServiceOperationLock } from "../../daemon/service-operation-
 import type { GatewayServiceControlArgs } from "../../daemon/service-types.js";
 import { assertGatewayServiceUpdateCurrent } from "../../daemon/service-update-authority.js";
 import { mockSystemAccountHome } from "../../daemon/service.test-helpers.js";
+import * as systemdDefinition from "../../daemon/systemd-definition-mutation.js";
 import * as systemdExec from "../../daemon/systemd-exec.js";
 import * as systemdScope from "../../daemon/systemd-scope.js";
 import { resolveRuntimeWorkerUrl } from "../../infra/runtime-worker-url.js";
@@ -73,7 +74,7 @@ beforeEach(() => {
     unitName: "fixture-A.service",
     unitPath: path.join(a, "unit"),
   });
-  vi.spyOn(systemdScope, "assertNoSystemGatewayOwnershipForActivation").mockResolvedValue();
+  vi.spyOn(systemdDefinition, "assertNoSystemGatewayOwnershipForActivation").mockResolvedValue();
   vi.spyOn(systemdExec, "assertSystemdAvailable").mockResolvedValue();
 });
 afterEach(() => {

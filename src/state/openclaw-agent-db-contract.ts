@@ -45,6 +45,16 @@ export type OpenClawAgentDatabaseOptions = OpenClawStateDatabaseOptions & {
   agentId: string;
 };
 
+export type OpenClawAgentDatabaseWorkerLeaseReceipt = {
+  leaseId: string;
+  agentId: string;
+  path: string;
+  ownerPid: number;
+  ownerStartTime: number | null;
+  sharedStatePath: string;
+  sharedStateIdentity: string;
+};
+
 /** Shared-state registry row describing an agent database seen by this process. */
 export type OpenClawRegisteredAgentDatabase = {
   agentId: string;

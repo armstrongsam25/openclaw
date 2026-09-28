@@ -12,11 +12,12 @@ import {
 import { configFailureHeading, isConfigReadFailure } from "../config/io.invalid-config.js";
 import { renderConfigValidationIssueLines } from "../config/issue-location.js";
 import { isPluginPackagingRuntimeOutputInvalidConfigSnapshot } from "../config/recovery-policy.js";
-import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.types.js";
 import {
-  buildPluginCompatibilitySnapshotNotices,
-  formatPluginCompatibilityNotice,
-} from "../plugins/status.js";
+  completePluginMetadataSnapshot,
+  resolvePluginMetadataSnapshot,
+} from "../plugins/plugin-metadata-snapshot.js";
+import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.types.js";
+import { formatPluginCompatibilityNotice } from "../plugins/status-compatibility.js";
 import type { RuntimeEnv } from "../runtime.js";
 
 type ConfigValidationOptions = {
@@ -61,13 +62,8 @@ export async function withCommandPluginMetadata<T>(
   params: { config: OpenClawConfig; workspaceDir?: string; snapshot?: PluginMetadataSnapshot },
   run: () => T,
 ): Promise<Awaited<T>> {
-  const [
-    { completePluginMetadataSnapshot, resolvePluginMetadataSnapshot },
-    { withPluginMetadataSnapshotScope },
-  ] = await Promise.all([
-    import("../plugins/plugin-metadata-snapshot.js"),
-    import("../plugins/current-plugin-metadata-snapshot.js"),
-  ]);
+  const { withPluginMetadataSnapshotScope } =
+    await import("../plugins/current-plugin-metadata-snapshot.js");
   const snapshot = completePluginMetadataSnapshot(params) ?? resolvePluginMetadataSnapshot(params);
   return await withPluginMetadataSnapshotScope(snapshot, run, {
     config: params.config,
@@ -105,6 +101,7 @@ async function validateConfigFileSnapshot(
   if (!includeCompatibilityAdvisory) {
     return snapshot;
   }
+  const { buildPluginCompatibilitySnapshotNotices } = await import("../plugins/status.js");
   const compatibility = buildPluginCompatibilitySnapshotNotices({ config: snapshot.config });
   if (compatibility.length > 0) {
     runtime.log(

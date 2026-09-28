@@ -22,7 +22,11 @@ import {
   type OpenClawAgentDatabase,
 } from "../state/openclaw-agent-db.js";
 import { TRAJECTORY_RUNTIME_CAPTURE_MAX_BYTES } from "./paths.js";
-import type { TrajectoryEvent } from "./types.js";
+import type {
+  SqliteTrajectoryRuntimeAppend,
+  SqliteTrajectoryRuntimeScope,
+  TrajectoryEvent,
+} from "./types.js";
 
 type SqliteTrajectoryRuntimeDatabase = Pick<
   OpenClawAgentKyselyDatabase,
@@ -34,21 +38,6 @@ const TRAJECTORY_RUNTIME_GLOBAL_MAX_BYTES = 512 * 1024 * 1024;
 const TRAJECTORY_RUNTIME_GLOBAL_SWEEP_INTERVAL_MS = 60 * 60 * 1_000;
 const TRAJECTORY_RUNTIME_DELETE_RUN_BATCH_SIZE = 100;
 const TRAJECTORY_RUNTIME_INSERT_BATCH_SIZE = 32;
-
-export type SqliteTrajectoryRuntimeScope = {
-  agentId?: string;
-  env?: NodeJS.ProcessEnv;
-  maxGlobalRuntimeBytes?: number;
-  maxRuntimeBytes?: number;
-  sessionId: string;
-  storePath: string;
-  assertCommitAllowed?: () => void;
-};
-
-export type SqliteTrajectoryRuntimeAppend = Pick<
-  SqliteTrajectoryRuntimeScope,
-  "sessionId" | "maxRuntimeBytes" | "maxGlobalRuntimeBytes"
-> & { events: readonly TrajectoryEvent[] };
 
 type SqliteTrajectoryRuntimeReadScope = Omit<
   SqliteTrajectoryRuntimeScope,

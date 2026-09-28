@@ -1,5 +1,6 @@
 // Plugin control-plane cold-import tests guard setup and plugin metadata paths against runtime-heavy imports.
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { makeCatalogEntry } from "../flows/channel-setup.test-helpers.js";
 import { clearPluginMetadataLifecycleCaches } from "../plugins/plugin-metadata-lifecycle.js";
 import { resetPluginRuntimeStateForTest } from "../plugins/runtime.js";
 import {
@@ -11,7 +12,7 @@ import {
 import { cleanupTrackedTempDirs, makeTrackedTempDir } from "../plugins/test-helpers/fs-fixtures.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
 import { buildAuthChoiceGroups, formatAuthChoiceChoicesForCli } from "./auth-choice-options.js";
-import { listManifestInstalledChannelIds } from "./channel-setup/discovery.js";
+import { isCatalogChannelInstalled } from "./channel-setup/discovery.js";
 
 const tempDirs: string[] = [];
 
@@ -88,12 +89,13 @@ describe("command control-plane plugin discovery", () => {
     const env = createColdPluginHermeticEnv(workspaceDir);
 
     expect(
-      listManifestInstalledChannelIds({
+      isCatalogChannelInstalled({
         cfg,
+        entry: makeCatalogEntry(plugin.channelId, "Cold Channel"),
         workspaceDir,
         env,
       }),
-    ).toContain(plugin.channelId);
+    ).toBe(true);
     expect(isColdPluginRuntimeLoaded(plugin)).toBe(false);
   });
 

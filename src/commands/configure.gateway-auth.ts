@@ -12,7 +12,6 @@ import { resolveManifestProviderAuthChoice } from "../plugins/provider-auth-choi
 import type { RuntimeEnv } from "../runtime.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
 import { promptAuthChoiceGrouped } from "./auth-choice-prompt.js";
-import { applyAuthChoice } from "./auth-choice.apply.js";
 import { loadStaticManifestCatalogRowsForList } from "./models/list.manifest-catalog.js";
 import {
   applyAgentModelDefaults,
@@ -21,7 +20,6 @@ import {
   resolveOnboardingAgentTarget,
 } from "./onboard-agent-target.js";
 import type { OnboardingAgentTarget } from "./onboard-agent-target.js";
-import { promptCustomApiConfig } from "./onboard-custom.js";
 
 type ProviderChoiceModelPrompt = {
   provider?: string;
@@ -163,6 +161,7 @@ export async function promptAuthConfig(
   prompter: WizardPrompter,
   target: OnboardingAgentTarget = resolveOnboardingAgentTarget(cfg),
 ): Promise<OpenClawConfig> {
+  const { applyAuthChoice } = await import("./auth-choice.apply.js");
   let next = cfg;
   let authChoice = "skip";
   let preferredProvider: string | undefined;
@@ -182,6 +181,7 @@ export async function promptAuthConfig(
           });
 
     if (authChoice === "custom-api-key") {
+      const { promptCustomApiConfig } = await import("./onboard-custom.js");
       const customResult = await promptCustomApiConfig({
         prompter,
         runtime,

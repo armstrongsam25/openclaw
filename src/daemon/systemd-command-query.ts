@@ -15,8 +15,10 @@ import {
   systemdInspectionError,
 } from "./systemd-exec.js";
 import { openSystemdUserManager } from "./systemd-peer-native.js";
-import { resolveUnavailableSystemdInspectionReason } from "./systemd-unavailable.js";
-import { resolveSystemdUserTransport } from "./systemd-user-transport.js";
+import {
+  resolveSystemdUserTransport,
+  resolveUnavailableSystemdInspectionReason,
+} from "./systemd-user-transport.js";
 
 export async function createSystemdCommandQuery(
   env: GatewayServiceEnv,

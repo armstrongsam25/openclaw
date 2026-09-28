@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { Command } from "commander";
 import { vi } from "vitest";
+import * as mcpOAuth from "../agents/mcp-oauth.js";
 import { registerMcpCli } from "./mcp-cli.js";
 
 type CreateSessionMcpRuntime =
@@ -22,13 +23,13 @@ const mocks = vi.hoisted(() => {
   return {
     runtime,
     serveOpenClawChannelMcp: vi.fn(),
-    clearMcpOAuthCredentials: vi.fn(),
-    clearMcpOAuthRequesters: vi.fn(),
-    clearMcpOAuthServer: vi.fn(),
-    completeMcpOAuthAuthorization: vi.fn(),
-    readMcpOAuthCredentialsStatus: vi.fn(),
-    countMcpOAuthPrincipals: vi.fn(),
-    startMcpOAuthAuthorization: vi.fn(),
+    clearMcpOAuthCredentials: vi.fn<typeof mcpOAuth.clearMcpOAuthCredentials>(),
+    clearMcpOAuthRequesters: vi.fn<typeof mcpOAuth.clearMcpOAuthRequesters>(),
+    clearMcpOAuthServer: vi.fn<typeof mcpOAuth.clearMcpOAuthServer>(),
+    completeMcpOAuthAuthorization: vi.fn<typeof mcpOAuth.completeMcpOAuthAuthorization>(),
+    readMcpOAuthCredentialsStatus: vi.fn<typeof mcpOAuth.readMcpOAuthCredentialsStatus>(),
+    countMcpOAuthPrincipals: vi.fn<typeof mcpOAuth.countMcpOAuthPrincipals>(),
+    startMcpOAuthAuthorization: vi.fn<typeof mcpOAuth.startMcpOAuthAuthorization>(),
     createSessionMcpRuntimeOverride: undefined as CreateSessionMcpRuntime | undefined,
   };
 });
@@ -47,16 +48,6 @@ vi.mock("../runtime.js", () => ({
 
 vi.mock("../mcp/channel-server.js", () => ({
   serveOpenClawChannelMcp: mocks.serveOpenClawChannelMcp,
-}));
-
-vi.mock("../agents/mcp-oauth.js", () => ({
-  clearMcpOAuthCredentials: mocks.clearMcpOAuthCredentials,
-  clearMcpOAuthRequesters: mocks.clearMcpOAuthRequesters,
-  clearMcpOAuthServer: mocks.clearMcpOAuthServer,
-  completeMcpOAuthAuthorization: mocks.completeMcpOAuthAuthorization,
-  readMcpOAuthCredentialsStatus: mocks.readMcpOAuthCredentialsStatus,
-  countMcpOAuthPrincipals: mocks.countMcpOAuthPrincipals,
-  startMcpOAuthAuthorization: mocks.startMcpOAuthAuthorization,
 }));
 
 vi.mock("../agents/agent-bundle-mcp-runtime.js", async (importOriginal) => {
@@ -105,6 +96,20 @@ function lastRuntimeLine(mock: typeof mockLog): string {
 
 export function resetMcpCliTestState(): void {
   vi.clearAllMocks();
+  // Manual module mocks can bypass their factory during parallel dynamic imports in Vitest.
+  vi.spyOn(mcpOAuth, "clearMcpOAuthCredentials").mockImplementation(mocks.clearMcpOAuthCredentials);
+  vi.spyOn(mcpOAuth, "clearMcpOAuthRequesters").mockImplementation(mocks.clearMcpOAuthRequesters);
+  vi.spyOn(mcpOAuth, "clearMcpOAuthServer").mockImplementation(mocks.clearMcpOAuthServer);
+  vi.spyOn(mcpOAuth, "completeMcpOAuthAuthorization").mockImplementation(
+    mocks.completeMcpOAuthAuthorization,
+  );
+  vi.spyOn(mcpOAuth, "readMcpOAuthCredentialsStatus").mockImplementation(
+    mocks.readMcpOAuthCredentialsStatus,
+  );
+  vi.spyOn(mcpOAuth, "countMcpOAuthPrincipals").mockImplementation(mocks.countMcpOAuthPrincipals);
+  vi.spyOn(mcpOAuth, "startMcpOAuthAuthorization").mockImplementation(
+    mocks.startMcpOAuthAuthorization,
+  );
   mocks.createSessionMcpRuntimeOverride = undefined;
   readMcpOAuthCredentialsStatus.mockResolvedValue({
     state: "unauthenticated",

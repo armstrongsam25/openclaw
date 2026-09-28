@@ -39,7 +39,7 @@ export async function applyNonInteractiveAuthChoice(params: {
   target: OnboardingAgentTarget;
 }): Promise<OpenClawConfig | null> {
   const { opts, runtime, baseConfig } = params;
-  let authChoice = normalizeApiKeyTokenProviderAuthChoice({
+  let authChoice = await normalizeApiKeyTokenProviderAuthChoice({
     authChoice: params.authChoice,
     tokenProvider: opts.tokenProvider,
     config: params.nextConfig,

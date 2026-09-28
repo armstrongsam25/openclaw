@@ -1,30 +1,18 @@
 import { uniqueStrings } from "@openclaw/normalization-core/string-normalization";
 import { executeSqliteQuerySync, sqliteStringSet } from "../../infra/kysely-sync.js";
 import type { OpenClawAgentDatabase } from "../../state/openclaw-agent-db.js";
-import type {
-  SessionEntryReplacementSnapshot,
-  SessionEntryStatus,
-} from "./session-accessor.sqlite-contract.js";
+import type { ResolvedSessionEntryRow } from "./session-accessor.sqlite-entry-cache.types.js";
 import { iterateSessionEntryKeys } from "./session-accessor.sqlite-entry-inventory.js";
 import {
   prepareExactSessionEntryRowReads,
   readExactSessionEntryRow,
-  type ResolvedSessionEntryRow,
 } from "./session-accessor.sqlite-entry-read.js";
+import type {
+  SessionEntryReplacementSelection,
+  SessionEntryReplacementState,
+} from "./session-accessor.sqlite-replacement-types.js";
 import { getSessionKysely } from "./session-accessor.sqlite-scope.js";
 import { assertCanonicalSqliteSessionKeysCurrent } from "./session-canonical-key.js";
-
-export type SessionEntryReplacementSelection = {
-  sessionKeys?: readonly string[];
-  statuses?: readonly SessionEntryStatus[];
-  includeLabelOwners?: string;
-};
-
-export type SessionEntryReplacementState = {
-  entries: SessionEntryReplacementSnapshot[];
-  expectedRows: Map<string, ResolvedSessionEntryRow>;
-  labelOwnerKeys: string[];
-};
 
 export function readSessionEntryReplacementLabelOwnerKeys(
   database: Pick<OpenClawAgentDatabase, "agentId" | "db">,

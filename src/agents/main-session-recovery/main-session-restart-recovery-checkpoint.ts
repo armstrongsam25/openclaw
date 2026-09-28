@@ -17,7 +17,7 @@ import {
   readTerminalSourceReplyDeliveryMirror,
 } from "../embedded-agent-runner/message-visibility.js";
 import { buildMainSessionRecoveryClearPatch } from "./main-session-recovery-clear.js";
-import type { MainSessionRecoveryStoreTarget } from "./main-session-recovery-store.js";
+import type { MainSessionRecoveryStoreTarget } from "./main-session-recovery-types.js";
 import { isRestartAbortTailArtifact } from "./main-session-restart-recovery-resume-policy.js";
 import {
   mainSessionRecoveryLog,

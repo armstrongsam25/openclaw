@@ -326,17 +326,18 @@ describe.each([
     const simpleOptions = { ...commonOptions, reasoning: cell.raw ? undefined : cell.requested };
     const rawOptions = { ...commonOptions, reasoningEffort: requested };
     const options = cell.raw ? rawOptions : simpleOptions;
-    const stream = await (transport === "managed-responses"
-      ? createOpenAIResponsesTransportStreamFn()(model, requestContext, options)
-      : transport === "managed-completions"
-        ? createOpenAICompletionsTransportStreamFn()(model, requestContext, options)
-        : api === "openai-completions"
-          ? cell.raw
-            ? streamOpenAICompletions({ ...model, api }, requestContext, rawOptions)
-            : streamSimpleOpenAICompletions({ ...model, api }, requestContext, simpleOptions)
-          : cell.raw
-            ? streamOpenAIResponses({ ...model, api }, requestContext, rawOptions)
-            : streamSimpleOpenAIResponses({ ...model, api }, requestContext, simpleOptions));
+    const stream =
+      transport === "managed-responses"
+        ? createOpenAIResponsesTransportStreamFn()(model, requestContext, options)
+        : transport === "managed-completions"
+          ? createOpenAICompletionsTransportStreamFn()(model, requestContext, options)
+          : api === "openai-completions"
+            ? cell.raw
+              ? streamOpenAICompletions({ ...model, api }, requestContext, rawOptions)
+              : streamSimpleOpenAICompletions({ ...model, api }, requestContext, simpleOptions)
+            : cell.raw
+              ? streamOpenAIResponses({ ...model, api }, requestContext, rawOptions)
+              : streamSimpleOpenAIResponses({ ...model, api }, requestContext, simpleOptions);
     const result = await stream.result();
     expect(result.errorMessage).toBeUndefined();
     expect(result.stopReason).toBe(

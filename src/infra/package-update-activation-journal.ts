@@ -34,7 +34,6 @@ import {
   withExistingSqliteRollbackDatabase,
   type ExistingSqliteTransaction,
 } from "./sqlite-existing-database.js";
-import { createVerifiedSqliteSnapshot } from "./sqlite-snapshot.js";
 export {
   assertPackageActivationLayout,
   isPackageActivationComplete,
@@ -298,6 +297,7 @@ export function openPackageActivationJournal(anchor: string) {
         if (!(error instanceof Error && "errcode" in error && error.errcode === 776)) {
           throw error;
         }
+        const { createVerifiedSqliteSnapshot } = await import("./sqlite-snapshot.js");
         hot = true;
         assertUnchanged();
         record = await withPackageRecoverySnapshot(

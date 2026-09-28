@@ -7,10 +7,8 @@ import {
   getPreparedModelRuntimeBorrowedSnapshot,
   getPreparedModelRuntimePluginGeneration,
 } from "../agents/prepared-model-runtime-generation-scope.js";
-import {
-  loadPublishedGatewayReplyDispatchRuntime,
-  registerPreparedModelRuntimePublicationListener,
-} from "../agents/prepared-model-runtime.js";
+import { loadPublishedGatewayReplyDispatchRuntime } from "../agents/prepared-model-runtime.js";
+import { registerPreparedModelRuntimePublicationListener } from "../agents/prepared-model-runtime.publication-events.js";
 import {
   getActiveGatewayRootWorkCount,
   getActiveGatewayRootWorkHolders,

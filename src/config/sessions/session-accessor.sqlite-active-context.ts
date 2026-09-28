@@ -7,9 +7,10 @@ import {
 } from "../../infra/kysely-sync.js";
 import { withCurrentProjectionSnapshot } from "./session-accessor.sqlite-active-projection.js";
 import type {
-  SessionTranscriptContextVersion,
+  SessionTranscriptBoundedActiveContext,
   SessionTranscriptReadScope,
   TranscriptEvent,
+  ResolvedTranscriptReadScope,
 } from "./session-accessor.sqlite-contract.js";
 import { iterateUnindexedActiveTranscriptNavigation } from "./session-accessor.sqlite-history-navigation.js";
 import {
@@ -20,7 +21,6 @@ import {
   readUnindexedHistoryControls,
   resolveTranscriptBoundaryWindow,
 } from "./session-accessor.sqlite-reset-window.js";
-import type { ResolvedTranscriptReadScope } from "./session-accessor.sqlite-scope.js";
 import { readTranscriptContextVersionInTransaction } from "./session-accessor.sqlite-transcript-state.js";
 import {
   DEFAULT_VISIBLE_MESSAGE_MAX_BYTES,
@@ -36,21 +36,6 @@ import {
   transcriptEventNavigationSql,
   transcriptEventResetNavigationSql,
 } from "./transcript-payload.js";
-
-export type SessionTranscriptBoundedActiveContext = {
-  activeLeafEntryId: string | null;
-  version: SessionTranscriptContextVersion;
-  opaqueParents: Map<string, string | null>;
-  parents: Map<string, string | null>;
-  firstKeptRanges: Map<string, { startIndex: number; endIndex: number }>;
-  persistedSuffixStartSeq: number;
-  boundaryCount: number;
-  events: TranscriptEvent[];
-  serializedBytes: number;
-  totalEvents: number;
-  transcriptMutationAt: number | null;
-  truncated: boolean;
-};
 
 function readBoundedRetentionRanges(
   projection: CurrentTranscriptProjection,

@@ -26,7 +26,7 @@ import {
   isTimeoutErrorMessage,
 } from "../failover/classify.js";
 import { isReasoningConstraintErrorMessage } from "../failover/context-overflow-tables.js";
-import type { PreparedProviderFailoverOwner } from "../failover/provider-patterns.js";
+import type { PreparedProviderFailoverOwner } from "../failover/signal.js";
 import {
   AUTH_INVALID_TOKEN_USER_TEXT,
   formatBillingErrorMessage,

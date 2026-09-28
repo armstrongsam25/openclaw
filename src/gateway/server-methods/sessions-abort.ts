@@ -57,7 +57,7 @@ import {
   abortQueuedCollectorSession,
   descendantAbortError,
 } from "./chat-abort-runtime.js";
-import { abortedPartialPersistenceError } from "./chat-aborted-partial.js";
+import { abortedPartialPersistenceError } from "./chat-transcript-persistence.js";
 import { emitSessionsChanged } from "./session-change-event.js";
 import {
   bindGatewayRequestHandlerMutationAuthority,

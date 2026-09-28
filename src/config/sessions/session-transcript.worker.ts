@@ -6,7 +6,7 @@ import type {
 import { withSqliteReaderOwner } from "../../infra/sqlite-reader-lifecycle.js";
 import { serveOwnedWorkerTasks } from "../../infra/worker-task-server.js";
 import { cloneEnvWithPlatformSemantics } from "../config-env-vars.js";
-import type { SessionIdentityEvidenceResult } from "./session-accessor.sqlite-entry-availability.js";
+import type { SessionIdentityEvidenceResult } from "./session-accessor.sqlite-contract.js";
 import { readSessionColdTranscript } from "./session-cold-storage-state.js";
 import {
   encodeSessionTranscriptWorkerError,
@@ -324,7 +324,7 @@ serveOwnedWorkerTasks(
       }
       if (request.kind === "session-entry-read") {
         const { loadSessionEntryReadOnlyResultInScope } =
-          await import("./session-accessor.sqlite-entry.js");
+          await import("./session-accessor.sqlite-exact-read.js");
         let source: SessionTranscriptWorkerValues["session-entry-read"]["source"];
         const read = loadSessionEntryReadOnlyResultInScope(
           {
@@ -465,7 +465,7 @@ serveOwnedWorkerTasks(
       }
       if (request.kind === "session-row-presence") {
         const { loadSessionEntryReadOnlyInScope } =
-          await import("./session-accessor.sqlite-entry.js");
+          await import("./session-accessor.sqlite-exact-read.js");
         return (
           loadSessionEntryReadOnlyInScope({ ...request.scope, projection: "list" }) !== undefined
         );

@@ -24,6 +24,7 @@ import type {
 import { resetCommandQueueStateForTest } from "../../process/command-queue.test-support.js";
 import type { OpenClawTestState } from "../../test-utils/openclaw-test-state.js";
 import type { AuthProfileStore } from "../auth-profiles/types.js";
+import { createNativeModelOwnedRuntimeModel } from "../defaults.js";
 import { extractObservedOverflowTokenCount } from "../embedded-agent-helpers/context-overflow-observation.js";
 import type { FailoverReason } from "../failover/signal.js";
 import { clearAgentHarnesses, registerAgentHarness } from "../harness/registry.js";
@@ -991,6 +992,7 @@ export async function loadRunOverflowCompactionHarness(): Promise<{
     DEFAULT_CONTEXT_TOKENS: 200000,
     DEFAULT_MODEL: "test-model",
     DEFAULT_PROVIDER: "anthropic",
+    createNativeModelOwnedRuntimeModel,
   }));
 
   vi.doMock("../failover-error.js", async () => ({

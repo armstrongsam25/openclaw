@@ -1,12 +1,8 @@
 import { retireSessionMcpRuntime } from "../../agents/agent-bundle-mcp-tools.js";
+import { bindAgentToolGatewayRequest } from "../../agents/tools/in-process-gateway.js";
 import { SESSION_LIFECYCLE_CHANGED_ERROR_REASON } from "../../config/sessions/lifecycle.js";
 import { isCronSessionKey } from "../../routing/session-key.js";
-import { createLazyImportLoader } from "../../shared/lazy-promise.js";
 import type { CronJob } from "../types.js";
-
-const gatewayCallRuntimeLoader = createLazyImportLoader(
-  () => import("../../agents/tools/in-process-gateway.js"),
-);
 
 export type CronRunSessionCleanupOutcome =
   | "not-requested"
@@ -21,7 +17,6 @@ export async function deleteCronSessionViaGateway(params: {
   lifecycleRevision?: string;
   sessionUpdatedAt?: number;
 }): Promise<boolean> {
-  const { bindAgentToolGatewayRequest } = await gatewayCallRuntimeLoader.load();
   const callGateway = bindAgentToolGatewayRequest({ hostedOnly: true });
   const result = await callGateway<{ deleted?: boolean }>({
     method: "sessions.delete",

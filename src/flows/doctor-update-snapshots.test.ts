@@ -7,9 +7,11 @@ import { resolveInitialDoctorHealthContributions } from "./doctor-health-contrib
 import { createDoctorHealthFlowContext } from "./doctor-health-contributions.test-support.js";
 import type { HealthCheckContext } from "./health-checks.js";
 
-vi.mock("../infra/openclaw-root.js", () => ({
-  resolveOpenClawPackageRoot: vi.fn(),
-}));
+vi.mock("../infra/openclaw-root.js", async (importOriginal) => {
+  const { resolveOpenClawPackageRootSync } =
+    await importOriginal<typeof import("../infra/openclaw-root.js")>();
+  return { resolveOpenClawPackageRoot: vi.fn(), resolveOpenClawPackageRootSync };
+});
 
 const dirs = useAutoCleanupTempDirTracker(afterEach);
 let globalRoot: string;

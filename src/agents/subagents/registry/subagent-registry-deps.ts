@@ -5,6 +5,7 @@ import { bindGatewayLifecycleRequest } from "../../../gateway/server-recovery-ru
 import type { PluginRegistry } from "../../../plugins/registry-types.js";
 import { createLazyImportLoader, createLazyPromiseLoader } from "../../../shared/lazy-promise.js";
 import { importRuntimeModule } from "../../../shared/runtime-import.js";
+import { loadAgentRuntimePluginRegistryHandle } from "../../runtime-plugins.js";
 
 const subagentAnnounceLoader = createLazyImportLoader(
   () => import("../announce/subagent-announce.js"),
@@ -18,9 +19,6 @@ const subagentRegistryRuntimeLoader = createLazyPromiseLoader(() =>
     ".js",
   ]),
 );
-const subagentRegistryPluginRuntimeLoader = createLazyPromiseLoader(
-  () => import("../../runtime-plugins.js"),
-);
 
 export const loadSubagentAnnounceModule = subagentAnnounceLoader.load;
 export const loadSubagentBrowserCleanupModule = browserCleanupLoader.load;
@@ -32,9 +30,7 @@ export async function loadSubagentRegistryPluginRuntimeHandle(params: {
   workspaceDir?: string;
   allowGatewaySubagentBinding?: boolean;
 }): Promise<PluginRegistry | undefined> {
-  return (await subagentRegistryPluginRuntimeLoader.load()).loadAgentRuntimePluginRegistryHandle(
-    params,
-  );
+  return loadAgentRuntimePluginRegistryHandle(params);
 }
 
 export async function resolveSubagentRegistryContextEngine(
@@ -50,7 +46,6 @@ export async function resolveSubagentRegistryContextEngine(
 
 export function resetSubagentRegistryRuntimeLoadersForTests() {
   subagentRegistryRuntimeLoader.clear();
-  subagentRegistryPluginRuntimeLoader.clear();
   subagentAnnounceLoader.clear();
   browserCleanupLoader.clear();
 }

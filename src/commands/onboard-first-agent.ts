@@ -1,7 +1,7 @@
 import { normalizeAgentId } from "@openclaw/normalization-core/agent-id";
 import { loadAgentTeamPreset, validateAgentTeamMemberIds } from "../agents/agent-roles.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
-import { type FirstOnboardingAgent, validateFirstOnboardingAgentName } from "./onboard-agent.js";
+import type { FirstOnboardingAgent } from "./onboard-agent.js";
 
 export async function promptFirstOnboardingAgent(
   hasAuthoredRoster: boolean,
@@ -13,6 +13,7 @@ export async function promptFirstOnboardingAgent(
   if (hasAuthoredRoster) {
     return undefined;
   }
+  const { validateFirstOnboardingAgentName } = await import("./onboard-agent.js");
   const createTeam =
     options?.team ??
     (options?.offerTeam === true &&

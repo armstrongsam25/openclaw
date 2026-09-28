@@ -11,10 +11,7 @@ import { loadPluginRegistryHandle } from "../../plugins/loader.js";
 import type { PluginRegistry } from "../../plugins/registry.js";
 import type { RuntimeEnv } from "../../runtime.js";
 import type { WizardPrompter } from "../../wizard/prompts.js";
-import {
-  ensureOnboardingPluginInstalled,
-  type OnboardingPluginInstallStatus,
-} from "../onboarding-plugin-install.js";
+import type { OnboardingPluginInstallStatus } from "../onboarding-plugin-install.js";
 import { getTrustedChannelPluginCatalogEntry } from "./trusted-catalog.js";
 
 type InstallResult = {
@@ -35,6 +32,7 @@ export async function ensureChannelSetupPluginInstalled(params: {
   autoConfirmSingleSource?: boolean;
   beforePersistentEffect?: () => Promise<void>;
 }): Promise<InstallResult> {
+  const { ensureOnboardingPluginInstalled } = await import("../onboarding-plugin-install.js");
   const result = await ensureOnboardingPluginInstalled({
     cfg: params.cfg,
     entry: {

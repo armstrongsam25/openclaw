@@ -11,7 +11,7 @@ import { stripPendingPluginInstallRecords } from "../plugins/install-record-comm
 import { withPluginLifecycleLease } from "../plugins/plugin-lifecycle-lease.js";
 import { resolveManifestProviderAuthChoices } from "../plugins/provider-auth-choices.js";
 import { createPluginCapabilityConsentPrompter } from "../wizard/plugin-capability-consent.js";
-import { createQuickstartNotePrompter } from "./setup-apply.js";
+import { createQuickstartNotePrompter } from "../wizard/prompts.js";
 import { listSetupInferenceAuthOptions } from "./setup-inference-auth-options.js";
 import {
   SetupInferenceActivationIndeterminateError,
@@ -43,7 +43,7 @@ export async function stageCodexCandidate(
     }
     const ensureCodex =
       ctx.deps.ensureCodexRuntimePlugin ??
-      (await import("../commands/codex-runtime-plugin-install.js"))
+      (await import("../commands/runtime-plugin-install.js"))
         .ensureCodexRuntimePluginForModelSelection;
     const ensured = await ensureCodex({
       cfg: enabled.config,

@@ -20,11 +20,13 @@ export { formatSqliteSessionFileMarker } from "../config/sessions/legacy-sqlite-
 export {
   appendSqliteTrajectoryRuntimeEvents,
   loadSqliteTrajectoryRuntimeEvents,
-  type SqliteTrajectoryRuntimeScope,
 } from "../trajectory/runtime-store.sqlite.js";
 export { createTrajectoryRuntimeRecorder as createTrajectoryRuntimeRecorderForTest } from "../trajectory/runtime.js";
 export { exportTrajectoryBundle as exportTrajectoryBundleForTest } from "../trajectory/export.js";
-export { type TrajectoryEvent as SqliteTrajectoryRuntimeEventForTest } from "../trajectory/types.js";
+export type {
+  SqliteTrajectoryRuntimeScope,
+  TrajectoryEvent as SqliteTrajectoryRuntimeEventForTest,
+} from "../trajectory/types.js";
 export {
   closeOpenClawAgentDatabasesAsync,
   closeOpenClawAgentDatabasesForTest,

@@ -20,7 +20,10 @@ import type { DesktopSessionRegistry } from "./desktop/session-registry.js";
 import type { NodeWorkerSupervisorTransport } from "./node-registry-private.js";
 import type { GatewayContextResolver, GatewayRequestContext } from "./server-methods/types.js";
 import { createWorkerRuntimeInstallProgressPublisher } from "./server-worker-runtime-install-progress.js";
-import type { ArtifactTransferHttpCallback } from "./worker-environments/artifact-transfer-http.js";
+import {
+  createArtifactTransferHttpCallback,
+  type ArtifactTransferHttpCallback,
+} from "./worker-environments/artifact-transfer-http.js";
 import type { WorkerBundleProducer, WorkerNpmArtifact } from "./worker-environments/bundle.js";
 import {
   bindDeviceWorkerAvailability,
@@ -35,6 +38,7 @@ import { nodeWorkerGatewayNamespace as resolveNodeWorkerGatewayNamespace } from 
 import type { NodeWorkerWorkspaceBindingResolver } from "./worker-environments/node-worker-tunnel.js";
 import type { NodeWorkerBundleRetention } from "./worker-environments/node-workspace-retain-coordinator.js";
 import type { NodeWorkspaceTransferHttpCallback } from "./worker-environments/node-workspace-transfer-http-contract.js";
+import { createNodeWorkspaceTransferHttpCallback } from "./worker-environments/node-workspace-transfer-http.js";
 import {
   createWorkerPlacementRuntimeInstallReader,
   type WorkerPlacementRuntimeInstallReader,
@@ -140,9 +144,7 @@ export async function createGatewayWorkerEnvironmentRuntime(params: {
     { createNodeWorkerPreparedWorkspaceTransport },
     { createGatewayNodeWorkerBundleInstaller },
     { createNodeWorkerBundleTransferService },
-    { createArtifactTransferHttpCallback },
     { createNodeWorkspaceTransferService },
-    { createNodeWorkspaceTransferHttpCallback },
     { createWorkerNodeDesktopCarrier },
     { createWorkerNodePortalCarrier },
     { createWorkerComputerService },
@@ -159,9 +161,7 @@ export async function createGatewayWorkerEnvironmentRuntime(params: {
     import("./worker-environments/node-worker-prepared-workspace-transport.js"),
     import("./worker-environments/node-worker-bundle-installer.js"),
     import("./worker-environments/node-worker-bundle-transfer-service.js"),
-    import("./worker-environments/artifact-transfer-http.js"),
     import("./worker-environments/node-workspace-transfer-service.js"),
-    import("./worker-environments/node-workspace-transfer-http.js"),
     import("./worker-environments/node-desktop-carrier.js"),
     import("./worker-environments/portal-node-carrier.js"),
     import("./worker-environments/computer-service.js"),

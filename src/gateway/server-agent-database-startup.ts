@@ -1,5 +1,9 @@
 import { resolveAgentDir } from "../agents/agent-scope-config.js";
 import { resolveAuthProfileDatabasePath } from "../agents/auth-profiles/sqlite.js";
+import {
+  refreshPreparedModelRuntimeSnapshots,
+  getPreparedModelRuntimeSnapshot,
+} from "../agents/prepared-model-runtime.js";
 import { resolveConfiguredAgentDatabaseTargets } from "../config/sessions/targets.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.types.js";
@@ -26,7 +30,6 @@ export function activateGatewayAgentDatabaseStartup(params: {
       runWithSpawnBroker(broker, async () => {
         const [
           { runStartupSessionMigration },
-          { refreshPreparedModelRuntimeSnapshots, getPreparedModelRuntimeSnapshot },
           { listConfiguredOwnerInputs },
           {
             getActiveSecretsRuntimeSnapshot,
@@ -35,7 +38,6 @@ export function activateGatewayAgentDatabaseStartup(params: {
           },
         ] = await Promise.all([
           import("./server-startup-session-migration.js"),
-          import("../agents/prepared-model-runtime.js"),
           import("../agents/prepared-model-runtime.configured.js"),
           import("../secrets/runtime.js"),
         ]);

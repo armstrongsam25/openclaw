@@ -1,5 +1,6 @@
 import path from "node:path";
 import { listAgentIds, tryResolveSoleAgentId } from "../agents/agent-scope.js";
+import { bindAgentToolGatewayRequest } from "../agents/tools/in-process-gateway.js";
 import { isExperimentalClawsEnabled } from "../claws/experimental.js";
 import {
   detectLegacyClawdBrowserProfileResidue,
@@ -95,7 +96,6 @@ export type CoreHealthCheckDeps = {
 async function listGatewayCronJobsWithRuntime(
   ctx: HealthCheckContext,
 ): Promise<readonly CronJob[]> {
-  const { bindAgentToolGatewayRequest } = await import("../agents/tools/in-process-gateway.js");
   const requestGateway = bindAgentToolGatewayRequest({ hostedOnly: true });
   if (
     (await hasActiveGatewayExecCredential({ cfg: ctx.cfg })) &&

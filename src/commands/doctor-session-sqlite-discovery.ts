@@ -16,10 +16,8 @@ import {
 } from "../config/sessions/legacy-store-inspection.js";
 import { collectSessionStateIdsForEntry } from "../config/sessions/session-accessor.sqlite-references.js";
 import { resolveUnsuffixedSqliteTargetFromSessionStorePath } from "../config/sessions/session-sqlite-target-paths.js";
-import {
-  resolveAllAgentSessionStoreCandidateTargetsSync,
-  type SessionStoreTarget,
-} from "../config/sessions/targets.js";
+import type { SessionStoreTarget } from "../config/sessions/session-store-target.types.js";
+import { resolveAllAgentSessionStoreCandidateTargetsSync } from "../config/sessions/targets.js";
 import type { SessionEntry } from "../config/sessions/types.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { resolveRealpathOrAbsolute as canonicalFilePath } from "../infra/boundary-path.js";

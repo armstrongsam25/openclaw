@@ -53,7 +53,7 @@ function createReviewerHarness(
       acquireSimpleCompletionModelForAgent:
         prepare as unknown as typeof import("./simple-completion-runtime.js").acquireSimpleCompletionModelForAgent,
       completeWithPreparedSimpleCompletionModel:
-        complete as unknown as typeof import("./simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel,
+        complete as unknown as typeof import("./simple-completion-execution.js").completeWithPreparedSimpleCompletionModel,
     },
   });
   return { reviewer, prepare, complete };
@@ -362,7 +362,7 @@ describe("createModelExecAutoReviewer", () => {
           acquireSimpleCompletionModelForAgent:
             prepare as unknown as typeof import("./simple-completion-runtime.js").acquireSimpleCompletionModelForAgent,
           completeWithPreparedSimpleCompletionModel:
-            complete as unknown as typeof import("./simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel,
+            complete as unknown as typeof import("./simple-completion-execution.js").completeWithPreparedSimpleCompletionModel,
         },
       });
 
@@ -536,7 +536,7 @@ describe("createModelExecAutoReviewer", () => {
         acquireSimpleCompletionModelForAgent:
           prepare as unknown as typeof import("./simple-completion-runtime.js").acquireSimpleCompletionModelForAgent,
         completeWithPreparedSimpleCompletionModel:
-          complete as unknown as typeof import("./simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel,
+          complete as unknown as typeof import("./simple-completion-execution.js").completeWithPreparedSimpleCompletionModel,
       },
     });
 
@@ -582,7 +582,7 @@ describe("createModelExecAutoReviewer", () => {
           stopReason: "error" as const,
           errorMessage: message,
           content: [],
-        })) as unknown as typeof import("./simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel,
+        })) as unknown as typeof import("./simple-completion-execution.js").completeWithPreparedSimpleCompletionModel,
       },
     });
 
@@ -640,7 +640,7 @@ describe("createModelExecAutoReviewer", () => {
                 }),
               },
             ],
-          })) as unknown as typeof import("./simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel,
+          })) as unknown as typeof import("./simple-completion-execution.js").completeWithPreparedSimpleCompletionModel,
         },
       });
 
@@ -734,7 +734,7 @@ describe("createModelExecAutoReviewer", () => {
         acquireSimpleCompletionModelForAgent:
           prepare as unknown as typeof import("./simple-completion-runtime.js").acquireSimpleCompletionModelForAgent,
         completeWithPreparedSimpleCompletionModel:
-          complete as unknown as typeof import("./simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel,
+          complete as unknown as typeof import("./simple-completion-execution.js").completeWithPreparedSimpleCompletionModel,
       },
     });
 
@@ -832,7 +832,7 @@ describe("createModelExecAutoReviewer", () => {
           acquireSimpleCompletionModelForAgent:
             prepare as unknown as typeof import("./simple-completion-runtime.js").acquireSimpleCompletionModelForAgent,
           completeWithPreparedSimpleCompletionModel:
-            complete as unknown as typeof import("./simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel,
+            complete as unknown as typeof import("./simple-completion-execution.js").completeWithPreparedSimpleCompletionModel,
         },
       });
 
@@ -979,7 +979,7 @@ describe("createModelExecAutoReviewer", () => {
         acquireSimpleCompletionModelForAgent:
           prepare as unknown as typeof import("./simple-completion-runtime.js").acquireSimpleCompletionModelForAgent,
         completeWithPreparedSimpleCompletionModel:
-          complete as unknown as typeof import("./simple-completion-runtime.js").completeWithPreparedSimpleCompletionModel,
+          complete as unknown as typeof import("./simple-completion-execution.js").completeWithPreparedSimpleCompletionModel,
       },
     });
 

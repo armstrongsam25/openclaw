@@ -4,6 +4,7 @@ import type { OpenClawAgentDatabase } from "./openclaw-agent-db-contract.js";
 import { readOpenClawAgentDatabaseIdentity } from "./openclaw-agent-db-identity.js";
 import { agentDatabaseLifecycle, retainAgentDatabase } from "./openclaw-agent-db-lifecycle.js";
 import { registerOpenClawAgentDatabaseAsyncResource } from "./openclaw-agent-db-resources.js";
+import { captureOpenClawAgentDatabaseExecution } from "./openclaw-agent-execution.js";
 import { runOpenClawAgentWorkerWrite } from "./openclaw-agent-write-admission.js";
 
 /** Keep the published timer's exact native owner pinned through worker settlement. */
@@ -53,8 +54,6 @@ export function registerOpenClawAgentWalMaintenance(
               await pending?.catch(() => {});
             },
           });
-          const { captureOpenClawAgentDatabaseExecution } =
-            await import("./openclaw-agent-execution.js");
           assertCurrent();
           const execution = captureOpenClawAgentDatabaseExecution(options, { expectedIdentity });
           try {

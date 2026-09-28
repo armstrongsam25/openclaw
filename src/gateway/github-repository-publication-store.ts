@@ -21,6 +21,7 @@ import {
   runOpenClawStateWriteTransaction,
 } from "../state/openclaw-state-db.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
+import { executeOpenClawStateWorker } from "../state/openclaw-state-worker-store.js";
 import { deferSharedGitHubPublicationChanged } from "./github-publication-events.js";
 import { createGitHubPublicationExecutionEffects } from "./github-publication-execution-effects.js";
 import { assertReadableSharedGitHubPublication } from "./github-publication-store.js";
@@ -62,7 +63,6 @@ export async function readPendingRepositoryGitHubPublication(
   input: RepositoryGitHubPublicationPendingQuery,
 ): Promise<RepositoryGitHubPublicationStatusRow | undefined> {
   const context = captureOpenClawStateWorkerContext();
-  const { executeOpenClawStateWorker } = await import("../state/openclaw-state-worker-store.js");
   return await executeOpenClawStateWorker(context, {
     type: "githubRepository.personalPending",
     input,

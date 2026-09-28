@@ -23,6 +23,7 @@ import {
   type ModelDirectiveSelection,
 } from "./model-selection-directive.js";
 import type { ReplySessionEntryHandle } from "./session-entry-handle.js";
+import { persistReplySessionEntry } from "./session-entry-persistence.js";
 
 type ResetModelResult = {
   selection?: ModelDirectiveSelection;
@@ -77,7 +78,6 @@ async function applySelectionToSession(params: {
   let appliedEntry = nextSessionEntry;
   let selectionApplied = true;
   if (storePath) {
-    const { persistReplySessionEntry } = await import("./session-entry-persistence.js");
     const persistence = await persistReplySessionEntry({
       storePath,
       sessionKey,

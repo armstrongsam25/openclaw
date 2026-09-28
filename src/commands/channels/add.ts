@@ -26,6 +26,7 @@ import { createLazyPromise } from "../../shared/lazy-promise.js";
 import { createClackPrompter } from "../../wizard/clack-prompter.js";
 import { WizardCancelledError } from "../../wizard/prompts.js";
 import { normalizeExternalChannelSetupConfig } from "../channel-setup/config-compatibility.js";
+import { isCatalogChannelInstalled } from "../channel-setup/discovery.js";
 import { resolveChannelSetupOwner } from "../channel-setup/owner.js";
 import { withCommandPluginMetadata, type ConfigWriteSnapshot } from "../config-validation.js";
 import { parseAccountSelector } from "./account-selector.js";
@@ -206,7 +207,6 @@ async function configureChannelAccount(
 
   if (catalogEntry) {
     const workspaceDir = resolveWorkspaceDir();
-    const { isCatalogChannelInstalled } = await import("../channel-setup/discovery.js");
     const registeredPlugin = channel ? getLoadedChannelPlugin(channel) : undefined;
     const bundledSetupPlugin = channel ? getBundledChannelSetupPlugin(channel) : undefined;
     if (

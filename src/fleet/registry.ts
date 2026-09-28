@@ -8,6 +8,10 @@ import { executeExistingOpenClawStateRead } from "../state/openclaw-state-db-rea
 import { resolveOpenClawStateSqlitePath } from "../state/openclaw-state-db.paths.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
 import type { OpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.types.js";
+import {
+  executeOpenClawStateWorker,
+  runOpenClawStateWorkerOperation,
+} from "../state/openclaw-state-worker-store.js";
 import type {
   FleetCellOperationName,
   FleetCellRecord,
@@ -55,7 +59,6 @@ async function writeFleetRegistry<Key extends keyof FleetRegistryWriteOperations
   context: OpenClawStateWorkerContext,
   command: { type: Key; input: FleetRegistryWriteOperations[Key]["input"] },
 ): Promise<FleetRegistryWriteOperations[Key]["output"]> {
-  const { executeOpenClawStateWorker } = await import("../state/openclaw-state-worker-store.js");
   return await executeOpenClawStateWorker(context, command);
 }
 
@@ -132,8 +135,6 @@ export async function withFleetCellOperationLease<T>(
   const owner = params.owner ?? crypto.randomUUID();
   const tenantId = params.tenantId;
   const claim = { tenantId, owner, operation: params.operation, nowMs: params.nowMs };
-  const { runOpenClawStateWorkerOperation } =
-    await import("../state/openclaw-state-worker-store.js");
   let phase: "claim" | "operation" | "cleanup" | "closed" = "claim";
   const assertCurrent = (commandType?: PropertyKey) => {
     context.admission.assertCurrent();

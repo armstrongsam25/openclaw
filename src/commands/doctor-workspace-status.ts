@@ -15,10 +15,8 @@ import {
   type PluginVersionDriftReport,
   type PluginVersionRestartReadiness,
 } from "../plugins/plugin-version-drift.js";
-import {
-  buildPluginCompatibilityWarnings,
-  buildPluginRegistrySnapshotReport,
-} from "../plugins/status.js";
+import { buildPluginCompatibilityWarnings } from "../plugins/status-compatibility.js";
+import { buildPluginRegistrySnapshotReport } from "../plugins/status-snapshot.js";
 
 type NoteWorkspaceStatusOptions = {
   pluginVersionReadiness?: PluginVersionRestartReadiness;

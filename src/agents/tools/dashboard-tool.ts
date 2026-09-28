@@ -19,8 +19,8 @@ import {
   ToolInputError,
 } from "./common.js";
 import { getGatewayToolCallerIdentity } from "./gateway-caller-context.js";
+import { callInProcessGatewayTool } from "./gateway.js";
 import {
-  callInProcessGatewayTool,
   getInProcessGatewayToolContext,
   type InProcessGatewayCaller,
 } from "./in-process-gateway.js";

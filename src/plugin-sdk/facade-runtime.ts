@@ -120,15 +120,6 @@ function loadFacadeActivationCheckRuntime(): FacadeActivationCheckRuntimeModule 
   }
 }
 
-// Async and synchronous host readers share the same native module and memo.
-async function loadFacadeActivationCheckRuntimeAsync(): Promise<FacadeActivationCheckRuntimeModule> {
-  const module =
-    getFacadeActivationCheckRuntimeModule() ??
-    (await import("./facade-activation-check.runtime.js"));
-  setFacadeActivationCheckRuntimeModule(module);
-  return module;
-}
-
 function buildFacadeActivationCheckParams(
   params: BundledPluginPublicSurfaceParams,
   location: FacadeModuleLocation | null = resolveFacadeModuleLocation(params),
@@ -180,12 +171,11 @@ export function loadActivatedBundledPluginPublicSurfaceModuleSync<T extends obje
   return wrapActivatedSurface(access.pluginId, loadBundledPluginPublicSurfaceModuleSync<T>(params));
 }
 
-/** Load activation asynchronously; allowed public artifacts still use the synchronous loader. */
+/** Defer activation and public-surface publication through the shared native loader. */
 export async function loadActivatedBundledPluginPublicSurfaceModule<T extends object>(
   params: BundledPluginPublicSurfaceParams,
 ): Promise<T> {
-  await loadFacadeActivationCheckRuntimeAsync().catch(throwFacadeActivationCheckRuntimeUnavailable);
-  return loadActivatedBundledPluginPublicSurfaceModuleSync<T>(params);
+  return Promise.resolve().then(() => loadActivatedBundledPluginPublicSurfaceModuleSync<T>(params));
 }
 
 /** Load an activated plugin public surface, returning null when activation policy blocks access. */
@@ -206,8 +196,9 @@ export function tryLoadActivatedBundledPluginPublicSurfaceModuleSync<T extends o
 export async function tryLoadActivatedBundledPluginPublicSurfaceModule<T extends object>(
   params: BundledPluginPublicSurfaceParams,
 ): Promise<T | null> {
-  await loadFacadeActivationCheckRuntimeAsync();
-  return tryLoadActivatedBundledPluginPublicSurfaceModuleSync<T>(params);
+  return Promise.resolve().then(() =>
+    tryLoadActivatedBundledPluginPublicSurfaceModuleSync<T>(params),
+  );
 }
 
 /** Test-only hooks for facade activation and resolution checks. */

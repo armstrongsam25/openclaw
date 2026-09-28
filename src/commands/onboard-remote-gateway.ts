@@ -1,4 +1,3 @@
-// Remote-Gateway onboarding adapters keep inference detection and activation on the Gateway host.
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import type {
@@ -11,7 +10,9 @@ import type {
 } from "../../packages/gateway-protocol/src/index.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { resolveDeviceIdentityForGatewayCall } from "../gateway/call-device-auth.js";
+// Remote-Gateway onboarding adapters keep inference detection and activation on the Gateway host.
 import {
+  callGatewayCli,
   isGatewayClientRequestError,
   isGatewayTransportError,
   type CallGatewayCliOptions,
@@ -195,7 +196,7 @@ export async function runRemoteGatewayInferenceOnboarding(
   runtime: RuntimeEnv = defaultRuntime,
   deps: RemoteGatewayInferenceOnboardingDeps = {},
 ): Promise<void> {
-  const callGateway = deps.callGateway ?? (await import("../gateway/call.js")).callGatewayCli;
+  const callGateway = deps.callGateway ?? callGatewayCli;
   const runGuidedOnboarding =
     deps.runGuidedOnboarding ?? (await import("./onboard-guided.js")).runGuidedOnboarding;
   const boundConfig = bindGatewayConfig(target);

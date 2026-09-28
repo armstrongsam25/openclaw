@@ -22,7 +22,7 @@ import type {
   ToolProgressDetailMode,
   ToolResultFormat,
 } from "./embedded-agent-subscribe.shared-types.js";
-import type { PreparedProviderFailoverOwner } from "./failover/provider-patterns.js";
+import type { PreparedProviderFailoverOwner } from "./failover/signal.js";
 import type { AgentInternalEvent } from "./internal-events.js";
 import type { AgentMessage } from "./runtime/index.js";
 import type { AgentSession } from "./sessions/index.js";

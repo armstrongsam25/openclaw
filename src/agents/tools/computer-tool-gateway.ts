@@ -5,11 +5,13 @@ import {
   type ComputerUseCapabilityDescriptor,
 } from "../../plugins/computer-use-contract.js";
 import { getGatewayToolCallerIdentity } from "./gateway-caller-context.js";
+import type { GatewayCallOptions } from "./gateway-options.js";
+import { callGatewayTool, shouldUseInProcessGatewayTool } from "./gateway.js";
 import {
-  callGatewayTool,
-  shouldUseInProcessGatewayTool,
-  type GatewayCallOptions,
-} from "./gateway.js";
+  bindAgentToolGatewayRequest,
+  runWithGatewayToolCleanupContext,
+  withAgentToolGatewayRuntimeIdentity,
+} from "./in-process-gateway.js";
 
 export type GatewayComputerStatus =
   | { configured: false; available: false }
@@ -55,11 +57,6 @@ export async function bindGatewayComputerCleanup(params: {
   if (!identity) {
     throw new Error("Gateway computer cleanup requires the admitted run identity");
   }
-  const {
-    bindAgentToolGatewayRequest,
-    runWithGatewayToolCleanupContext,
-    withAgentToolGatewayRuntimeIdentity,
-  } = await import("./in-process-gateway.js");
   const request = runWithGatewayToolCleanupContext(
     () => bindAgentToolGatewayRequest({ resolveGatewayContext: caller.gatewayContextResolver }),
     caller.gatewayContextResolver,

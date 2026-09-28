@@ -5,6 +5,8 @@
  * server types and helpers without paying the full startup dependency graph.
  */
 import { measureGatewayBootstrapStep } from "../cli/startup-trace.js";
+import { createSqliteReadOnlyWorkerScope } from "../infra/sqlite-readonly-worker.js";
+import { createSubsystemLogger } from "../logging/subsystem.js";
 import { resolveOpenClawStateSqlitePath } from "../state/openclaw-state-db.paths.js";
 import type { GatewayServerOptions } from "./server-public.js";
 import { GatewayStartupCleanupError, rethrowGatewayStartupError } from "./server-shutdown.js";
@@ -57,7 +59,6 @@ async function startGatewayServerWithRuntime(
   const startupStartedAt = opts.startupStartedAt ?? Date.now();
   let stopDatabaseAdmission: (() => Promise<void>) | undefined;
   const start = async () => {
-    const { createSqliteReadOnlyWorkerScope } = await import("../infra/sqlite-readonly-worker.js");
     const readOnlyWorkers = createSqliteReadOnlyWorkerScope();
     const { withAgentDatabaseStartupAdmission } =
       await import("../state/agent-database-startup.js");
@@ -99,7 +100,6 @@ async function startGatewayServerWithRuntime(
       }
     },
     async onStartupFailure(message) {
-      const { createSubsystemLogger } = await import("../logging/subsystem.js");
       createSubsystemLogger("gateway").error(message);
     },
   });
@@ -112,7 +112,6 @@ async function startGatewayServerWithRuntime(
     await broker.close();
   };
   try {
-    const { createSubsystemLogger } = await import("../logging/subsystem.js");
     logger = createSubsystemLogger("gateway");
     logger.info(`spawn broker ready pid=${broker.pid}`);
     const server = await runWithSpawnBroker(broker, start);

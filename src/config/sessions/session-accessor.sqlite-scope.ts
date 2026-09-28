@@ -34,6 +34,11 @@ import { resolveStateDir } from "../paths.js";
 import { formatSqliteSessionFileMarker } from "./legacy-sqlite-marker.js";
 import { resolveSessionArtifactDirectory } from "./paths.js";
 import type {
+  ResolvedSqliteScope,
+  ResolvedSqliteReadScope,
+  ResolvedTranscriptScope,
+  ResolvedTranscriptReadScope,
+  ResolvedSqliteStoreTarget,
   SessionTranscriptReadScope,
   SessionTranscriptWriteScope,
   SqliteSessionArtifactPreparationDiagnostics,
@@ -45,7 +50,6 @@ import { resolveUnsuffixedSqliteTargetFromSessionStorePath } from "./session-sql
 import {
   prepareSqliteTargetFromSessionStorePath,
   resolveSqliteTargetFromSessionStorePath,
-  type ResolvedSqliteStoreTarget,
 } from "./session-sqlite-target.js";
 import { normalizeStoreSessionKey } from "./store-entry.js";
 import type { InternalSessionEntry } from "./types.js";
@@ -79,27 +83,6 @@ type SessionSqliteDatabase = Pick<
   | "transcript_events"
 > & {
   sqlite_schema: { name: string | null; type: string };
-};
-
-export type ResolvedSqliteScope = {
-  agentId: string;
-  databaseAgentId?: string;
-  env?: NodeJS.ProcessEnv;
-  ownerStorePath?: string;
-  path?: string;
-  sessionKey: string;
-};
-
-export type ResolvedSqliteReadScope = Omit<ResolvedSqliteScope, "sessionKey"> & {
-  sessionKey?: string;
-};
-
-export type ResolvedTranscriptScope = ResolvedSqliteScope & {
-  sessionId: string;
-};
-
-export type ResolvedTranscriptReadScope = ResolvedSqliteReadScope & {
-  sessionId: string;
 };
 
 export type SessionSqliteTargetResolutionCache = Map<

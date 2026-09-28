@@ -8,11 +8,8 @@ import {
   isPluginRegistryRetired,
   getPluginLoaderCacheState,
 } from "../../plugins/registry-lifecycle.js";
-import {
-  clearActivePluginRegistry,
-  getActivePluginRegistry,
-  setActivePluginRegistry,
-} from "../../plugins/runtime.js";
+import { getActivePluginRegistry, setActivePluginRegistry } from "../../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../../plugins/runtime.test-support.js";
 import { createSyncSuiteTempRootTracker } from "../../plugins/test-helpers/fs-fixtures.js";
 import { runModelsAuthLoginFlowCore } from "./auth.js";
 

@@ -47,7 +47,17 @@ const compactRuntimeMocks = vi.hoisted(() => ({
   compactEmbeddedAgentSessionOnDemand: vi.fn(),
 }));
 
-vi.mock("../simple-completion-runtime.js", () => completionMocks);
+vi.mock("../simple-completion-execution.js", () => ({
+  completeWithPreparedSimpleCompletionModel:
+    completionMocks.completeWithPreparedSimpleCompletionModel,
+}));
+vi.mock("../simple-completion-runtime.js", () => ({
+  acquireSimpleCompletionModelForAgent: completionMocks.acquireSimpleCompletionModelForAgent,
+}));
+vi.mock("../simple-completion-selection.js", () => ({
+  resolveSimpleCompletionSelectionForAgent:
+    completionMocks.resolveSimpleCompletionSelectionForAgent,
+}));
 vi.mock("./compact.runtime.js", () => compactRuntimeMocks);
 
 // Keep this dedicated leaf on the compaction composition boundary. Runtime/auth/lane policy is

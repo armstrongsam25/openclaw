@@ -22,7 +22,7 @@ import {
   NodeClaudeSkillResultSchema,
   type NodeClaudeSkillInit,
 } from "../infra/node-claude-skill-protocol.js";
-import { removeTemporaryArtifacts } from "../infra/temp-artifact-cleanup.js";
+import { removeTemporaryArtifacts } from "../infra/temp-artifact-removal.js";
 import type { OpenClawPluginNodeHostCommandIo } from "../plugins/types.js";
 import { createDeferredCore } from "../shared/deferred.js";
 import { materializeSkillResources } from "../skills/runtime/resources.js";

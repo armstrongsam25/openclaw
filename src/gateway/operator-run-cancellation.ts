@@ -9,10 +9,8 @@ import {
 import { abortQueuedChatTurnById } from "./chat-queued-turns.js";
 import { retainGatewayDeviceRevocation } from "./device-revocation.js";
 import { captureGatewayOperatorRunAuthority } from "./operator-run-authority.js";
-import {
-  captureAbortedPartial,
-  deferAbortedPartialPersistence,
-} from "./server-methods/chat-aborted-partial.js";
+import { captureAbortedPartial } from "./server-methods/chat-aborted-partial.js";
+import { deferAbortedPartialPersistence } from "./server-methods/chat-transcript-persistence.js";
 import type { GatewayRequestContext } from "./server-methods/types.js";
 import { formatForLog } from "./ws-log.js";
 

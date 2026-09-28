@@ -9,7 +9,7 @@ import {
   readStringArrayParam,
   readToolStringParam,
 } from "./common.js";
-import type { GatewayCallOptions } from "./gateway.js";
+import type { GatewayCallOptions } from "./gateway-options.js";
 import { callNodesToolNodeInvoke, resolveNodesToolInvokeTimeouts } from "./nodes-tool-invoke.js";
 import { resolveAgentNodeId } from "./nodes-utils.js";
 

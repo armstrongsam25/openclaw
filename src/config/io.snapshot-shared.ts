@@ -1,4 +1,4 @@
-import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.js";
+import type { DeferredPluginMigration } from "../infra/deferred-plugin-migrations.contract.js";
 import { setDeferredPluginMigrationConfigFacts } from "./deferred-plugin-migration-config.js";
 import { observeConfigSnapshot } from "./io.observe.js";
 import type { NormalizedConfigIoDeps } from "./io.read.types.js";

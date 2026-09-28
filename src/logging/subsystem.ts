@@ -162,7 +162,7 @@ function formatSubsystemForConsole(subsystem: string): string {
   return parts.join("/");
 }
 
-export function stripRedundantSubsystemPrefixForConsole(
+function stripRedundantSubsystemPrefixForConsole(
   message: string,
   displaySubsystem: string,
 ): string {

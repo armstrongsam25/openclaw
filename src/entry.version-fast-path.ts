@@ -30,12 +30,12 @@ export function tryHandleRootVersionFastPath(
       const detail = error instanceof Error ? (error.stack ?? error.message) : String(error);
       const message = `[openclaw] Failed to resolve version: ${detail}\n`;
       try {
-        const [{ loadCliDotEnv }, { formatConsoleDiagnosticBlock }] = await Promise.all([
+        const [{ loadCliDotEnv }, { writeConsoleDiagnosticError }] = await Promise.all([
           import("./cli/dotenv.js"),
-          import("./logging/json-console-line.js"),
+          import("./logging/diagnostic.runtime.js"),
         ]);
         loadCliDotEnv({ quiet: true });
-        process.stderr.write(formatConsoleDiagnosticBlock({ level: "error", message }));
+        writeConsoleDiagnosticError(message);
       } catch {
         process.stderr.write(message);
       } finally {

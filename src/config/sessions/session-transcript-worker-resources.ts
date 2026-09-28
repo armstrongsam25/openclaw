@@ -43,7 +43,7 @@ import type {
   SessionStoreTargetReadRequest,
   SessionStoreTargetReadResult,
   SessionStoreTargetInventoryResult,
-} from "./session-store-target-inventory.js";
+} from "./session-store-target.types.js";
 import type {
   SessionHistoryWorkerInput,
   SessionTranscriptWorkerReply,

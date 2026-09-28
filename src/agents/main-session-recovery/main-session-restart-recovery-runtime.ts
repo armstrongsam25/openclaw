@@ -10,7 +10,7 @@ import { runWithGatewayIndependentRootWorkAdmission } from "../../process/gatewa
 import { runWithMainSessionRecoveryAdmission } from "./main-session-recovery-admission.js";
 import { createMainSessionRecoveryCapacity } from "./main-session-recovery-capacity.js";
 import { getMainSessionRecoveryRetryCount } from "./main-session-recovery-state.js";
-import type { MainSessionRecoveryStoreTarget } from "./main-session-recovery-store.js";
+import type { MainSessionRecoveryStoreTarget } from "./main-session-recovery-types.js";
 import { restartRecoveryStoreTargetKey } from "./main-session-restart-recovery-diagnostics.js";
 import { markStartupOrphanedMainSessionsForRecovery } from "./main-session-restart-recovery-marking.js";
 import {

@@ -11,7 +11,7 @@ import { loadAndActivateRootPluginRegistry } from "./loader.js";
 import { resetPluginCache, waitForPluginCacheRetirement } from "./plugin-cache.js";
 import { getPluginSetupModuleLoader } from "./plugin-setup-module.js";
 import { verifyPreparedModelGenerationCleanup } from "./prepared-model-generation.retirement.test-support.js";
-import { clearActivePluginRegistry } from "./runtime.js";
+import { clearActivePluginRegistry } from "./runtime.test-support.js";
 import { withPluginRuntimeRegistryScope } from "./runtime/gateway-request-scope.js";
 
 it.each(["standalone reset", "shared runtime projection"] as const)(

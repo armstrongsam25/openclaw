@@ -26,6 +26,7 @@ import { getCliHistoryWriter } from "./cli-history-boundary.js";
 import type {
   SessionTranscriptWriteScope,
   TranscriptAppendRefusal,
+  ResolvedTranscriptScope,
 } from "./session-accessor.sqlite-contract.js";
 import { publishSessionEntryWorkerMetadataInvalidation } from "./session-accessor.sqlite-entry-cache.js";
 import { readSessionEntryRow } from "./session-accessor.sqlite-entry-store.js";
@@ -40,7 +41,6 @@ import {
   resolveSqliteWriteAdmissionScope,
   runExclusiveSqliteSessionWrite,
   toDatabaseOptions,
-  type ResolvedTranscriptScope,
 } from "./session-accessor.sqlite-scope.js";
 import { prepareTranscriptMessageAppend } from "./session-accessor.sqlite-transcript-message-append.js";
 import {

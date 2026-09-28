@@ -7,7 +7,7 @@ import {
 import { materializeLegacyDefaultAgentRoles } from "../../../config/legacy.default-agent-roles.js";
 import type { OpenClawConfig } from "../../../config/types.openclaw.js";
 import { resolveCronJobEffectiveAgentId } from "../../../cron/agent-id.js";
-import { resolveHeartbeatAgents } from "../../../infra/heartbeat-runner.js";
+import { resolveHeartbeatAgents } from "../../../infra/heartbeat-config.js";
 import { resolveAgentRoute } from "../../../routing/resolve-route.js";
 import { resolveTalkSessionAgentId } from "../../../talk/agent-target.js";
 

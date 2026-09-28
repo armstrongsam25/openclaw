@@ -33,6 +33,7 @@ import {
 } from "../../infra/update-freebsd-pkg-ownership.js";
 import { resolveUpdateInstallRoot } from "../../infra/update-install-root.js";
 import { cleanupStaleManagedServiceUpdateHandoffs } from "../../infra/update-managed-service-handoff-cleanup.js";
+import { assertManagedServiceUpdateHandoffRoot } from "../../infra/update-managed-service-handoff.js";
 import {
   POST_CORE_UPDATE_CHANNEL_ENV,
   POST_CORE_UPDATE_ENV,
@@ -681,8 +682,6 @@ export async function prepareUpdateCommand(opts: UpdateCommandOptions) {
   opts.run?.executorFence?.assertCurrent();
   const handoffRoot = controlPlaneUpdateSentinelMeta?.root;
   if (handoffRoot) {
-    const { assertManagedServiceUpdateHandoffRoot } =
-      await import("../../infra/update-managed-service-handoff.js");
     await assertManagedServiceUpdateHandoffRoot({
       expectedRoot: handoffRoot,
       root: discoveredRoot,

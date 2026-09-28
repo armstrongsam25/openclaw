@@ -28,7 +28,7 @@ import {
   normalizeMainSessionRecoveryRunFences,
   transitionMainSessionRecovery,
 } from "./main-session-recovery-state.js";
-import type { MainSessionRecoveryStoreTarget } from "./main-session-recovery-store.js";
+import type { MainSessionRecoveryStoreTarget } from "./main-session-recovery-types.js";
 import {
   recordStartupRecoveryStoreResult,
   restartRecoveryStoreTargetKey,

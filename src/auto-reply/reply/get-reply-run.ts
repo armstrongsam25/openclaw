@@ -1,4 +1,5 @@
 import { withPreparedModelRuntimePluginGenerationScope } from "../../agents/prepared-model-runtime-generation-scope.js";
+import { acquireAgentRunPreparedModelRuntime } from "../../agents/prepared-model-runtime.js";
 import { withPluginRuntimeGenerationScope } from "../../plugins/runtime/generation-scope.js";
 import type { ReplyPayload } from "../types.js";
 import { prepareReplyRunAdmission } from "./get-reply-run-admission.js";
@@ -30,8 +31,6 @@ export async function runPreparedReply(
     return executePreparedReplyContext(context);
   }
 
-  const { acquireAgentRunPreparedModelRuntime } =
-    await import("../../agents/prepared-model-runtime.js");
   await using lease = await acquireAgentRunPreparedModelRuntime(
     {
       config: dispatchRuntime.config,

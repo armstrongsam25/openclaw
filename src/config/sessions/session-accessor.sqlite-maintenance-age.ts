@@ -1,7 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import { stageSqliteTransactionState } from "../../infra/sqlite-post-commit.js";
 import { parseAgentSessionKey } from "../../sessions/session-key-utils.js";
-import type { OpenClawAgentDatabase } from "../../state/openclaw-agent-db.js";
+import type { OpenClawAgentDatabase } from "../../state/openclaw-agent-db-contract.js";
+import type { SessionEntryMaintenanceAgeFact } from "./session-accessor.sqlite-lifecycle-types.js";
 import { readSessionMaintenanceAgeQueries } from "./session-accessor.sqlite-maintenance-age-queries.js";
 import { hasCanonicalSessionValidationProjection } from "./session-canonical-key.js";
 import {
@@ -11,11 +12,6 @@ import {
 } from "./store-maintenance.js";
 import type { SessionEntry } from "./types.js";
 
-export type SessionEntryMaintenanceAgeFact = {
-  maintenance: ResolvedSessionMaintenanceConfig;
-  next: { at: number };
-  recheckAt: number;
-};
 export type SessionEntryMaintenanceAgeCapture = { fact?: SessionEntryMaintenanceAgeFact };
 
 type Activity = Parameters<typeof getSessionMaintenanceActivityAt>[0];

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { heartbeatRunnerTelegramPlugin } from "../../../test/helpers/infra/heartbeat-runner-channel-plugins.js";
 import * as embeddedAgent from "../../agents/embedded-agent.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
-import { runHeartbeatOnce } from "../../infra/heartbeat-runner.js";
+import { runHeartbeatOnce } from "../../infra/heartbeat-runner-run.js";
 import { seedMainSessionStore } from "../../infra/heartbeat-runner.test-utils.js";
 import { enqueueSystemEvent, resetSystemEventsForTest } from "../../infra/system-events.js";
 import { resetPluginRuntimeStateForTest, setActivePluginRegistry } from "../../plugins/runtime.js";

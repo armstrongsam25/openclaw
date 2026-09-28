@@ -2,7 +2,6 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { requesterMcpOAuthStoreKeyPrefix } from "../agents/mcp-oauth-identity.js";
 import { readMcpOAuthPendingAuthorization, readMcpOAuthStore } from "../agents/mcp-oauth-store.js";
-import { completeOAuthCallback } from "../agents/mcp-oauth.js";
 import { resolveMcpTransportConfig } from "../agents/mcp-transport-config.js";
 import { normalizeConfiguredMcpServers } from "../config/mcp-config-normalize.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
@@ -112,6 +111,7 @@ export async function handleMcpOAuthCallback(
   }
 
   try {
+    const { completeOAuthCallback } = await import("../agents/mcp-oauth.js");
     const result = await completeOAuthCallback(
       {
         storeKey,

@@ -1,9 +1,9 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { DEFAULT_BOOTSTRAP_FILENAME } from "../agents/workspace.js";
-import {
+import type {
   ensureOnboardingPluginInstalled,
-  type OnboardingPluginInstallEntry,
+  OnboardingPluginInstallEntry,
 } from "../commands/onboarding-plugin-install.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { fetchClawHubSkillVerification } from "../infra/clawhub-skills.js";
@@ -301,7 +301,6 @@ export async function setupAppRecommendations(params: {
   await recordResult(selectedMatches);
   let pendingMatches = selectedMatches;
   const retryMatches: SetupAppRecommendationMatch[] = [];
-  const ensurePlugin = params.deps?.ensurePlugin ?? ensureOnboardingPluginInstalled;
   const installSkill = params.deps?.installSkill ?? installSkillFromClawHub;
   const isSkillInstalled = params.deps?.isSkillInstalled ?? isClawHubSkillInstalled;
   for (const match of selectedMatches) {
@@ -330,6 +329,10 @@ export async function setupAppRecommendations(params: {
         if (!entry) {
           throw new Error(t("wizard.appRecommendations.catalogEntryMissing"));
         }
+        const ensurePlugin =
+          params.deps?.ensurePlugin ??
+          (await import("../commands/onboarding-plugin-install.js"))
+            .ensureOnboardingPluginInstalled;
         const pluginResult = await ensurePlugin({
           cfg: next,
           entry,

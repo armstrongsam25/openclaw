@@ -1,11 +1,15 @@
 // Post-install migration helpers guide users through setup after package install.
 import { formatCliCommand } from "../cli/command-format.js";
+import { createMigrationLogger } from "../commands/migrate/context.js";
+import { withMigrationProvider } from "../commands/migrate/providers.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import {
   readMigrationConfigPatchDetails,
   writeMigrationConfigPath,
 } from "../plugin-sdk/migration.js";
+import { resolveManifestContractRuntimePluginResolution } from "../plugins/manifest-contract-runtime.js";
+import { withPluginMigrationProviders } from "../plugins/migration-provider-runtime.js";
 import type { MigrationProviderPlugin } from "../plugins/types.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { createLazyRuntimeModule } from "../shared/lazy-runtime.js";
@@ -35,10 +39,6 @@ type ResolvedProviderCandidate = {
   source?: string;
 };
 
-const loadMigrationContextModule = createLazyRuntimeModule(
-  () => import("../commands/migrate/context.js"),
-);
-
 const loadConfigPathsModule = createLazyRuntimeModule(() => import("../config/paths.js"));
 
 async function resolveCandidates(params: {
@@ -50,15 +50,7 @@ async function resolveCandidates(params: {
   if (params.installedPluginIds.length === 0) {
     return [];
   }
-  const [
-    { resolveManifestContractRuntimePluginResolution },
-    { createMigrationLogger },
-    { resolveStateDir },
-  ] = await Promise.all([
-    import("../plugins/manifest-contract-runtime.js"),
-    loadMigrationContextModule(),
-    loadConfigPathsModule(),
-  ]);
+  const { resolveStateDir } = await loadConfigPathsModule();
   const installedIds = new Set(params.installedPluginIds);
   const stateDir = resolveStateDir();
   const logger = createMigrationLogger(params.runtime);
@@ -159,7 +151,6 @@ export async function offerPostInstallMigrations(
   if (params.installedPluginIds.length === 0) {
     return { config: params.config };
   }
-  const { withPluginMigrationProviders } = await import("../plugins/migration-provider-runtime.js");
   return await withPluginMigrationProviders(
     {
       cfg: params.config,
@@ -233,12 +224,10 @@ async function runPostInstallMigrationOffers(
     let disposingPreparation = false;
     let resultRetained = false;
     try {
-      const [{ migrateDefaultCommand }, { createMigrationLogger }, { resolveStateDir }] =
-        await Promise.all([
-          import("../commands/migrate.js"),
-          loadMigrationContextModule(),
-          loadConfigPathsModule(),
-        ]);
+      const [{ migrateDefaultCommand }, { resolveStateDir }] = await Promise.all([
+        import("../commands/migrate.js"),
+        loadConfigPathsModule(),
+      ]);
       const runCommand = async (provider: MigrationProviderPlugin) => {
         let preparation: Awaited<ReturnType<NonNullable<MigrationProviderPlugin["prepareApply"]>>>;
         try {
@@ -272,7 +261,6 @@ async function runPostInstallMigrationOffers(
       if (nextConfig === params.config) {
         await runCommand(candidate.provider);
       } else {
-        const { withMigrationProvider } = await import("../commands/migrate/providers.js");
         await withMigrationProvider(candidate.provider.id, nextConfig, runCommand);
       }
     } catch (error) {

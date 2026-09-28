@@ -17,10 +17,14 @@ const { callGatewayToolMock, dispatchMock, host } = vi.hoisted(() => ({
   callGatewayToolMock: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({ ok: true })),
 }));
 
-vi.mock("./gateway.js", () => ({
-  callGatewayTool: callGatewayToolMock,
-  readGatewayCallOptions: vi.fn(() => ({})),
-}));
+vi.mock("./gateway.js", async (importOriginal) => {
+  const { callInProcessGatewayTool } = await importOriginal<typeof import("./gateway.js")>();
+  return {
+    callGatewayTool: callGatewayToolMock,
+    callInProcessGatewayTool,
+    readGatewayCallOptions: vi.fn(() => ({})),
+  };
+});
 
 vi.mock("../../gateway/server-plugin-in-process-dispatch.js", () => ({
   dispatchGatewayMethodInProcess: dispatchMock,

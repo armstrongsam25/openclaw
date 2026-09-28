@@ -42,7 +42,7 @@ import {
   readStringArrayParam,
   readToolStringParam,
 } from "./common.js";
-import type { decodeDataUrl } from "./image-tool.helpers.js";
+import { decodeDataUrl } from "./image-tool.helpers.js";
 import {
   capabilityAuthOperation,
   getCurrentCapabilityMetadataSnapshot,
@@ -516,7 +516,6 @@ export async function loadMediaToolReferences<T>(params: {
     }
     let media: LoadedToolReferenceMedia;
     if (reference.isDataUrl) {
-      const { decodeDataUrl } = await import("./image-tool.helpers.js");
       params.signal?.throwIfAborted();
       media = decodeDataUrl(resolvedInput, { maxBytes: params.maxBytes });
     } else {

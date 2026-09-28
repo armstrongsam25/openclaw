@@ -1,5 +1,6 @@
 import pLimit from "p-limit";
 import { racePromiseWithAbortSignal } from "../infra/abort-signal.js";
+import { createSqliteWorkerOperationAdmission } from "../infra/sqlite-worker-operation-admission.js";
 import { WorkerTaskError } from "../infra/worker-task-pool.js";
 import { getOpenClawDatabaseMaintenanceScope } from "./openclaw-state-db-async-lifecycle.js";
 import { executeExistingOpenClawStateRead } from "./openclaw-state-db-readonly.js";
@@ -9,6 +10,10 @@ import {
   captureOpenClawStateReadContext,
   captureOpenClawStateWorkerContext,
 } from "./openclaw-state-worker-context.js";
+import {
+  executeOpenClawStateWorker,
+  runOpenClawStateWorkerOperation,
+} from "./openclaw-state-worker-store.js";
 import { onUserProfilesChanged, readUserProfileVersion } from "./user-profile-events.js";
 import { profileCatalogPath } from "./user-profile-identity.read.js";
 import {
@@ -273,8 +278,6 @@ export async function adoptTailscaleProfileAvatar(
     ...options,
     path: options.database?.path ?? options.path,
   });
-  const { executeOpenClawStateWorker, runOpenClawStateWorkerOperation } =
-    await import("./openclaw-state-worker-store.js");
   const before = await executeOpenClawStateWorker(first, {
     type: "userProfiles.avatar.inspect",
     input: { profileId },
@@ -300,11 +303,7 @@ export async function adoptTailscaleProfileAvatar(
       profileId,
     );
   }
-  const [{ withOpenClawStateSettlementRead }, { createSqliteWorkerOperationAdmission }] =
-    await Promise.all([
-      import("./openclaw-state-settlement-read.js"),
-      import("../infra/sqlite-worker-operation-admission.js"),
-    ]);
+  const { withOpenClawStateSettlementRead } = await import("./openclaw-state-settlement-read.js");
   return await withOpenClawStateSettlementRead(context, async (settlementRead) =>
     runOpenClawStateWorkerOperation(
       context,

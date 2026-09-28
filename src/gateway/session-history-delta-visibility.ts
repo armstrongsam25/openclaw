@@ -1,9 +1,9 @@
 import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
-import type { SessionTranscriptDisplayDeltaResult } from "../config/sessions/session-accessor.sqlite-history-query.js";
 import type {
   SessionHistoryDelta,
   SessionHistorySubagentFacts,
   SessionHistorySubagentLookup,
+  SessionTranscriptDisplayDeltaResult,
 } from "../config/sessions/session-history-types.js";
 import {
   encodeSessionTranscriptWorkerError,

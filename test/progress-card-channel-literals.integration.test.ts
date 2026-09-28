@@ -14,8 +14,8 @@ import { normalizeAgentPlanSteps } from "../src/channels/streaming.js";
 const { createDiscordDraftPreviewController } = await loadDiscordDraftPreview();
 
 const gatewayCall = vi.hoisted(() => vi.fn<InProcessGatewayCaller>());
-vi.mock("../src/agents/tools/in-process-gateway.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/agents/tools/in-process-gateway.js")>()),
+vi.mock("../src/agents/tools/gateway.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/agents/tools/gateway.js")>()),
   callInProcessGatewayTool: gatewayCall,
 }));
 

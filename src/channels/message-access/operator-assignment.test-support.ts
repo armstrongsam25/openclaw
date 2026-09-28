@@ -8,7 +8,7 @@ import { withGatewayToolCallerIdentity } from "../../agents/tools/gateway-caller
 import {
   callInProcessGatewayTool,
   callInProcessGatewayToolWithCreation,
-} from "../../agents/tools/in-process-gateway.js";
+} from "../../agents/tools/gateway.js";
 import { resolveCommandAuthorization } from "../../auto-reply/command-auth.js";
 import {
   captureCommandOwnerAssertion,

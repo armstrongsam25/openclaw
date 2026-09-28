@@ -3,13 +3,13 @@ import { assertAgentDatabaseTerminalOpenAllowed } from "../../state/openclaw-age
 import { getOpenClawAgentDatabaseIfOpen } from "../../state/openclaw-agent-db.js";
 import { resolveOpenClawAgentSqlitePath } from "../../state/openclaw-agent-db.paths.js";
 import { readSessionTranscriptBoundedActiveContextCore } from "./session-accessor.sqlite-active-context.js";
+import type { ResolvedTranscriptReadScope } from "./session-accessor.sqlite-contract.js";
 import { readSessionTranscriptCurrentTurnEntry } from "./session-accessor.sqlite-current-turn.js";
 import { loadTranscriptReadSnapshotSync } from "./session-accessor.sqlite-read.js";
 import {
   prepareSqliteTranscriptReadScope,
   resolveSqliteTranscriptReadScope,
   toDatabaseOptions,
-  type ResolvedTranscriptReadScope,
 } from "./session-accessor.sqlite-scope.js";
 import type { SessionTranscriptRuntimeTarget } from "./session-accessor.types.js";
 import {

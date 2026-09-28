@@ -126,7 +126,11 @@ vi.mock("../../plugins/status.js", () => ({
   buildAllPluginInspectReports: buildAllPluginInspectReportsMock,
   withPluginDiagnosticsReportForInspection: withPluginDiagnosticsReportForInspectionMock,
   buildPluginInspectReport: buildPluginInspectReportMock,
+}));
+vi.mock("../../plugins/status-snapshot.js", () => ({
   buildPluginRegistrySnapshotReport: buildPluginRegistrySnapshotReportMock,
+}));
+vi.mock("../../plugins/status-compatibility.js", () => ({
   formatPluginCompatibilityNotice: formatPluginCompatibilityNoticeMock,
 }));
 

@@ -1,9 +1,8 @@
 // Route-first machine-readable Gateway health command.
 import { type RuntimeEnv, writeRuntimeJson } from "../../runtime.js";
+import { callGatewayFromCliWithTransport, formatGatewayErrorJsonFromCli } from "../gateway-rpc.js";
 
-type GatewayHealthRpcOpts = Parameters<
-  typeof import("../gateway-rpc.js").callGatewayFromCliWithTransport
->[1];
+type GatewayHealthRpcOpts = Parameters<typeof callGatewayFromCliWithTransport>[1];
 
 type GatewayHealthJsonRouteArgs = {
   rpc: GatewayHealthRpcOpts;
@@ -40,7 +39,6 @@ export async function runGatewayHealthJsonRoute(
   let rpc: GatewayHealthRpcOpts | undefined;
   try {
     rpc = await resolveRouteRpcOptions(args);
-    const { callGatewayFromCliWithTransport } = await import("../gateway-rpc.js");
     writeRuntimeJson(
       runtime,
       await callGatewayFromCliWithTransport("health", rpc, undefined, {
@@ -52,14 +50,8 @@ export async function runGatewayHealthJsonRoute(
     if (!rpc) {
       throw error;
     }
-    const [
-      { emitReachableGatewayAuthDiagnostic, readNonObservingHealthConfig },
-      {
-        formatGatewayAuthErrorJson,
-        formatGatewayClientRequestErrorJson,
-        formatGatewayTransportErrorJson,
-      },
-    ] = await Promise.all([import("../../commands/health.js"), import("../../gateway/call.js")]);
+    const { emitReachableGatewayAuthDiagnostic, readNonObservingHealthConfig } =
+      await import("../../commands/health.js");
     const handled = await emitReachableGatewayAuthDiagnostic({
       error,
       config: rpc.config ?? (await readNonObservingHealthConfig()),
@@ -73,10 +65,7 @@ export async function runGatewayHealthJsonRoute(
     if (handled) {
       return;
     }
-    const payload =
-      formatGatewayAuthErrorJson(error) ??
-      formatGatewayClientRequestErrorJson(error) ??
-      formatGatewayTransportErrorJson(error);
+    const payload = await formatGatewayErrorJsonFromCli(error);
     if (payload) {
       writeRuntimeJson(runtime, payload);
       runtime.exit(1);

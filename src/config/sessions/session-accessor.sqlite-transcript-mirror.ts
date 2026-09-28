@@ -4,12 +4,15 @@ import {
 } from "../../infra/kysely-sync.js";
 import { runSqliteDeferredTransactionSync } from "../../infra/sqlite-transaction.js";
 import type { OpenClawAgentDatabase } from "../../state/openclaw-agent-db.js";
-import type { TranscriptEvent } from "./session-accessor.sqlite-contract.js";
+import type {
+  TranscriptEvent,
+  ResolvedTranscriptScope,
+} from "./session-accessor.sqlite-contract.js";
 import {
   loadTranscriptEventsFromDatabase,
   readTranscriptEventMessage,
 } from "./session-accessor.sqlite-read.js";
-import { getSessionKysely, type ResolvedTranscriptScope } from "./session-accessor.sqlite-scope.js";
+import { getSessionKysely } from "./session-accessor.sqlite-scope.js";
 import { createTranscriptEntryAnchor } from "./session-accessor.sqlite-transcript-anchor.js";
 import { assertSessionTranscriptHot } from "./session-cold-storage-state.js";
 import { sessionTranscriptIndexNeedsReconcile } from "./session-transcript-index.js";

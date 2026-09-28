@@ -5,6 +5,7 @@ import type { OpenClawConfig } from "../../config/config.js";
 import { racePromiseWithAbortSignal } from "../../infra/abort-signal.js";
 import { createApprovalNativeRouteReporter } from "../../infra/approval-native-route-coordinator.js";
 import type { SessionBindingRecord } from "../../infra/outbound/session-binding-service.js";
+import { createPluginMetadataSnapshotFixture } from "../../plugins/plugin-metadata.test-support.js";
 import { createTestRegistry } from "../../test-utils/channel-plugins.js";
 import type { MsgContext } from "../templating.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
@@ -175,10 +176,10 @@ describe("dispatchReplyFromConfig", () => {
     const preparedLookup = vi.fn(({ abortSignal }: { abortSignal?: AbortSignal }) =>
       racePromiseWithAbortSignal(new Promise<never>(() => {}), abortSignal),
     );
-    const runtimeLoaders = await import("./dispatch-from-config.runtime-loaders.js");
-    const preparedLoader = vi.spyOn(runtimeLoaders, "loadPreparedModelRuntime").mockResolvedValue({
-      loadPublishedGatewayReplyDispatchRuntime: preparedLookup,
-    } as never);
+    const preparedRuntime = await import("../../agents/prepared-model-runtime.js");
+    const preparedLoader = vi
+      .spyOn(preparedRuntime, "loadPublishedGatewayReplyDispatchRuntime")
+      .mockImplementation(preparedLookup);
     const dispatch = withDispatchProcessedOutcomeSink(() =>
       dispatchReplyFromConfig({
         ctx: buildTestCtx({
@@ -1109,12 +1110,17 @@ describe("dispatchReplyFromConfig", () => {
         config: cfg,
         modelCatalog: { entries: [], routeVariants: [] },
         inboundPluginRegistry: createTestRegistry([]),
+        pluginGeneration: {
+          pluginMetadataSnapshot: createPluginMetadataSnapshotFixture(),
+          inlineProviderModels: [],
+          configuredCatalogEntries: [],
+        },
       });
     });
-    const runtimeLoaders = await import("./dispatch-from-config.runtime-loaders.js");
-    const preparedLoader = vi.spyOn(runtimeLoaders, "loadPreparedModelRuntime").mockResolvedValue({
-      loadPublishedGatewayReplyDispatchRuntime: preparedLookup,
-    } as never);
+    const preparedRuntime = await import("../../agents/prepared-model-runtime.js");
+    const preparedLoader = vi
+      .spyOn(preparedRuntime, "loadPublishedGatewayReplyDispatchRuntime")
+      .mockImplementation(preparedLookup);
 
     let result: Awaited<ReturnType<typeof dispatchReplyFromConfig>>;
     try {

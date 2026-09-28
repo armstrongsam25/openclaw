@@ -5,6 +5,10 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { extensionForMime, normalizeMimeType } from "@openclaw/media-core/mime";
 import type { Command } from "commander";
+import {
+  assertOkOrThrowHttpError,
+  assertProviderBinaryResponseContent,
+} from "../../agents/provider-http-errors.js";
 import { resolveAgentModelPrimaryValue } from "../../config/model-input.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { createEnumOptionParser } from "../../shared/enum-option.js";
@@ -23,8 +27,6 @@ async function fetchGeneratedVideoDownload(params: {
   provider: string;
   url: string;
 }) {
-  const { assertOkOrThrowHttpError, assertProviderBinaryResponseContent } =
-    await import("../../agents/provider-http-errors.js");
   const {
     fetchWithTimeoutGuarded,
     resolveProviderHttpRequestConfig,

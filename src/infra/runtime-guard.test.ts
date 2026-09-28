@@ -56,6 +56,7 @@ vi.mock("../worker/worker-deploy-runtime.js", () => ({}));
 vi.mock("../process/output-drain.js", () => ({ drainProcessOutput: state.drain }));
 vi.mock("../worker/worker-deploy-browser-runtime.js", () => ({ default: {} }));
 vi.mock("../worker/worker-process.js", () => ({ runWorkerProcess: state.run }));
+vi.mock("../worker/worker.runtime.js", () => ({ loadWorkerTurnRuntime: vi.fn() }));
 
 function createExitingRuntime() {
   return {

@@ -14,8 +14,8 @@ import { withOwnedSessionTranscriptWrites } from "../config/sessions/transcript-
 import { onSessionTranscriptUpdate } from "../sessions/transcript-events.js";
 import { setTestEnvValue } from "../test-utils/env.js";
 import { getLastHeartbeatEvent, resetHeartbeatEventsForTest } from "./heartbeat-events.js";
-import { runHeartbeatOnce } from "./heartbeat-runner.js";
-import type { HeartbeatDeps } from "./heartbeat-runner.js";
+import { runHeartbeatOnce } from "./heartbeat-runner-run.js";
+import type { HeartbeatDeps } from "./heartbeat-runner.test-utils.js";
 import {
   readSessionStoreForTest,
   seedMainSessionStore,

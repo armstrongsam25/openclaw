@@ -4,7 +4,6 @@ import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { callGateway } from "../../gateway/call.js";
 import type { RuntimeEnv } from "../../runtime.js";
 import { toSavedAuthSetupKind } from "../../system-agent/setup-inference-core.js";
-import { activateSetupInference } from "../../system-agent/setup-inference.js";
 import { refreshRunningGatewayAuthState } from "./auth-refresh.js";
 import { loadValidConfigSnapshotOrThrow, resolveModelsTargetAgent } from "./shared.js";
 
@@ -14,6 +13,7 @@ export async function modelsAuthActivateCommand(
 ): Promise<void> {
   const { runtimeConfig } = await loadValidConfigSnapshotOrThrow();
   const { agentId } = resolveModelsTargetAgent(runtimeConfig, opts.agent, { kind: "mutation" });
+  const { activateSetupInference } = await import("../../system-agent/setup-inference.js");
   const result = await activateSetupInference({
     kind: toSavedAuthSetupKind(opts.profileId.trim()),
     agentId,

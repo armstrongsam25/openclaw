@@ -9,10 +9,7 @@ import { loadExecApprovalsReadOnly } from "../../infra/exec-approvals.js";
 import { inspectPortUsage } from "../../infra/ports-inspect.js";
 import { readRestartSentinelReadOnly } from "../../infra/restart-sentinel.js";
 import { resolvePluginControlPlaneWorkspace } from "../../plugins/control-plane-workspace.js";
-import {
-  buildPluginCompatibilityNotices,
-  withPluginDiagnosticsReport,
-} from "../../plugins/status.js";
+import { buildPluginCompatibilityNotices } from "../../plugins/status-compatibility.js";
 import { buildWorkspaceSkillReadiness } from "../../skills/discovery/status.js";
 import { getRemoteSkillEligibility } from "../../skills/runtime/remote.js";
 import { buildStatusAllOverviewRows } from "../status-overview-rows.ts";
@@ -122,6 +119,7 @@ async function resolveStatusAllLocalDiagnosis(params: {
           }
         })()
       : null;
+  const { withPluginDiagnosticsReport } = await import("../../plugins/status.js");
   const pluginCompatibility = await withPluginDiagnosticsReport(
     { config: overview.cfg },
     (report) => buildPluginCompatibilityNotices({ report }),

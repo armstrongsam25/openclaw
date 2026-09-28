@@ -4,7 +4,6 @@ import {
 } from "@openclaw/normalization-core/string-coerce";
 import { resolveUserTimezone } from "../../agents/date-time.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
-import { buildChannelSummary } from "../../infra/channel-summary.js";
 import {
   formatUtcTimestamp,
   formatZonedTimestamp,
@@ -127,11 +126,14 @@ export async function drainFormattedSystemEvents(params: {
   }
   // Each sub-line gets its own prefix so continuation lines can't be mistaken
   // for regular user content.
-  const summaryLines =
+  const summary =
     params.isMainSession && params.isNewSession
-      ? (await buildChannelSummary(params.cfg)).flatMap((line) =>
-          line.split("\n").map((subline) => `System: ${subline}`),
+      ? await import("../../infra/channel-summary.js").then(({ buildChannelSummary }) =>
+          buildChannelSummary(params.cfg),
         )
       : [];
+  const summaryLines = summary.flatMap((line) =>
+    line.split("\n").map((subline) => `System: ${subline}`),
+  );
   return [...summaryLines, ...systemLines].join("\n") || undefined;
 }

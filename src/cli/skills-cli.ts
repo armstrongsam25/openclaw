@@ -15,7 +15,7 @@ import {
 } from "../agents/agent-scope.js";
 import { getRuntimeConfig } from "../config/config.js";
 import { resolveGatewayPort } from "../config/paths.js";
-import type { CallGatewayOptions } from "../gateway/call.js";
+import { callGateway, type CallGatewayOptions } from "../gateway/call.js";
 import { CLAWHUB_TRUST_ERROR_CODE } from "../infra/clawhub-install-trust.js";
 import {
   CLAWHUB_SKILLS_SH_REF_PREFIX,
@@ -132,7 +132,6 @@ async function callSkillsGateway<T>(params: {
   requiredMethods?: string[];
   caps?: CallGatewayOptions["caps"];
 }): Promise<T> {
-  const { callGateway } = await import("../gateway/call.js");
   return await callGateway<T>({
     timeoutMs: GATEWAY_SKILLS_STATUS_TIMEOUT_MS,
     clientName: GATEWAY_CLIENT_NAMES.CLI,

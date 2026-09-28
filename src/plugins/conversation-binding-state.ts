@@ -4,6 +4,7 @@ import { createDeferredCore } from "../shared/deferred.js";
 import { resolveGlobalSingleton } from "../shared/global-singleton.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
 import type { OpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.types.js";
+import { runOpenClawStateWorkerOperation } from "../state/openclaw-state-worker-store.js";
 import { normalizeChannel } from "./conversation-binding-session-key.js";
 import type { PluginBindingApprovalEntry } from "./conversation-binding-state.types.js";
 
@@ -109,8 +110,6 @@ async function getApprovals(
   }
   let approvals: PluginBindingApprovalEntry[];
   try {
-    const { runOpenClawStateWorkerOperation } =
-      await import("../state/openclaw-state-worker-store.js");
     approvals = await runOpenClawStateWorkerOperation(context, (scope) =>
       scope.execute({ type: "plugins.conversationBindingApprovals.read", input: undefined }),
     );
@@ -138,8 +137,6 @@ export function addPersistentApproval(entry: PluginBindingApprovalEntry): Promis
   const key = buildApprovalScopeKey(prepared);
   const context = captureOpenClawStateWorkerContext();
   return serializeApprovalOperation(async () => {
-    const { runOpenClawStateWorkerOperation } =
-      await import("../state/openclaw-state-worker-store.js");
     // A failed write must never publish permission that did not reach disk.
     await runOpenClawStateWorkerOperation(context, (scope) =>
       scope.execute({ type: "plugins.conversationBindingApprovals.upsert", input: prepared }),

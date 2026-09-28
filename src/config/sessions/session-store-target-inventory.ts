@@ -19,45 +19,25 @@ import {
 import {
   resolveSqliteTargetFromSessionStorePath,
   SessionStoreRegistryReadRequired,
-  type SessionStoreRegistryRead,
 } from "./session-sqlite-target.js";
 import {
   captureSessionStoreReadCandidate,
   assertSessionStoreReadCandidate,
-  type CapturedSessionStorePaths,
   type SessionStoreReadCandidate,
 } from "./session-store-read-candidates.js";
-import type { SessionStoreTarget } from "./targets-collision.js";
+import type {
+  SessionStoreTarget,
+  SessionStoreTargetReadRequest,
+  SessionStoreTargetReadResult,
+  SessionStoreTargetInventoryRequest,
+  SessionStoreTargetInventoryResult,
+} from "./session-store-target.types.js";
 import { shouldSkipDiscoveryError } from "./targets-path-validation.js";
 import {
   resolveExistingAgentSessionStoreTargetsReadOnlyResult,
   type SessionStoreTargetsReadCache,
-  type SessionStoreTargetsReadResult,
 } from "./targets-read-availability.js";
 import { isPerAgentSessionStoreConfig, listConfiguredSessionStoreAgentIds } from "./targets.js";
-
-export type SessionStoreTargetReadRequest = {
-  agentId?: string;
-  defaultAgentId?: string;
-  storePath: string;
-  env: NodeJS.ProcessEnv;
-  candidates: SessionStoreReadCandidate[];
-  registeredDatabases: SessionStoreRegistryRead;
-};
-
-type SessionStoreRegistryRequired = {
-  kind: "session-target-registry-required";
-  readFailed?: boolean;
-};
-
-export type SessionStoreTargetReadResult =
-  | SessionStoreRegistryRequired
-  | {
-      kind: "session-store-target";
-      sourcePath: string;
-      logicalAgentId: string;
-      database: { agentId: string; path: string };
-    };
 
 /** Resolve a single configured store without inspecting or listing its session rows. */
 function readSessionStoreTarget(
@@ -146,27 +126,6 @@ export function captureSessionStoreReadCandidates(storePath: string): SessionSto
   }
   return [...candidates.values()];
 }
-
-export type SessionStoreTargetInventoryRequest = {
-  config: OpenClawConfig;
-  legacyDefaultAgentId?: string;
-  agentIds: string[];
-  env: NodeJS.ProcessEnv;
-  paths: CapturedSessionStorePaths;
-  candidates: SessionStoreReadCandidate[];
-  registeredDatabases: SessionStoreRegistryRead;
-};
-
-export type SessionStoreTargetInventoryResult =
-  | SessionStoreRegistryRequired
-  | {
-      kind: "session-target-inventory";
-      agents: Array<{
-        agentId: string;
-        result: SessionStoreTargetsReadResult;
-        reads: Array<{ target: SessionStoreTarget; database: { agentId: string; path: string } }>;
-      }>;
-    };
 
 /** Capture locators and bounded families without reading SQLite or assigning an owner. */
 export function prepareSessionStoreTargetInventory(

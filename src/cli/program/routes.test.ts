@@ -25,8 +25,10 @@ vi.mock("../command-execution-startup.js", () => ({
   ensureCliExecutionBootstrap: vi.fn(async () => {}),
 }));
 
-vi.mock("../config-cli.js", () => ({
+vi.mock("../config-cli-read.js", () => ({
   runConfigGet: runConfigGetMock,
+}));
+vi.mock("../config-cli.js", () => ({
   runConfigUnset: runConfigUnsetMock,
 }));
 

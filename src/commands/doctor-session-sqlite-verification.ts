@@ -7,8 +7,8 @@ import {
   attachSessionEntrySnapshots,
   sessionEntrySnapshotColumns,
 } from "../config/sessions/session-entry-snapshots.js";
+import type { SessionStoreTarget } from "../config/sessions/session-store-target.types.js";
 import { normalizeStoreSessionKey } from "../config/sessions/store-entry.js";
-import type { SessionStoreTarget } from "../config/sessions/targets.js";
 import { readFileDescriptorBoundedSync } from "../infra/boundary-file-read.js";
 import { executeSqliteQueryTakeFirstSync } from "../infra/kysely-sync.js";
 import {

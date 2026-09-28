@@ -8,10 +8,13 @@ import {
   isBillingErrorMessage,
   isRateLimitErrorMessage,
 } from "../failover/classify.js";
-import type { PreparedProviderFailoverOwner } from "../failover/provider-patterns.js";
 import { resolveRetryAfterMs } from "../failover/retry-evidence.js";
 import { extractFailoverSignalDetails } from "../failover/signal-details.js";
-import type { FailoverReason, FailoverSignal } from "../failover/signal.js";
+import type {
+  FailoverReason,
+  FailoverSignal,
+  PreparedProviderFailoverOwner,
+} from "../failover/signal.js";
 export function buildAssistantFailoverSignal(
   msg: AssistantMessage,
   opts?: { provider?: string },

@@ -4,7 +4,7 @@ import {
   type CronMutationCompletion,
 } from "../../cron/mutation-completion.js";
 import type { AgentRuntimeIdentity } from "../../gateway/agent-runtime-identity-token.js";
-import type { CallGatewayOptions } from "../../gateway/call.js";
+import { callGateway, type CallGatewayOptions } from "../../gateway/call.js";
 import { withInProcessAgentRuntimeIdentity } from "../../gateway/in-process-agent-runtime-identity.js";
 import { readInProcessSessionDeliveryGeneration } from "../../gateway/in-process-session-delivery.js";
 import {
@@ -32,13 +32,10 @@ import {
 import {
   captureGatewayToolCallerAssertion,
   getGatewayToolCallerIdentity,
-  resolveGatewayToolOperatorSelection,
   withoutGatewayToolCallerIdentity,
 } from "./gateway-caller-context.js";
-import { runWithGatewaySessionSpawnContext } from "./gateway-session-spawn-context.js";
-import { callGatewayTool } from "./gateway.js";
 
-type InProcessGatewayCallOptions = {
+export type InProcessGatewayCallOptions = {
   onExecution?: (execution: Promise<void>) => void;
   resolveGatewayContext?: GatewayContextResolver;
   sessionMutationCommitGuard?: () => void;
@@ -244,7 +241,6 @@ async function callAgentToolGatewayRequestBound<T>(
     if (boundGateway && !forceTransport) {
       throw new Error(`Gateway instance unavailable for ${method}`);
     }
-    const { callGateway } = await import("../../gateway/call.js");
     const {
       agentRunTracking: _agentRunTracking,
       agentToolCaller: _agentToolCaller,
@@ -358,7 +354,7 @@ export const callAgentToolGatewayRequest: AgentToolGatewayRequestCaller = async 
   request: AgentToolGatewayRequest,
 ): Promise<T> => await bindAgentToolGatewayRequest()<T>(request);
 
-async function callInProcessGatewayToolBound<T>(
+export async function callInProcessGatewayToolBound<T>(
   method: string,
   params: Record<string, unknown>,
   options: InProcessGatewayCallOptions & {
@@ -421,75 +417,4 @@ async function callInProcessGatewayToolBound<T>(
     throw new Error("operator run authority requires its admitted Gateway");
   }
   return await runBoundInProcessGatewayCall(undefined, () => fallback(scopes), assertCallerCurrent);
-}
-
-export const callInProcessGatewayTool: InProcessGatewayCaller = async <T>(
-  method: string,
-  params: Record<string, unknown>,
-  options: InProcessGatewayCallOptions = {},
-): Promise<T> => {
-  return await callInProcessGatewayToolBound(method, params, options, async (scopes) =>
-    callGatewayTool<T>(
-      method,
-      options.timeoutMs == null ? {} : { timeoutMs: options.timeoutMs },
-      params,
-      {
-        scopes,
-        ...(options.signal ? { signal: options.signal } : {}),
-      },
-    ),
-  );
-};
-
-export async function callInProcessGatewayToolWithCreation<T = Record<string, unknown>>(
-  method: string,
-  params: Record<string, unknown>,
-  creation: TrustedSessionCreation,
-  options: Omit<InProcessGatewayCallOptions, "onExecution"> = {},
-): Promise<T> {
-  const requesterProfileId = resolveGatewayToolOperatorSelection().operatorAuthority?.profileId;
-  const trustedCreation =
-    creation.via === "spawn" && requesterProfileId ? { ...creation, requesterProfileId } : creation;
-  return await callInProcessGatewayToolBound(
-    method,
-    params,
-    { ...options, sessionCreation: trustedCreation },
-    async (scopes) => {
-      const gatewayOptions = options.timeoutMs == null ? {} : { timeoutMs: options.timeoutMs };
-      // The fallback is a real local Gateway request. Carry spawn policy only in
-      // the signed agent-runtime identity token, never in model-authored params.
-      if (trustedCreation.via !== "spawn" || !trustedCreation.inheritedToolPolicy) {
-        return await callGatewayTool<T>(method, gatewayOptions, params, {
-          scopes,
-          ...(options.signal ? { signal: options.signal } : {}),
-        });
-      }
-      return await runWithGatewaySessionSpawnContext(
-        {
-          ...(trustedCreation.requesterProfileId
-            ? { requesterProfileId: trustedCreation.requesterProfileId }
-            : {}),
-          ...(trustedCreation.completionOwnerSessionKey
-            ? { completionOwnerSessionKey: trustedCreation.completionOwnerSessionKey }
-            : {}),
-          inheritedToolPolicy: trustedCreation.inheritedToolPolicy,
-          ...(trustedCreation.inheritedPermissionMode
-            ? { inheritedPermissionMode: trustedCreation.inheritedPermissionMode }
-            : {}),
-          ...(trustedCreation.resolvedModel
-            ? { resolvedModel: trustedCreation.resolvedModel }
-            : {}),
-          ...(trustedCreation.spawnModelAutoSelection
-            ? { spawnModelAutoSelection: trustedCreation.spawnModelAutoSelection }
-            : {}),
-        },
-        () =>
-          callGatewayTool<T>(method, gatewayOptions, params, {
-            scopes,
-            requireAgentRuntimeIdentity: true,
-            ...(options.signal ? { signal: options.signal } : {}),
-          }),
-      );
-    },
-  );
 }

@@ -26,7 +26,7 @@ vi.mock("node:timers/promises", async (importOriginal) => ({
 const observer = useReconcileWorkerObserver();
 const tempDirs = useAutoCleanupTempDirTracker(afterEach);
 
-it.each(["reader-import", "between-polls", "queued-status", "during-close"] as const)(
+it.each(["reader-result", "between-polls", "queued-status", "during-close"] as const)(
   "preserves readiness lifetime and cancellation across %s",
   async (boundary) => {
     const stateDir = tempDirs.make("openclaw-projection-read-retirement-");
@@ -74,32 +74,40 @@ it.each(["reader-import", "between-polls", "queued-status", "during-close"] as c
         await closing;
         await waitForSessionTranscriptIndexReconcile(options);
       };
-      if (boundary === "reader-import") {
-        const runtime = await import("./session-transcript-worker-runtime.js");
+      if (boundary === "reader-result") {
+        const {
+          historyLane: { pool: historyPages },
+        } = await import("./session-transcript-worker-resources.js");
         const entered = createDeferred();
-        const continueImport = createDeferred();
-        vi.doMock("./session-transcript-worker-runtime.js", async () => {
+        const continueRead = createDeferred();
+        const run = historyPages.run.bind(historyPages);
+        const reading = vi.spyOn(historyPages, "run").mockImplementationOnce(async (...args) => {
+          const result = await run(...args);
           entered.resolve();
-          await continueImport.promise;
-          return runtime;
+          await continueRead.promise;
+          return result;
         });
+        const outcome = waitForSessionTranscriptProjection(scope).then(
+          () => ({ ok: true as const }),
+          (error: unknown) => ({ ok: false as const, error }),
+        );
         try {
-          const outcome = waitForSessionTranscriptProjection(scope).then(
-            () => ({ ok: true as const }),
-            (error: unknown) => ({ ok: false as const, error }),
-          );
           await entered.promise;
-          await retire();
-          continueImport.resolve();
+          const retiring = retire();
+          continueRead.resolve();
+          await retiring;
           await expect(outcome).resolves.toMatchObject({
             ok: false,
             error: expect.objectContaining({
-              message: "Agent database execution admission is closed",
+              name: "WorkerTaskError",
+              code: "unavailable",
+              message: "Session history database read was revoked",
             }),
           });
         } finally {
-          continueImport.resolve();
-          vi.doUnmock("./session-transcript-worker-runtime.js");
+          continueRead.resolve();
+          await outcome;
+          reading.mockRestore();
         }
       } else if (boundary === "during-close") {
         observer.onTask = undefined;

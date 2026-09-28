@@ -2,7 +2,7 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { AsyncWorkScope } from "../shared/async-work-scope.js";
 import type { GatewayScheduler, GatewayScheduledJob } from "./gateway-scheduler.js";
 import type { UpdateCampaignController } from "./update-campaign.js";
-import type { resolveStartupInstallStatus } from "./update-install-status.js";
+import { resolveStartupInstallStatus } from "./update-install-status.js";
 
 export type UpdateCheckLifecycle = {
   scheduler: GatewayScheduler;
@@ -34,11 +34,7 @@ export function createGatewayUpdateLifecycle(scheduler: GatewayScheduler): Updat
   const initialize = async () => {
     signal.throwIfAborted();
     if (!initialization) {
-      const task = run(async () => {
-        const { resolveStartupInstallStatus } = await import("./update-install-status.js");
-        signal.throwIfAborted();
-        return resolveStartupInstallStatus(false, signal);
-      });
+      const task = run(() => resolveStartupInstallStatus(false, signal));
       initialization = task;
       void task.catch(() => {
         if (initialization === task) {

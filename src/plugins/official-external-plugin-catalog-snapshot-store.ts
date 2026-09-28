@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { cloneEnvWithPlatformSemantics } from "../config/config-env-vars.js";
 import { resolveOpenClawStateSqlitePath } from "../state/openclaw-state-db.paths.js";
 import { captureOpenClawStateWorkerContext } from "../state/openclaw-state-worker-context.js";
+import { runOpenClawStateWorkerOperation } from "../state/openclaw-state-worker-store.js";
 import { HostedCatalogSignedFeedMonotonicityError } from "./official-external-plugin-catalog-source.js";
 import type {
   HostedOfficialExternalPluginCatalogSnapshot,
@@ -74,8 +75,6 @@ export function createSqliteHostedOfficialExternalPluginCatalogSnapshotStore(
         return null;
       }
       const context = captureOpenClawStateWorkerContext(databaseOptions);
-      const { runOpenClawStateWorkerOperation } =
-        await import("../state/openclaw-state-worker-store.js");
       return (
         (await runOpenClawStateWorkerOperation(
           context,
@@ -88,8 +87,6 @@ export function createSqliteHostedOfficialExternalPluginCatalogSnapshotStore(
       const now = Date.now();
       const prepared = captureSnapshot(snapshot);
       const context = captureOpenClawStateWorkerContext(resolveDatabaseOptions(options));
-      const { runOpenClawStateWorkerOperation } =
-        await import("../state/openclaw-state-worker-store.js");
       const result = await runOpenClawStateWorkerOperation(context, (scope) =>
         scope.execute({
           type: "plugins.catalogSnapshot.write",

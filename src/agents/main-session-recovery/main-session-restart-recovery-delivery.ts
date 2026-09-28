@@ -12,7 +12,7 @@ import {
   type DeliveryContext,
 } from "../../utils/delivery-context.shared.js";
 import { isDeliverableMessageChannel } from "../../utils/message-channel.js";
-import type { MainSessionRecoveryStoreTarget } from "./main-session-recovery-store.js";
+import type { MainSessionRecoveryStoreTarget } from "./main-session-recovery-types.js";
 import { mainSessionRecoveryLog } from "./main-session-restart-recovery-shared.js";
 
 export function resolveRestartRecoveryDeliveryContext(params: {

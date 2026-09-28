@@ -6,6 +6,7 @@ import { resolveAgentDir } from "../agents/agent-scope.js";
 import { loadAuthProfileStoreWithoutExternalProfiles } from "../agents/auth-profiles/store-runtime.js";
 import { areRuntimeModelRefsEquivalent } from "../agents/model-runtime-aliases.js";
 import { resolveModelRuntimePolicy } from "../agents/model-runtime-policy.js";
+import { resolveSimpleCompletionSelectionForAgent } from "../agents/simple-completion-selection.js";
 import { readUtilityModelSetting } from "../agents/utility-model-setting.js";
 import {
   resolveConfiguredPrimaryModelForAgent,
@@ -174,8 +175,6 @@ async function prepareSetupInferenceOptions(deps: DetectSetupInferenceDeps, agen
   const utilitySetting = readUtilityModelSetting(cfg, targetAgentId);
   let utilityModel: string | undefined;
   if (utilitySetting.kind === "explicit") {
-    const { resolveSimpleCompletionSelectionForAgent } =
-      await import("../agents/simple-completion-runtime.js");
     const selection = resolveSimpleCompletionSelectionForAgent({
       cfg,
       agentId: targetAgentId,

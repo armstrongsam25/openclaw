@@ -49,10 +49,14 @@ import {
   isTimeoutErrorMessage,
   matchesFormatErrorPattern,
 } from "./message-patterns.js";
-import type { classifyProviderPluginError } from "./provider-patterns.js";
-import type { FailoverClassification, FailoverReason, FailoverSignal } from "./signal.js";
+import type {
+  FailoverClassification,
+  FailoverReason,
+  FailoverSignal,
+  ProviderSpecificErrorContext,
+} from "./signal.js";
 type ProviderErrorClassifier = (
-  context: Omit<Parameters<typeof classifyProviderPluginError>[0], "providerPlugin">,
+  context: Omit<ProviderSpecificErrorContext, "providerPlugin">,
 ) => FailoverReason | null;
 
 const HTML_BODY_RE = /^\s*(?:<!doctype\s+html\b|<html\b)/i;

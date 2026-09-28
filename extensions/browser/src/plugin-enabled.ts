@@ -3,6 +3,7 @@ import {
   normalizePluginsConfig,
   resolveEffectiveEnableState,
 } from "openclaw/plugin-sdk/plugin-config-runtime";
+import { getPluginRuntimeGatewayRequestScope } from "openclaw/plugin-sdk/plugin-runtime";
 import { loadBrowserConfigForRuntimeRefresh } from "./browser/config-refresh-source.js";
 
 /** Retains the policy owner's refusal reason alongside browser enablement. */
@@ -26,8 +27,6 @@ export async function describeBrowserControlUnavailable(
     if (cfg.browser?.enabled === false) {
       return "browser control disabled: browser.enabled=false. Set browser.enabled=true.";
     }
-    const { getPluginRuntimeGatewayRequestScope } =
-      await import("openclaw/plugin-sdk/plugin-runtime");
     const record = getPluginRuntimeGatewayRequestScope()?.pluginRegistry?.plugins.find(
       (plugin) => plugin.id === "browser",
     );

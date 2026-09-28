@@ -1,15 +1,9 @@
-import { resolveIntegerOption } from "@openclaw/normalization-core/number-coercion";
 import { asNullableRecord } from "@openclaw/normalization-core/record-coerce";
-import {
-  normalizeLowercaseStringOrEmpty,
-  normalizeOptionalString,
-} from "@openclaw/normalization-core/string-coerce";
+import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import {
   GATEWAY_CLIENT_MODES,
   GATEWAY_CLIENT_NAMES,
 } from "../../../packages/gateway-protocol/src/client-info.js";
-import { getRuntimeConfig, resolveGatewayPort } from "../../config/config.js";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import {
   createAgentRuntimeExecutionLineageHandoff,
   readAgentRuntimeExecutionLineage,
@@ -22,13 +16,14 @@ import {
   type AgentRuntimeIdentityTokenParams,
 } from "../../gateway/agent-runtime-identity-token.js";
 import { callGateway } from "../../gateway/call.js";
-import { resolveGatewayCredentialsFromConfig, trimToUndefined } from "../../gateway/credentials.js";
+import { trimToUndefined } from "../../gateway/credentials.js";
 import { resolveMessageActionTurnCapability } from "../../gateway/message-action-turn-capability.js";
 import {
   resolveLeastPrivilegeOperatorScopesForMethod,
   type OperatorScope,
 } from "../../gateway/method-scopes.js";
 import { getOperatorApprovalRuntimeToken } from "../../gateway/operator-approval-runtime-token.js";
+import type { TrustedSessionCreation } from "../../gateway/server-methods/session-creation-provenance.js";
 import {
   claimAgentRunApprovalAuthority,
   getActiveAgentRunDelegatedAuthority,
@@ -38,22 +33,33 @@ import {
   loadOrCreateDeviceIdentityAsync,
 } from "../../infra/device-identity-async.js";
 import type { DeviceIdentity } from "../../infra/device-identity.js";
-import { formatErrorMessage } from "../../infra/errors.js";
 import { readPositiveIntegerParam, readToolStringParam } from "./common.js";
-import { getGatewayToolCallerIdentity } from "./gateway-caller-context.js";
-import { getGatewaySessionSpawnContext } from "./gateway-session-spawn-context.js";
+import {
+  getGatewayToolCallerIdentity,
+  resolveGatewayToolOperatorSelection,
+} from "./gateway-caller-context.js";
+import {
+  resolveGatewayOptions,
+  type GatewayCallOptions,
+  type GatewayOverrideTarget,
+} from "./gateway-options.js";
+import {
+  getGatewaySessionSpawnContext,
+  runWithGatewaySessionSpawnContext,
+} from "./gateway-session-spawn-context.js";
 import { getGatewaySessionSpawnParentExecutionIdentityToken } from "./gateway-session-spawn-execution-identity.js";
 import {
   isStaleGatewayAgentRuntimeIdentityRejection,
   isStaleGatewayNodeInvokeTurnSourceRejection,
   staleGatewayAgentRuntimeIdentityError,
 } from "./gateway-transport-errors.js";
-
-export type GatewayCallOptions = {
-  gatewayUrl?: string;
-  gatewayToken?: string;
-  timeoutMs?: number;
-};
+import {
+  callAgentToolGatewayRequest,
+  callInProcessGatewayToolBound,
+  type InProcessGatewayCaller,
+  type InProcessGatewayCallOptions,
+  withAgentToolGatewayRuntimeIdentity,
+} from "./in-process-gateway.js";
 
 /** Presentation hint from the admitted operator source; RPC admission remains authoritative. */
 export function readGatewayToolOperatorScopes(): readonly string[] | undefined {
@@ -65,174 +71,12 @@ export function readGatewayToolOperatorScopes(): readonly string[] | undefined {
   return [...authority.scopes];
 }
 
-type GatewayOverrideTarget = "local" | "remote";
-
 /** Reads common gateway options from tool parameters while preserving explicit token whitespace. */
 export function readGatewayCallOptions(params: Record<string, unknown>): GatewayCallOptions {
   return {
     gatewayUrl: readToolStringParam(params, "gatewayUrl", { trim: false }),
     gatewayToken: readToolStringParam(params, "gatewayToken", { trim: false }),
     timeoutMs: readPositiveIntegerParam(params, "timeoutMs"),
-  };
-}
-
-function canonicalizeToolGatewayWsUrl(raw: string): { origin: string; key: string } {
-  const input = raw.trim();
-  let url: URL;
-  try {
-    url = new URL(input);
-  } catch (error) {
-    const message = formatErrorMessage(error);
-    throw new Error(`invalid gatewayUrl: ${input} (${message})`, { cause: error });
-  }
-
-  if (url.protocol !== "ws:" && url.protocol !== "wss:") {
-    throw new Error(`invalid gatewayUrl protocol: ${url.protocol} (expected ws:// or wss://)`);
-  }
-  if (url.username || url.password) {
-    throw new Error("invalid gatewayUrl: credentials are not allowed");
-  }
-  if (url.search || url.hash) {
-    throw new Error("invalid gatewayUrl: query/hash not allowed");
-  }
-  // Agents/tools expect the gateway websocket on the origin, not arbitrary paths.
-  if (url.pathname && url.pathname !== "/") {
-    throw new Error("invalid gatewayUrl: path not allowed");
-  }
-
-  const origin = url.origin;
-  // Key: protocol + host only, lowercased. (host includes IPv6 brackets + port when present)
-  const key = `${url.protocol}//${normalizeLowercaseStringOrEmpty(url.host)}`;
-  return { origin, key };
-}
-
-function resolveLocalGatewayUrlKeys(cfg: OpenClawConfig): Set<string> {
-  const port = resolveGatewayPort(cfg);
-  return new Set<string>([
-    `ws://127.0.0.1:${port}`,
-    `wss://127.0.0.1:${port}`,
-    `ws://localhost:${port}`,
-    `wss://localhost:${port}`,
-    `ws://[::1]:${port}`,
-    `wss://[::1]:${port}`,
-  ]);
-}
-
-function resolveConfiguredRemoteGatewayKey(cfg: OpenClawConfig): string | undefined {
-  const remoteUrl = normalizeOptionalString(cfg.gateway?.remote?.url) ?? "";
-  if (remoteUrl) {
-    try {
-      return canonicalizeToolGatewayWsUrl(remoteUrl).key;
-    } catch {
-      // Misconfigured remote URL should not make ordinary tool calls fail; only explicit
-      // gatewayUrl overrides need strict validation.
-    }
-  }
-  return undefined;
-}
-
-function resolveDefaultGatewayTarget(params: {
-  cfg: OpenClawConfig;
-  envGatewayUrl?: string;
-}): GatewayOverrideTarget {
-  if (params.envGatewayUrl) {
-    // Match operator-approvals-client: env-selected URLs may be tunnels or other gateways,
-    // so loopback alone must not grant local approval-runtime authority.
-    return "remote";
-  }
-  if (
-    params.cfg.gateway?.mode === "remote" &&
-    normalizeOptionalString(params.cfg.gateway.remote?.url)
-  ) {
-    return "remote";
-  }
-  return "local";
-}
-
-function validateGatewayUrlOverrideForAgentTools(params: {
-  cfg: OpenClawConfig;
-  urlOverride: string;
-}): { url: string; target: GatewayOverrideTarget } {
-  const { cfg } = params;
-  const localAllowed = resolveLocalGatewayUrlKeys(cfg);
-  const remoteKey = resolveConfiguredRemoteGatewayKey(cfg);
-
-  const parsed = canonicalizeToolGatewayWsUrl(params.urlOverride);
-  if (localAllowed.has(parsed.key)) {
-    return { url: parsed.origin, target: "local" };
-  }
-  if (remoteKey && parsed.key === remoteKey) {
-    return { url: parsed.origin, target: "remote" };
-  }
-  const port = resolveGatewayPort(cfg);
-  throw new Error(
-    [
-      "gatewayUrl override rejected.",
-      `Allowed: ws(s) loopback on port ${port} (127.0.0.1/localhost/[::1])`,
-      "Or: configure gateway.remote.url and omit gatewayUrl to use the configured remote gateway.",
-    ].join(" "),
-  );
-}
-
-function resolveGatewayOverrideToken(params: {
-  cfg: OpenClawConfig;
-  target: GatewayOverrideTarget;
-  explicitToken?: string;
-}): string | undefined {
-  if (params.explicitToken) {
-    return params.explicitToken;
-  }
-  return resolveGatewayCredentialsFromConfig({
-    cfg: params.cfg,
-    env: process.env,
-    modeOverride: params.target,
-    remoteTokenFallback: params.target === "remote" ? "remote-only" : "remote-env-local",
-    remotePasswordFallback: params.target === "remote" ? "remote-only" : "remote-env-local",
-  }).token;
-}
-
-export function resolveGatewayOptions(opts?: GatewayCallOptions) {
-  const cfg = getRuntimeConfig();
-  const validatedOverride =
-    trimToUndefined(opts?.gatewayUrl) !== undefined
-      ? validateGatewayUrlOverrideForAgentTools({
-          cfg,
-          urlOverride: String(opts?.gatewayUrl),
-        })
-      : undefined;
-  const explicitToken = trimToUndefined(opts?.gatewayToken);
-  const resolveGatewayContext = getGatewayToolCallerIdentity()?.gatewayContextResolver;
-  const context =
-    cfg.gateway?.mode === "remote" && !validatedOverride && !explicitToken && resolveGatewayContext
-      ? resolveGatewayContext()
-      : undefined;
-  const localConfig =
-    context && context.localEmbedded !== true ? context.getRuntimeConfig() : undefined;
-  const token = validatedOverride
-    ? resolveGatewayOverrideToken({
-        cfg,
-        target: validatedOverride.target,
-        explicitToken,
-      })
-    : explicitToken;
-  const timeoutMs = resolveIntegerOption(opts?.timeoutMs, 30_000, { min: 1 });
-  const envGatewayUrl = trimToUndefined(process.env.OPENCLAW_GATEWAY_URL);
-  const target: GatewayOverrideTarget = localConfig
-    ? "local"
-    : (validatedOverride?.target ?? resolveDefaultGatewayTarget({ cfg, envGatewayUrl }));
-  return {
-    url: validatedOverride?.url,
-    token,
-    timeoutMs,
-    target,
-    ...(localConfig
-      ? {
-          config: localConfig,
-          localPortOverride: resolveGatewayPort(localConfig),
-          ignoreEnvUrlOverride: true,
-          tlsFingerprint: context?.gatewayTlsFingerprint,
-        }
-      : {}),
   };
 }
 
@@ -660,8 +504,6 @@ export async function callGatewayTool<T = Record<string, unknown>>(
     if (typeof runtimeIdentity === "string") {
       throw new Error("in-process Gateway requests require an internal runtime identity");
     }
-    const { callAgentToolGatewayRequest, withAgentToolGatewayRuntimeIdentity } =
-      await import("./in-process-gateway.js");
     return await callAgentToolGatewayRequest<T>(
       withAgentToolGatewayRuntimeIdentity(
         {
@@ -743,4 +585,75 @@ export async function callGatewayTool<T = Record<string, unknown>>(
     }
     throw error;
   }
+}
+
+export const callInProcessGatewayTool: InProcessGatewayCaller = async <T>(
+  method: string,
+  params: Record<string, unknown>,
+  options: InProcessGatewayCallOptions = {},
+): Promise<T> => {
+  return await callInProcessGatewayToolBound(method, params, options, async (scopes) =>
+    callGatewayTool<T>(
+      method,
+      options.timeoutMs == null ? {} : { timeoutMs: options.timeoutMs },
+      params,
+      {
+        scopes,
+        ...(options.signal ? { signal: options.signal } : {}),
+      },
+    ),
+  );
+};
+
+export async function callInProcessGatewayToolWithCreation<T = Record<string, unknown>>(
+  method: string,
+  params: Record<string, unknown>,
+  creation: TrustedSessionCreation,
+  options: Omit<InProcessGatewayCallOptions, "onExecution"> = {},
+): Promise<T> {
+  const requesterProfileId = resolveGatewayToolOperatorSelection().operatorAuthority?.profileId;
+  const trustedCreation =
+    creation.via === "spawn" && requesterProfileId ? { ...creation, requesterProfileId } : creation;
+  return await callInProcessGatewayToolBound(
+    method,
+    params,
+    { ...options, sessionCreation: trustedCreation },
+    async (scopes) => {
+      const gatewayOptions = options.timeoutMs == null ? {} : { timeoutMs: options.timeoutMs };
+      // The fallback is a real local Gateway request. Carry spawn policy only in
+      // the signed agent-runtime identity token, never in model-authored params.
+      if (trustedCreation.via !== "spawn" || !trustedCreation.inheritedToolPolicy) {
+        return await callGatewayTool<T>(method, gatewayOptions, params, {
+          scopes,
+          ...(options.signal ? { signal: options.signal } : {}),
+        });
+      }
+      return await runWithGatewaySessionSpawnContext(
+        {
+          ...(trustedCreation.requesterProfileId
+            ? { requesterProfileId: trustedCreation.requesterProfileId }
+            : {}),
+          ...(trustedCreation.completionOwnerSessionKey
+            ? { completionOwnerSessionKey: trustedCreation.completionOwnerSessionKey }
+            : {}),
+          inheritedToolPolicy: trustedCreation.inheritedToolPolicy,
+          ...(trustedCreation.inheritedPermissionMode
+            ? { inheritedPermissionMode: trustedCreation.inheritedPermissionMode }
+            : {}),
+          ...(trustedCreation.resolvedModel
+            ? { resolvedModel: trustedCreation.resolvedModel }
+            : {}),
+          ...(trustedCreation.spawnModelAutoSelection
+            ? { spawnModelAutoSelection: trustedCreation.spawnModelAutoSelection }
+            : {}),
+        },
+        () =>
+          callGatewayTool<T>(method, gatewayOptions, params, {
+            scopes,
+            requireAgentRuntimeIdentity: true,
+            ...(options.signal ? { signal: options.signal } : {}),
+          }),
+      );
+    },
+  );
 }

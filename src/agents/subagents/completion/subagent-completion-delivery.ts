@@ -28,6 +28,7 @@ import {
   assertSubagentReadContext,
   readFullSubagentRuns,
 } from "../registry/subagent-registry-read-cache.js";
+import { resumeSubagentRun } from "../registry/subagent-registry.js";
 import { compareSubagentRunGeneration } from "../registry/subagent-run-generation.js";
 import {
   admitSubagentCompletionDelivery,
@@ -264,7 +265,6 @@ export async function settleCorrelatedSubagentDelivery(
     throw new Error("Subagent completion recovery is waiting for committed publication");
   }
   const committed = structuredClone(published);
-  const { resumeSubagentRun } = await import("../registry/subagent-registry.js");
   assertSubagentRegistryWriteSourceCurrent(queueContext);
   const latest = readMatchingDeliveryOwner();
   if (!latest) {

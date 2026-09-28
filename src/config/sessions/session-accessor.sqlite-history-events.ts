@@ -10,8 +10,8 @@ import {
   readTranscriptDisplayDeltaFromProjection,
   readRecentSessionTranscriptHistoryEventsFromProjection,
   readSessionTranscriptHistoryEventPageFromProjection,
-  type SessionTranscriptDisplayDeltaResult,
 } from "./session-accessor.sqlite-history-query.js";
+import type { SessionTranscriptDisplayDeltaResult } from "./session-history-types.js";
 
 export function readTranscriptDisplayDelta(
   scope: SessionTranscriptReadScope,

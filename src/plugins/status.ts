@@ -45,7 +45,8 @@ import { buildPluginRuntimeLoadOptions } from "./runtime/load-context.js";
 import { resolvePluginRuntimeLoadContext } from "./runtime/load-context.resolve.js";
 import { loadPluginMetadataRegistrySnapshot } from "./runtime/metadata-registry-loader.js";
 import {
-  formatPluginCompatibilityNotice,
+  buildCompatibilityNoticesForInspect,
+  buildPluginCompatibilityNotices,
   type PluginCompatibilityNotice,
 } from "./status-compatibility.js";
 import { projectPluginInstallHealth } from "./status-snapshot.js";
@@ -121,61 +122,6 @@ export type PluginInspectReport = {
   };
   compatibility: PluginCompatibilityNotice[];
 };
-
-function buildCompatibilityNoticesForInspect(
-  inspect: Pick<PluginInspectReport, "plugin" | "shape"> & {
-    diagnostics: readonly PluginDiagnostic[];
-  },
-): PluginCompatibilityNotice[] {
-  const warnings: PluginCompatibilityNotice[] = [];
-  if (inspect.shape === "hook-only") {
-    warnings.push({
-      pluginId: inspect.plugin.id,
-      code: "hook-only",
-      compatCode: "hook-only-plugin-shape",
-      severity: "info",
-      message:
-        "is hook-only. This remains a supported compatibility path, but it has not migrated to explicit capability registration yet.",
-    });
-  }
-  if (usesRemovedSessionTranscriptFileApi(inspect)) {
-    warnings.push({
-      pluginId: inspect.plugin.id,
-      code: "removed-session-transcript-file-api",
-      compatCode: "removed-session-transcript-file-api",
-      severity: "warn",
-      message:
-        "references removed session/transcript file APIs; migrate to session identity, SessionTranscriptUpdate.target, and Gateway/runtime session helpers.",
-    });
-  }
-  return warnings;
-}
-
-const removedSessionTranscriptFileApiMarkers = [
-  "saveSessionStore",
-  "resolveSessionTranscriptPathInDir",
-  "resolveAndPersistSessionFile",
-  "readLatestAssistantTextFromSessionTranscript",
-  "SessionTranscriptUpdate.sessionFile",
-  "sessionFiles",
-  "transcriptPath",
-  "sessionFile",
-] as const;
-
-function usesRemovedSessionTranscriptFileApi(
-  inspect: Pick<PluginInspectReport, "plugin"> & { diagnostics: readonly PluginDiagnostic[] },
-): boolean {
-  if (inspect.plugin.origin === "bundled") {
-    return false;
-  }
-  const messages = [
-    inspect.plugin.error,
-    ...inspect.diagnostics.map((diagnostic) => diagnostic.message),
-  ].filter((message): message is string => typeof message === "string" && message.length > 0);
-  return messages.some((message) =>
-    removedSessionTranscriptFileApiMarkers.some((marker) => message.includes(marker)),
-  );
-}
 
 function resolveReportedPluginVersion(
   plugin: PluginRegistry["plugins"][number],
@@ -583,23 +529,6 @@ export function buildAllPluginInspectReports(params: PluginInspectParams): Plugi
       diagnostics: diagnostics.get(plugin.id) ?? [],
       sessionCatalogs: sessionCatalogs.get(plugin.id) ?? [],
       gatewayMethodDescriptors: gatewayMethodDescriptors.get(plugin.id) ?? [],
-    }),
-  );
-}
-
-export function buildPluginCompatibilityWarnings(params: PluginInspectParams): string[] {
-  return buildPluginCompatibilityNotices(params).map(formatPluginCompatibilityNotice);
-}
-
-export function buildPluginCompatibilityNotices(
-  params: PluginInspectParams,
-): PluginCompatibilityNotice[] {
-  const registry = params.report;
-  return registry.plugins.flatMap((plugin) =>
-    buildCompatibilityNoticesForInspect({
-      plugin,
-      shape: buildPluginShapeSummary({ plugin, report: registry }).shape,
-      diagnostics: registry.diagnostics.filter((entry) => entry.pluginId === plugin.id),
     }),
   );
 }

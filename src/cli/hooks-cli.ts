@@ -14,6 +14,7 @@ import {
 } from "../agents/agent-scope.js";
 import { getRuntimeConfig, transformConfigFile } from "../config/config.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import { callGateway } from "../gateway/call.js";
 import {
   buildWorkspaceHookStatus,
   type HookStatusEntry,
@@ -23,7 +24,6 @@ import { resolveHookEntries } from "../hooks/policy.js";
 import { loadWorkspaceHookEntries } from "../hooks/workspace.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { loadGatewayStartupPluginPlanWithMetadata } from "../plugins/channel-plugin-ids.js";
-import { withPluginDiagnosticsReport } from "../plugins/status.js";
 import { normalizeAgentId } from "../routing/session-key.js";
 import { defaultRuntime } from "../runtime.js";
 import { summarizeStringEntries } from "../shared/string-sample.js";
@@ -76,6 +76,7 @@ async function withHooksReport<T>(
   target: HooksReportTarget,
   consume: (report: HookStatusReport) => T,
 ): Promise<T> {
+  const { withPluginDiagnosticsReport } = await import("../plugins/status.js");
   // Plugin-managed and workspace hooks share one resolved policy view for status/actions.
   const workspaceDir = target.workspaceDir;
   const workspaceEntries = loadWorkspaceHookEntries(workspaceDir, { config });
@@ -107,7 +108,6 @@ async function loadHooksReport<T>(
 ): Promise<T> {
   const config = getRuntimeConfig({ skipPluginValidation: true });
   const target = resolveHooksReportTarget(config, agentId);
-  const { callGateway } = await import("../gateway/call.js");
   let report: HookStatusReport;
   try {
     report = await callGateway<HookStatusReport>({

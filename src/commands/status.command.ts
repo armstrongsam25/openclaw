@@ -10,6 +10,7 @@ import {
 import { sanitizeTerminalText } from "../../packages/terminal-core/src/safe-text.js";
 import { withProgress } from "../cli/progress.js";
 import { OPENCLAW_WRAPPER_ENV_KEY } from "../daemon/program-args.js";
+import { buildGatewayConnectionDetails } from "../gateway/call.js";
 import { readRestartSentinelReadOnly } from "../infra/restart-sentinel.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { createLazyImportLoader } from "../shared/lazy-promise.js";
@@ -232,7 +233,6 @@ export async function statusCommand(
 
   if (opts.verbose) {
     // Verbose status prints the raw gateway target resolution before the report tables.
-    const { buildGatewayConnectionDetails } = await import("../gateway/call.js");
     const details = buildGatewayConnectionDetails({ config: scan.cfg });
     logGatewayConnectionDetails({
       runtime,

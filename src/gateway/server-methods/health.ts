@@ -4,7 +4,6 @@ import type { ChannelAccountSnapshot } from "../../channels/plugins/types.public
 import { readChildRuntimeViability } from "../../infra/child-runtime-viability.js";
 import { formatErrorMessage as formatError } from "../../infra/errors.js";
 import { readGatewayMaintenanceWork } from "../../infra/gateway-active-work.js";
-import { getStatusSummary } from "../../status/summary.js";
 import type { GatewayHotReloadStatus } from "../config-reload-status.types.js";
 import { buildContextEngineHealthSummary } from "../health/context-engine.js";
 import { buildDeliveryQueueHealthSummary } from "../health/delivery-queue.js";
@@ -179,6 +178,7 @@ export const healthHandlers: GatewayRequestHandlers = {
     });
   },
   status: async ({ respond, client, params, context }) => {
+    const { getStatusSummary } = await import("../../status/summary.js");
     const scopes = Array.isArray(client?.connect?.scopes) ? client.connect.scopes : [];
     const hostDesktopStatus = await context.hostDesktopService?.status();
     const status = await getStatusSummary({

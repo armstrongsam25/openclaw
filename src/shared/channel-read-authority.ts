@@ -1,4 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { redactToolPayloadText } from "../logging/redact.js";
+import { createSubsystemLogger } from "../logging/subsystem.js";
 import { resolveGlobalSingleton } from "./global-singleton.js";
 
 type ChannelReadResource = {
@@ -45,10 +47,6 @@ export async function settleChannelReadResource(resource: ChannelReadResource, a
     await resource.settle(accepted);
   } catch (error) {
     try {
-      const [{ createSubsystemLogger }, { redactToolPayloadText }] = await Promise.all([
-        import("../logging/subsystem.js"),
-        import("../logging/redact.js"),
-      ]);
       const log = createSubsystemLogger("channels");
       const failures: unknown[] = error instanceof AggregateError ? error.errors : [error];
       for (const failure of failures) {

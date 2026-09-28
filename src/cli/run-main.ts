@@ -258,7 +258,8 @@ async function resolveReachableGateway(
   if (targets.length === 0) {
     return { kind: "unreachable" };
   }
-  const { probeGatewayConfiguredModel } = await import("../commands/onboard-helpers.js");
+  const { probeGatewayConfiguredModel } =
+    await import("../commands/onboard-gateway-model.runtime.js");
   let missingModelGateway: ReachableGateway | undefined;
   let reachableUnverifiedGateway: ReachableGateway | undefined;
   let configuredGateway: ReachableGateway | undefined;
@@ -756,15 +757,11 @@ async function bootstrapCliProxyCaptureAndDispatcher(
   // debug-proxy env requests capture; importing their sqlite-store graph anyway
   // costs ~100 MB RSS on metadata-only commands such as `plugins list --json`.
   if (isDebugProxyCaptureEnvEnabled()) {
-    const [{ initializeDebugProxyCaptureAsync }, { maybeWarnAboutDebugProxyCoverage }] =
-      await startupTrace.measure("proxy-imports", () =>
-        Promise.all([
-          import("../proxy-capture/runtime.js"),
-          import("../proxy-capture/coverage.js"),
-        ]),
-      );
-    await initializeDebugProxyCaptureAsync("cli");
-    maybeWarnAboutDebugProxyCoverage(undefined, (message) => console.warn(message));
+    const { initializeCliDebugProxyCapture } = await startupTrace.measure(
+      "proxy-imports",
+      () => import("../proxy-capture/transport.runtime.js"),
+    );
+    await initializeCliDebugProxyCapture();
   }
   if (options.ensureDispatcher !== false) {
     await startupTrace.measure("proxy-dispatcher", () => ensureCliEnvProxyDispatcher());

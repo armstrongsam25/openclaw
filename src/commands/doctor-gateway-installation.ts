@@ -6,6 +6,7 @@ import { SERVICE_AUDIT_CODES } from "../daemon/service-audit.js";
 import { mergeGatewayServiceEnv } from "../daemon/service-env-merge.js";
 import { sanitizeServiceInspectionError } from "../daemon/service-inspection-error.js";
 import { withGatewayServiceOperationLock } from "../daemon/service-operation-lock.js";
+import { reconcileGatewayServiceDefinition } from "../daemon/service-reconciliation.js";
 import type { GatewayServiceDefinitionTransactionHooks } from "../daemon/service-stage.js";
 import type {
   GatewayServiceCommandConfig,
@@ -77,8 +78,6 @@ export async function installDoctorGatewayService(
         await params.service.install({ ...params.args, assertCurrent, definitionTransaction });
       };
       if (params.repair.kind === "definition") {
-        const { reconcileGatewayServiceDefinition } =
-          await import("../daemon/service-reconciliation.js");
         await reconcileGatewayServiceDefinition({
           env: params.args.env,
           root: params.repair.root,

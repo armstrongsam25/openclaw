@@ -1,6 +1,7 @@
 import { executeExistingOpenClawStateRead } from "./openclaw-state-db-readonly.js";
 import type { OpenClawStateDatabaseOptions } from "./openclaw-state-db.js";
 import { captureOpenClawStateWorkerContext } from "./openclaw-state-worker-context.js";
+import { executeOpenClawStateWorker } from "./openclaw-state-worker-store.js";
 import type { CachedGitHubIdentity } from "./user-profiles.types.js";
 
 type ProfileReadOptions = Pick<OpenClawStateDatabaseOptions, "path" | "env">;
@@ -25,7 +26,6 @@ export async function resolveCanonicalCachedGitHubIdentity(
 
 export async function listProfiles(options: ProfileReadOptions = {}) {
   const context = captureOpenClawStateWorkerContext(options);
-  const { executeOpenClawStateWorker } = await import("./openclaw-state-worker-store.js");
   return await executeOpenClawStateWorker(context, {
     type: "userProfiles.list",
     input: undefined,
@@ -35,7 +35,6 @@ export async function listProfiles(options: ProfileReadOptions = {}) {
 /** Candidate IDs and search labels; current recipient policy remains caller-owned. */
 export async function readUserProfileDirectory(limit: number, options: ProfileReadOptions = {}) {
   const context = captureOpenClawStateWorkerContext(options);
-  const { executeOpenClawStateWorker } = await import("./openclaw-state-worker-store.js");
   return await executeOpenClawStateWorker(context, {
     type: "userProfiles.directory",
     input: { limit },

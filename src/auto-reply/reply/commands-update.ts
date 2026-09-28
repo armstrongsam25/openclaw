@@ -1,7 +1,5 @@
-import {
-  callInProcessGatewayTool,
-  getInProcessGatewayToolContext,
-} from "../../agents/tools/in-process-gateway.js";
+import { callInProcessGatewayTool } from "../../agents/tools/gateway.js";
+import { getInProcessGatewayToolContext } from "../../agents/tools/in-process-gateway.js";
 import { readChannelContextGatewayContextResolver } from "../../channels/message-access/admission-evidence.js";
 import {
   DEFAULT_UPDATE_TIMEOUT_MS,

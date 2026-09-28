@@ -2,6 +2,10 @@ import { isCronSessionKey, isSubagentSessionKey } from "../sessions/session-key-
 import { listFinishedSessions, listRunningSessions } from "./bash-process-registry.js";
 import { resolveProcessToolScopeKey } from "./bash-process-scope.js";
 import { bindRequesterYieldCronAuthority } from "./cron-creator-authority-context.js";
+import {
+  markRequesterTurnYielded,
+  listUnsettledRequesterChildren,
+} from "./subagents/registry/subagent-registry.js";
 import type { SessionsYieldClaimResult, SessionsYieldIntent } from "./tools/sessions-yield-tool.js";
 
 const ISOLATED_AUTOMATION_YIELD_UNSUPPORTED_ERROR =
@@ -72,8 +76,6 @@ export function createRequesterYieldCallback(params: {
     const runtimeClaimed = (await params.claimYieldCompletion?.()) ?? false;
     let registryClaimed = false;
     if (hasRegistryClaim) {
-      const { markRequesterTurnYielded } =
-        await import("./subagents/registry/subagent-registry.js");
       const markYielded = () =>
         markRequesterTurnYielded({
           requesterSessionKey: params.requesterSessionKey as string,
@@ -109,8 +111,6 @@ export function createRequesterYieldCallback(params: {
     // await its children: their completion resumes the session on its own, so
     // report them instead of telling the model the work is finished.
     if (requesterSessionKey) {
-      const { listUnsettledRequesterChildren } =
-        await import("./subagents/registry/subagent-registry.js");
       const pendingChildren = await listUnsettledRequesterChildren({
         requesterSessionKey,
         requesterAgentId: params.requesterAgentId,

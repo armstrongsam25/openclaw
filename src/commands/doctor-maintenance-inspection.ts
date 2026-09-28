@@ -1,6 +1,7 @@
 import { formatCliCommand } from "../cli/command-format.js";
 import type { PreManagedServiceStop } from "../cli/update-cli/update-command-service-maintenance.js";
 import { ConfigWritePostCommitError } from "../config/io.write-errors.js";
+import { resolveConfiguredAgentDatabaseTargets } from "../config/sessions/targets.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { hasGatewayServiceStopUnsafeError } from "../daemon/service-inspection-error.js";
 import { collectNestedErrorCandidates } from "../infra/error-graph-internal.js";
@@ -106,7 +107,6 @@ export async function assertDoctorMaintenanceReady(
     await import("../config/sessions/startup-migration.js");
   assertSessionStoreMigrationComplete({ cfg, env, operation: "doctor" });
   const { assertOpenClawDatabasesReady } = await import("../state/openclaw-database-preflight.js");
-  const { resolveConfiguredAgentDatabaseTargets } = await import("../config/sessions/targets.js");
   await assertOpenClawDatabasesReady({
     env,
     config: cfg,

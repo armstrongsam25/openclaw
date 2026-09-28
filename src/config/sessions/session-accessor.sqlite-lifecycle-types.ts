@@ -6,7 +6,7 @@ import type { SqliteWalReclamationResult } from "../../infra/sqlite-wal.js";
 import type {
   OpenClawAgentDatabase,
   OpenClawAgentDatabaseOptions,
-} from "../../state/openclaw-agent-db.js";
+} from "../../state/openclaw-agent-db-contract.js";
 import type { ConversationRouteContext } from "./conversation-route-context.js";
 import type {
   SessionArchivedTranscriptCleanupRule,
@@ -26,7 +26,6 @@ import type {
   SessionEntryLifecycleUpsert,
 } from "./session-accessor.sqlite-contract.js";
 import type { SqliteLifecycleTargetSnapshot } from "./session-accessor.sqlite-entry-equality.js";
-import type { SessionEntryMaintenanceAgeFact } from "./session-accessor.sqlite-maintenance-age.js";
 import type {
   SessionEntryCommitContext,
   SessionEntryCreateWithTranscriptOptions,
@@ -121,6 +120,12 @@ export type ProjectedLifecycleRemovalCommitInput = {
   materializationFailed: boolean;
   allowCanonicalRepair?: boolean;
   maintenance: SessionEntryMaintenanceInput | null;
+};
+
+export type SessionEntryMaintenanceAgeFact = {
+  maintenance: ResolvedSessionMaintenanceConfig;
+  next: { at: number };
+  recheckAt: number;
 };
 
 export type SessionEntryLifecycleMutationParams = {

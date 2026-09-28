@@ -5,8 +5,8 @@ import type {
   SessionUnreferencedArtifactSweepResult,
 } from "./disk-budget.types.js";
 import { resolveSqliteTargetFromSessionStorePath } from "./session-sqlite-target.js";
+import type { SessionStoreTarget } from "./session-store-target.types.js";
 import type { ResolvedSessionMaintenanceConfig } from "./store-maintenance.js";
-import type { SessionStoreTarget } from "./targets.js";
 
 export type SessionCleanupSummary = {
   agentId: string;

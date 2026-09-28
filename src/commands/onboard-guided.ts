@@ -24,6 +24,7 @@ import {
   type GuidedAccessMode,
 } from "./onboard-guided-consent.js";
 import { runManualStage } from "./onboard-guided-manual.js";
+import * as onboardHelpers from "./onboard-helpers.js";
 import { enableDefaultOnboardingInternalHooks } from "./onboard-hooks.js";
 import {
   hasInteractiveOnboardingTty,
@@ -61,7 +62,6 @@ async function runGuidedOnboardingFlow(
   runtime: RuntimeEnv,
   deps: GuidedOnboardingDeps,
 ): Promise<GuidedOnboardingHandoff | null> {
-  const onboardHelpers = await import("./onboard-helpers.js");
   const prompter = await (deps.createPrompter?.() ??
     import("../wizard/clack-prompter.js").then(({ createClackPrompter }) => createClackPrompter()));
   await onboardHelpers.printWizardHeader(runtime);

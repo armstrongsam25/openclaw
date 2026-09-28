@@ -13,7 +13,8 @@ import {
   resolveSqliteScope,
   toDatabaseOptions,
 } from "../config/sessions/session-accessor.sqlite-scope.js";
-import { runHeartbeatOnce, startHeartbeatRunner } from "../infra/heartbeat-runner.js";
+import { runHeartbeatOnce } from "../infra/heartbeat-runner-run.js";
+import { startHeartbeatRunner } from "../infra/heartbeat-runner-scheduler.js";
 import { installHeartbeatRunnerTestRuntime } from "../infra/heartbeat-runner.test-harness.js";
 import { seedMainSessionStore } from "../infra/heartbeat-runner.test-utils.js";
 import {

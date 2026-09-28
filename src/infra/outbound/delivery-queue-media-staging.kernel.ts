@@ -1,6 +1,6 @@
 // SQLite media custody runs on the queue operation's admitted connection.
 import { asNullableRecord } from "@openclaw/normalization-core/record-coerce";
-import type { ReplyPayload } from "../../auto-reply/types.js";
+import type { ReplyPayload } from "../../shared/reply-payload.types.js";
 import type { OpenClawStateDatabase } from "../../state/openclaw-state-db-contract.js";
 import type { DB } from "../../state/openclaw-state-db.generated.js";
 import {

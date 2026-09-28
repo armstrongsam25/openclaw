@@ -1,5 +1,7 @@
 import type { z } from "zod";
 import { UPDATE_RUN_PHASES } from "../../packages/gateway-protocol/src/update-run-vocabulary.js";
+import { BUNDLED_OFFICIAL_EXTERNAL_PLUGIN_CATALOG_ENTRIES } from "../plugins/official-external-plugin-bundled-catalogs.js";
+import { resolveOfficialExternalPluginId } from "../plugins/official-external-plugin-catalog-source.js";
 import { CANARY_CHECKS, isPublicUpdateFailureCode } from "./update-failure-public-codes.js";
 import type { UpdateFailureFactSchema } from "./update-run-schema.js";
 import { resolvePublicUpdateStepId } from "./update-step-identity.js";
@@ -51,24 +53,16 @@ const NATIVE_CHECKS = new Set<string>([
   "npm lifecycle policy preflight",
 ]);
 
-let publicPluginIds: Promise<ReadonlySet<string>> | undefined;
+let publicPluginIds: ReadonlySet<string> | undefined;
 let publicDoctorCheckIds: Promise<ReadonlySet<string>> | undefined;
 
-function loadPublicPluginIds(): Promise<ReadonlySet<string>> {
-  publicPluginIds ??= Promise.all([
-    import("../plugins/official-external-plugin-bundled-catalogs.js"),
-    import("../plugins/official-external-plugin-catalog-source.js"),
-  ]).then(([catalogs, identities]) => {
-    // Installation directories can contain private extensions; only shipped catalogs establish public IDs.
-    const ids = new Set<string>();
-    for (const entry of catalogs.BUNDLED_OFFICIAL_EXTERNAL_PLUGIN_CATALOG_ENTRIES) {
-      const id = identities.resolveOfficialExternalPluginId(entry);
-      if (id) {
-        ids.add(id);
-      }
-    }
-    return ids;
-  });
+async function loadPublicPluginIds(): Promise<ReadonlySet<string>> {
+  // Installation directories can contain private extensions; only shipped catalogs establish public IDs.
+  publicPluginIds ??= new Set(
+    BUNDLED_OFFICIAL_EXTERNAL_PLUGIN_CATALOG_ENTRIES.map(resolveOfficialExternalPluginId).filter(
+      (id) => id !== undefined,
+    ),
+  );
   return publicPluginIds;
 }
 

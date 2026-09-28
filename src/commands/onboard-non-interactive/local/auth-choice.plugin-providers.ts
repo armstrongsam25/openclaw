@@ -34,10 +34,6 @@ import {
 } from "../../onboard-agent-target.js";
 import { rejectOnboardingOption } from "../../onboard-options.js";
 import type { OnboardOptions } from "../../onboard-types.js";
-import {
-  CODEX_RUNTIME_PLUGIN_ID,
-  ensureModelSelectionRuntimePlugins,
-} from "../../runtime-plugin-install.js";
 
 const loadAuthChoicePluginProvidersRuntime = createLazyRuntimeNamedExport(
   () => import("./auth-choice.plugin-providers.runtime.js"),
@@ -447,6 +443,8 @@ export async function applyNonInteractivePluginProviderChoice(
   }
   // Model selection can imply a runtime plugin even when auth setup belonged to
   // a provider plugin; install those runtimes before persisting the config.
+  const { CODEX_RUNTIME_PLUGIN_ID, ensureModelSelectionRuntimePlugins } =
+    await import("../../runtime-plugin-install.js");
   const runtimes = await ensureModelSelectionRuntimePlugins({
     cfg: result,
     model: selectedModel,

@@ -36,7 +36,7 @@ import { createTestRegistry } from "../test-utils/channel-plugins.js";
 import { normalizeSessionDeliveryState } from "../utils/delivery-context.shared.js";
 import { getLastHeartbeatEvent, resetHeartbeatEventsForTest } from "./heartbeat-events.js";
 import { claimHeartbeatOutcomeForRun } from "./heartbeat-outcome-store.js";
-import { runHeartbeatOnce, type HeartbeatDeps } from "./heartbeat-runner.js";
+import { runHeartbeatOnce } from "./heartbeat-runner-run.js";
 import { installHeartbeatRunnerTestRuntime } from "./heartbeat-runner.test-harness.js";
 import {
   heartbeatTestConfig,
@@ -44,6 +44,7 @@ import {
   seedMainSessionStore,
   seedSessionStore,
   setHeartbeatAgentTurnStatus,
+  type HeartbeatDeps,
   type HeartbeatReplySpy,
   withTempHeartbeatSandbox,
   withTempTelegramHeartbeatSandbox,

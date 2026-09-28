@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { expect, it, onTestFinished } from "vitest";
 import { beginSessionWorkAdmission } from "../../sessions/session-lifecycle-admission.js";
-import { collectAdmissionProtectedSessionIds } from "./session-history-eviction.js";
+import { collectAdmissionProtectedSessionIds } from "./session-history-eviction-candidates.js";
 
 it("reads only admitted entry payloads while protecting normalized keys and every generation", async () => {
   const db = new DatabaseSync(":memory:");

@@ -7,10 +7,8 @@ import type { BoardWidgetPutResult } from "../../packages/gateway-protocol/src/i
 import { WIDGET_HTML_MAX_UTF8_BYTES } from "../../packages/gateway-protocol/src/schema/canvas.js";
 import { optionalStringEnum } from "../agents/schema/string-enum.js";
 import { type AnyAgentTool, jsonResult, readToolStringParam } from "../agents/tools/common.js";
-import {
-  callInProcessGatewayTool,
-  type InProcessGatewayCaller,
-} from "../agents/tools/in-process-gateway.js";
+import { callInProcessGatewayTool } from "../agents/tools/gateway.js";
+import type { InProcessGatewayCaller } from "../agents/tools/in-process-gateway.js";
 import { normalizeBoardWidgetDeclared } from "../boards/board-capabilities.js";
 import {
   BOARD_REPORT_GUIDANCE,
