@@ -26,3 +26,17 @@ export type ManagedHandoffLeaseStoreOptions = {
   originalUpdateKey?: string;
   onProcessIdentityWarning?: (pid: number, message: string) => void;
 };
+
+export type ManagedHandoffRepair = {
+  assertCurrent: () => void;
+  bindRun(runId: string): void;
+  complete(runId: string): void;
+  [Symbol.dispose](): void;
+};
+
+export type ManagedHandoffLeaseTransition = (
+  lease: ManagedHandoffLease,
+  action: ManagedHandoffLease["action"],
+  executor?: ManagedHandoffLease["executor"],
+  recovery?: (next: ManagedHandoffLease) => string,
+) => ManagedHandoffLease | null;
