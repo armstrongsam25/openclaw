@@ -227,9 +227,11 @@ export async function runWorkerDescriptor(
           loadWorkspaceBootstrapFiles(workspaceDir, [DEFAULT_AGENTS_FILENAME]),
       ),
     ] as const;
-    // Imports and workspace reads must settle before the environment can be restored.
+    const ready = Promise.all(preparation);
+    // Observe early rejection while joining every operation before environment cleanup.
+    await Promise.allSettled([ready, ...preparation]);
     const [[{ runWorkerEmbeddedTurn }, { createWorkerInferenceStreamAdapter }], bootstrapFiles] =
-      await Promise.all(preparation).finally(() => Promise.allSettled(preparation));
+      await ready;
     const computerContextEpoch: ComputerContextEpoch = { value: 0 };
     const stream = createWorkerInferenceStreamAdapter({
       client: inference,
