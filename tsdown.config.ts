@@ -293,7 +293,7 @@ function workerDeployBuildConfig(entry: Record<string, string>, split = false): 
     shims: true,
     sourcemap: OUTPUT_SOURCE_MAPS,
     inputOptions: (options) => ({
-      ...buildInputOptions(options, { bundleAllDependencies: true }),
+      ...(buildInputOptions(options, { bundleAllDependencies: true }) ?? options),
       ...(split ? { preserveEntrySignatures: "allow-extension" as const } : {}),
     }),
   };

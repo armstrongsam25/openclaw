@@ -22,6 +22,7 @@ import {
 } from "../../scripts/lib/tsdown-config-groups.mts";
 import { WORKER_DEPLOY_OPTIONAL_NATIVE_MODULE_ID } from "../../scripts/lib/worker-deploy-build-plugin.mts";
 import { importFreshModule } from "../../src/plugin-sdk/test-helpers/import-fresh.js";
+import { isWorkerBundleChunkPath } from "../../src/shared/worker-bundle-hash.js";
 import { resolveTestNodeExecPath } from "../../src/test-utils/node-process.js";
 import buildConfigs from "../../tsdown.config.ts";
 import { copyFsSafePackageFixture } from "./fs-safe-package.test-support.js";
@@ -646,9 +647,22 @@ describe("tsdown config", () => {
       fs.renameSync(outDir, path.join(installed, "dist"));
       const require = createRequire(import.meta.url);
       if (worker) {
-        expect(bundles.flatMap((bundle) => bundle.chunks.map((chunk) => chunk.fileName))).toEqual([
-          `${entry}.mjs`,
-        ]);
+        const files = bundles.flatMap((bundle) => bundle.chunks.map((chunk) => chunk.fileName));
+        expect(files).toContain(`${entry}.mjs`);
+        expect(files.length).toBeGreaterThan(1);
+        expect(
+          files.every(
+            (file) =>
+              file === `${entry}.mjs` ||
+              (file.startsWith("worker/") && isWorkerBundleChunkPath(file.slice("worker/".length))),
+          ),
+        ).toBe(true);
+        expect(
+          collectPackageDistImportErrors({
+            files,
+            readText: (file) => fs.readFileSync(path.join(installed, "dist", file), "utf8"),
+          }),
+        ).toEqual([]);
       } else {
         // Install only the engine package. The grammar must come from emitted assets,
         // even when the entrypoint is nested and the whole package has moved.
@@ -1038,15 +1052,28 @@ console.log("relocated Bash parser works without native grammar package");
         ...selected,
         config: false,
         cwd: root,
-        entry: [entry],
+        entry: bundleAll ? { "worker/entry": entry } : [entry],
         outDir: path.join(root, "dist"),
         tsconfig: declarations ? path.join(root, "tsconfig.json") : false,
         dts: declarations ? { emitDtsOnly: true } : false,
         logLevel: "silent",
       });
       try {
-        const imports = bundles.flatMap((bundle) =>
-          bundle.chunks.flatMap((chunk) => (chunk.type === "chunk" ? chunk.imports : [])),
+        const chunks = bundles.flatMap((bundle) =>
+          bundle.chunks.filter((chunk) => chunk.type === "chunk"),
+        );
+        const emitted = new Set(chunks.map((chunk) => chunk.fileName));
+        const imports = chunks.flatMap((chunk) =>
+          [...chunk.imports, ...chunk.dynamicImports].filter((specifier) => {
+            // Portable workers retain Node shims, but no third-party package imports.
+            if (bundleAll && isBuiltin(specifier)) {
+              return false;
+            }
+            const resolved = specifier.startsWith(".")
+              ? path.posix.join(path.posix.dirname(chunk.fileName), specifier)
+              : specifier;
+            return !emitted.has(resolved);
+          }),
         );
         expect(imports.toSorted()).toEqual(expectedImports.toSorted());
       } finally {
@@ -1237,6 +1264,7 @@ console.log("relocated Bash parser works without native grammar package");
     const anchorConfig = configs.find(isWorkerServiceChildGroupAnchorConfig);
     expect(workerConfig?.entry).toEqual({
       "worker/worker": "src/worker/worker-deploy-entry.ts",
+      "worker/worker-chunk-highlight": "node_modules/highlight.js/lib/index.js",
     });
     expect(fileToolPlanningConfig?.entry).toEqual({
       "worker/file-tool-planning.worker": "src/worker/worker-deploy-file-tool-planning.ts",
@@ -1284,9 +1312,14 @@ console.log("relocated Bash parser works without native grammar package");
       expect.arrayContaining([expect.objectContaining({ name: "openclaw:worker-deploy" })]),
     );
     expect(workerConfig?.outputOptions).toMatchObject({
-      codeSplitting: false,
+      codeSplitting: { groups: expect.any(Array) },
+      strictExecutionOrder: true,
+      chunkFileNames: "worker/worker-chunk-[hash].mjs",
       assetFileNames: "worker/[name][extname]",
     });
+    for (const config of [fileToolPlanningConfig, imageProcessorConfig, sqliteStoreConfig]) {
+      expect(config?.outputOptions).toMatchObject({ codeSplitting: false });
+    }
     for (const config of [receiverConfig, launcherConfig]) {
       expect(config?.define).toBeUndefined();
     }
