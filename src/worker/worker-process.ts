@@ -1,4 +1,5 @@
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
+import { initializeSqliteRuntimeCapabilities } from "../infra/bun-sqlite-library.js";
 import { enableConsoleCapture, routeLogsToStderr } from "../logging/console.js";
 import { signalProcessTree } from "../process/kill-tree.js";
 import {
@@ -161,7 +162,6 @@ export async function runWorkerProcess(
     browserRuntime?: WorkerBrowserRuntime;
   } = {},
 ): Promise<void> {
-  const { initializeSqliteRuntimeCapabilities } = await import("../infra/bun-sqlite-library.js");
   await initializeSqliteRuntimeCapabilities();
   // Stdout belongs to the worker result; diagnostics stay on stderr through process shutdown.
   routeLogsToStderr();

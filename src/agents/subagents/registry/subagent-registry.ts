@@ -728,7 +728,6 @@ export function adoptSubagentRunForRequesterTurn(
   });
 }
 
-
 const bootstrapState = subagentRegistryBootstrapState;
 bootstrapState.restorer = subagentRestorer;
 bootstrapState.ready = true;

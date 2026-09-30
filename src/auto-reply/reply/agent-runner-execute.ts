@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
-import { appendCurrentInboundContext } from "../../agents/embedded-agent-runner/run/runtime-context-prompt.js";
 import { loadAgentRunnerMemoryRuntime } from "../../agents/command/runtime-loaders.js";
+import { appendCurrentInboundContext } from "../../agents/embedded-agent-runner/run/runtime-context-prompt.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import { withBeforeAgentReplyObserver } from "../../plugins/before-agent-reply.js";
