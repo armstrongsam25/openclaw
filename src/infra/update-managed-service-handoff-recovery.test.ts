@@ -1,9 +1,14 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDeferred } from "../../test/helpers/promise.js";
 import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
-import { closeOpenClawStateDatabaseForTest } from "../state/openclaw-state-db.js";
+import {
+  closeOpenClawStateDatabaseAsync,
+  closeOpenClawStateDatabaseForTest,
+} from "../state/openclaw-state-db.js";
+import * as bootReader from "./update-managed-service-handoff-boot.js";
 import { createManagedHandoffLeaseStore } from "./update-managed-service-handoff-lease.js";
 import { createManagedHandoffRecoveryFixture } from "./update-managed-service-handoff-recovery.test-support.js";
 import {
@@ -11,10 +16,12 @@ import {
   finishUpdateRun,
   getUpdateRun,
   listUpdateRuns,
+  recordUpdateRunStep,
 } from "./update-run-ledger.js";
 
 const dirs = useAutoCleanupTempDirTracker((cleanup) =>
-  afterEach(() => {
+  afterEach(async () => {
+    await closeOpenClawStateDatabaseAsync();
     closeOpenClawStateDatabaseForTest();
     cleanup();
   }),
@@ -96,11 +103,25 @@ describe("managed handoff lease repair", () => {
     expect(fixture.current()).toEqual(previous);
   });
 
-  it("preserves a legacy generation when artifact inspection reports unfinished restoration", async () => {
+  it("preserves the legacy generation and heartbeat when recorded rollback is incomplete", async () => {
     const previous = fixture.seed();
-    fixture.repairFacts.mockRejectedValue(new Error("Retained state restoration is unfinished"));
-    await expect(prepareRepair()).rejects.toThrow("Retained state restoration is unfinished");
+    fixture.repairFacts.mockRestore();
+    vi.spyOn(os, "tmpdir").mockReturnValue(fixture.root);
+    const run = createUpdateRun(
+      {
+        trigger: "cli",
+        origin: { driver: { ...previous.executor, host: os.hostname() } },
+      },
+      { env },
+    );
+    recordUpdateRunStep(run.runId, { step: "package rollback", status: "completed" }, { env });
+    finishUpdateRun(run.runId, { status: "failed", reason: "interrupted-restoration" }, { env });
+    const recorded = getUpdateRun(run.runId, { env });
+
+    await expect(prepareRepair()).rejects.toThrow(/rollback.*update status/u);
+
     expect(fixture.current()).toEqual(previous);
+    expect(getUpdateRun(run.runId, { env })).toEqual(recorded);
   });
 
   it("retains bound recovery facts if the finalizer ledger refuses its settlement receipt", async () => {
@@ -204,7 +225,7 @@ describe("managed handoff lease repair", () => {
     expect(listUpdateRuns({}, { env })).toEqual([]);
   });
 
-  it("keeps an interrupted repair's own run in the census until its descendant exits", async () => {
+  it("preserves interrupted repair evidence across reboot until explicit repair settles it", async () => {
     let now = Date.now();
     vi.spyOn(Date, "now").mockImplementation(() => now);
     const original = fixture.seed();
@@ -220,8 +241,21 @@ describe("managed handoff lease repair", () => {
     });
     now += 45 * 60_000 + 1_000;
     fixture.births.set(process.pid, 20);
+    const boot = fixture.store.bootIdentity();
+    vi.spyOn(bootReader, "createManagedHandoffBootIdentityReader").mockReturnValue(() => ({
+      ...boot,
+      identity:
+        boot.platform === "win32"
+          ? "2026-09-16T03:42:10.5000000Z"
+          : "01234567-89ab-cdef-0123-456789abcdee",
+    }));
     const nextStore = createManagedHandoffLeaseStore();
     const retained = fixture.current();
+    const metadata = fixture.readMetadata(retained);
+    expect(nextStore.acquire(fixture.root, "next-update", { kind: "update" }).kind).toBe("busy");
+    expect(nextStore.release(retained)).toBe(false);
+    expect(fixture.current()).toEqual(retained);
+    expect(fixture.readMetadata(retained)).toEqual(metadata);
     fixture.runCensus.set(interruptedRun.runId, { matchingPids: [81235], unverifiedPids: [] });
     await expect(nextStore.prepareRepair(fixture.root, env)).rejects.toThrow(/PID 81235/);
     expect(fixture.current()).toEqual(retained);

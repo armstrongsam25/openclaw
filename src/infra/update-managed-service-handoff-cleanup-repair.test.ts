@@ -3,8 +3,16 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
+import { closeOpenClawStateDatabaseForTest } from "../state/openclaw-state-db.js";
 import { readManagedHandoffRepairFacts } from "./update-managed-service-handoff-cleanup.js";
 import type { ManagedHandoffLease } from "./update-managed-service-handoff-lease-types.js";
+import { retainedCheckpointBinding } from "./update-retained-checkpoint.test-support.js";
+import {
+  createRetainedUpdateRecovery,
+  retainedTerminalRecord,
+  storeRetainedUpdateRecovery,
+} from "./update-retained-recovery.test-support.js";
+import { createUpdateRun } from "./update-run-ledger.js";
 import { listUpdateRunsAsync } from "./update-run-reader.js";
 import type { UpdateRunRecord } from "./update-run-record.js";
 import { assertUpdateRecoveryAdmission } from "./update-run-recovery-admission.js";
@@ -12,7 +20,12 @@ import { assertUpdateRecoveryAdmission } from "./update-run-recovery-admission.j
 vi.mock("./update-run-reader.js", () => ({ listUpdateRunsAsync: vi.fn() }));
 vi.mock("./update-run-recovery-admission.js", () => ({ assertUpdateRecoveryAdmission: vi.fn() }));
 
-const dirs = useAutoCleanupTempDirTracker(afterEach);
+const dirs = useAutoCleanupTempDirTracker((cleanup) =>
+  afterEach(() => {
+    closeOpenClawStateDatabaseForTest();
+    cleanup();
+  }),
+);
 let root: string;
 let env: NodeJS.ProcessEnv;
 let lease: ManagedHandoffLease;
@@ -178,6 +191,254 @@ describe("managed handoff repair facts", () => {
     vi.mocked(assertUpdateRecoveryAdmission).mockRejectedValueOnce(refusal);
     await expect(readManagedHandoffRepairFacts(lease, env)).rejects.toBe(refusal);
   });
+
+  it.each<{
+    name: string;
+    step?: string;
+    status?: UpdateRunRecord["steps"][number]["status"];
+    outcome?: NonNullable<UpdateRunRecord["verification"]["rollbackOutcome"]>["status"];
+    legacyCompleted?: boolean;
+    refuses: boolean;
+  }>([
+    { name: "failed outcome without a step", outcome: "failed", refuses: true },
+    {
+      name: "in-progress Git rollback after an old no-op outcome",
+      step: "git rollback reset",
+      status: "in_progress",
+      outcome: "not-needed",
+      refuses: true,
+    },
+    {
+      name: "failed package rollback after an old refusal",
+      step: "global install rollback",
+      status: "failed",
+      outcome: "not-attempted",
+      refuses: true,
+    },
+    {
+      name: "package restored before config settlement",
+      step: "package rollback",
+      status: "completed",
+      refuses: true,
+    },
+    {
+      name: "failed config restoration after old success",
+      step: "config-rollback",
+      status: "failed",
+      outcome: "succeeded",
+      refuses: true,
+    },
+    {
+      name: "in-progress runtime restoration",
+      step: "git-runtime-rollback",
+      status: "in_progress",
+      refuses: true,
+    },
+    {
+      name: "partial source restoration",
+      step: "git-rollback-source",
+      status: "completed",
+      refuses: true,
+    },
+    {
+      name: "unsettled previous generation",
+      step: "previous generation restoration",
+      status: "failed",
+      refuses: true,
+    },
+    {
+      name: "completed headless rollback",
+      step: "package rollback",
+      status: "completed",
+      outcome: "succeeded",
+      refuses: false,
+    },
+    {
+      name: "completed Git rollback with failed temporary-branch cleanup",
+      step: "git rollback delete openclaw-update-fixture",
+      status: "failed",
+      outcome: "succeeded",
+      refuses: false,
+    },
+    {
+      name: "legacy verified previous generation",
+      step: "git rollback checkout",
+      status: "completed",
+      legacyCompleted: true,
+      refuses: false,
+    },
+    { name: "skipped rollback", step: "package rollback", status: "skipped", refuses: false },
+    {
+      name: "outcome recording warning",
+      step: "rollback-outcome-recording",
+      status: "failed",
+      refuses: false,
+    },
+    {
+      name: "diagnostic rollback label",
+      step: "warning:package rollback",
+      status: "failed",
+      refuses: false,
+    },
+    {
+      name: "finalizer no-op",
+      step: "finalize:package-rollback-not-needed",
+      status: "completed",
+      refuses: false,
+    },
+    {
+      name: "retained Git branch",
+      step: "git-rollback-keep-branch",
+      status: "completed",
+      refuses: false,
+    },
+  ])("classifies legacy rollback evidence: $name", async (scenario) => {
+    const original = run("legacy-rollback", {
+      driver: { ...lease.executor, host: os.hostname() },
+    });
+    if (scenario.step) {
+      original.steps = [{ step: scenario.step, status: scenario.status! }];
+    }
+    if (scenario.outcome) {
+      original.verification.rollbackOutcome = { status: scenario.outcome, reason: scenario.name };
+    }
+    if (scenario.legacyCompleted) {
+      original.status = "rolled-back";
+      original.verification.recovery = {
+        serviceRestartSafe: true,
+        packageRollbackVerified: true,
+        service: "healthy",
+        version: "1.0.0",
+      };
+    }
+    vi.mocked(listUpdateRunsAsync).mockResolvedValue([original]);
+    if (scenario.refuses) {
+      await expect(readManagedHandoffRepairFacts(lease, env)).rejects.toThrow(
+        /legacy-rollback.*rollback.*update status/u,
+      );
+    } else {
+      expect((await readManagedHandoffRepairFacts(lease, env)).runIds).toEqual([original.runId]);
+    }
+  });
+
+  it.each(["restored", "retired", "forward"] as const)(
+    "honors a %s capture receipt over stale rollback diagnostics",
+    async (settlement) => {
+      const original = run("settled-capture", {
+        driver: { ...lease.executor, host: os.hostname() },
+      });
+      original.verification.rollbackOutcome = { status: "failed", reason: "Old rollback" };
+      original.steps = [{ step: "package rollback", status: "failed" }];
+      const capture: NonNullable<UpdateRunRecord["origin"]["updateRecoveryCapture"]> = {
+        manifestSha256: "a".repeat(64),
+        configWrites: [],
+        status: "pending",
+      };
+      if (settlement === "restored") {
+        capture.restored = true;
+      } else if (settlement === "retired") {
+        capture.retirement = {
+          directory: root,
+          installRoot: root,
+          stateDir: env.OPENCLAW_STATE_DIR!,
+          configPath: path.join(root, "openclaw.json"),
+          identity: { dev: 1, ino: 2, birthtimeMs: 3 },
+          outcome: "restored",
+        };
+      } else {
+        capture.forwardResolution = {
+          kind: "forward-resolved",
+          binding: {
+            runId: original.runId,
+            failedAtMs: 20,
+            manifestSha256: capture.manifestSha256,
+            candidateSha256: null,
+            preparedSha256: null,
+            installRoot: root,
+            stateDir: env.OPENCLAW_STATE_DIR!,
+            configPath: path.join(root, "openclaw.json"),
+          },
+          repair: {
+            root,
+            packageSha256: "b".repeat(64),
+            node: process.execPath,
+            nodeVersion: process.version,
+            build: "settled-build",
+            artifact: {
+              rootIdentity: "settled-root",
+              module: path.join(root, "module.mjs"),
+              entry: path.join(root, "entry.mjs"),
+              inventorySha256: "c".repeat(64),
+              executableIdentity: "settled-node",
+              executableSha256: "d".repeat(64),
+            },
+          },
+          completedAtMs: 30,
+        };
+      }
+      original.origin.updateRecoveryCapture = capture;
+      vi.mocked(listUpdateRunsAsync).mockResolvedValue([original]);
+      expect((await readManagedHandoffRepairFacts(lease, env)).runIds).toEqual([original.runId]);
+    },
+  );
+
+  it.each(["rollback", "forward", "preparation-aborted"] as const)(
+    "distinguishes native %s settlement from legacy rollback failure",
+    async (settlement) => {
+      const created = createUpdateRun({ trigger: "cli" }, { env });
+      const original = run(created.runId, { driver: { ...lease.executor, host: os.hostname() } });
+      original.verification.rollbackOutcome = { status: "failed", reason: "Old rollback" };
+      original.steps = [{ step: "package rollback", status: "failed" }];
+      vi.mocked(listUpdateRunsAsync).mockResolvedValue([original]);
+      const runtime = { root, nodePath: process.execPath, version: "1.0.0", buildId: "build" };
+      const record = createRetainedUpdateRecovery(
+        { runId: created.runId, from: runtime, to: runtime },
+        { env },
+      );
+      if (settlement === "preparation-aborted") {
+        record.claimKind = "recovery";
+        record.revision = 4;
+        record.preimages = { ...retainedCheckpointBinding(record), boundAtRevision: 0 };
+        record.nativeManager = {
+          identity: {
+            platform: "linux",
+            scope: "user",
+            uid: 1000,
+            unitName: "openclaw.service",
+            runId: record.runId,
+            stateDir: record.source!.stateDir,
+            configPath: record.source!.configPath,
+            profile: record.source!.profile!,
+          },
+          original: { exists: true, enabled: true, loaded: true, stopped: false },
+          boundAtRevision: 0,
+          effects: [],
+        };
+        record.package = retainedTerminalRecord(record).package!;
+        record.package.descriptor.retention = null;
+        record.package.observed.observation = {
+          previous: "live",
+          candidate: "staged",
+          launchers: "both",
+          successorLive: false,
+        };
+        record.primaryFailure = { code: "interrupted-preparation", effectId: null };
+        record.preparationAborted = {
+          reason: "interrupted-preparation",
+          committedAtMs: record.updatedAtMs,
+          commitRevision: record.revision,
+          observedIdentity: record.package.observed.observedIdentity,
+        };
+        storeRetainedUpdateRecovery(record, { env });
+        await expect(readManagedHandoffRepairFacts(lease, env)).rejects.toThrow(/rollback/u);
+      } else {
+        storeRetainedUpdateRecovery(retainedTerminalRecord(record, settlement === "rollback"), {
+          env,
+        });
+        expect((await readManagedHandoffRepairFacts(lease, env)).runIds).toEqual([original.runId]);
+      }
+    },
+  );
 
   it.each(["unreadable", "invalid-json", "invalid-owner"])(
     "keeps an %s helper directory and installation root in the census scope",

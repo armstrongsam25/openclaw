@@ -208,11 +208,49 @@ export async function readManagedHandoffRepairFacts(
   if (!runId || runIds.size !== 1) {
     throw new Error("Cannot identify handoff run; inspect openclaw update status --json.");
   }
-  const capture = runs.find((run) => run.runId === runId)?.origin.updateRecoveryCapture;
+  const original = runs.find((run) => run.runId === runId);
+  const capture = original?.origin.updateRecoveryCapture;
   if (capture && !capture.restored && !capture.forwardResolution && !capture.retirement) {
     throw new Error(`Update ${runId} retains restoration; run openclaw doctor --fix.`);
   }
   await assertUpdateRecoveryAdmission({ env });
+  if (original && !capture) {
+    const { resolvePublicUpdateStepId } = await import("./update-step-identity.js");
+    const { isVerifiedUpdateRollback } = await import("../shared/update-outcome.js");
+    const rollback = original.steps.filter(({ step, status }) => {
+      const id = resolvePublicUpdateStepId(step);
+      return (
+        status !== "skipped" &&
+        (id === "package-rollback" ||
+          id === "config-rollback" ||
+          id === "git-runtime-rollback" ||
+          id === "previous-generation-restoration" ||
+          (id?.startsWith("git-rollback-") && id !== "git-rollback-delete-branch") ||
+          step === "git-rollback-source")
+      );
+    });
+    const outcome = original.verification.rollbackOutcome?.status;
+    const completed =
+      outcome === "succeeded" ||
+      (original.status === "rolled-back" &&
+        isVerifiedUpdateRollback({ recovery: original.verification.recovery ?? undefined }));
+    // Steps can be newer than the merged outcome; a package step alone omits config restoration.
+    if (
+      outcome === "failed" ||
+      rollback.some((step) => step.status === "failed" || step.status === "in_progress") ||
+      (rollback.length > 0 && !completed)
+    ) {
+      const { loadUpdateRecovery } = await import("./update-run-recovery.js");
+      const { isUpdateRecoveryPending } = await import("./update-run-recovery-schema.js");
+      const recovery = loadUpdateRecovery(runId, { env });
+      // A settled native receipt supersedes stale history; aborted preparation does not.
+      if (!recovery?.terminal || isUpdateRecoveryPending(recovery)) {
+        throw new Error(
+          `Update ${runId} retains an unverified rollback of its installation or configuration. Keep its artifacts, inspect openclaw update status --json, and complete the recorded restoration before retrying openclaw update repair.`,
+        );
+      }
+    }
+  }
   if (path.basename(runId) === runId && runId !== "." && runId !== "..") {
     const capturePath = path.join(resolveUpdateCaptureRoot(resolveStateDir(env)), runId);
     const canonical = await fs.realpath(capturePath).catch(() => null);

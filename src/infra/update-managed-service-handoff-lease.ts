@@ -12,6 +12,7 @@ import { createManagedHandoffCancellation } from "./update-managed-service-hando
 import {
   createManagedHandoffLeaseDatabase,
   leaseQueries,
+  readManagedHandoffRepairMetadata,
 } from "./update-managed-service-handoff-database.js";
 import type {
   LeaseAcquisition,
@@ -157,7 +158,11 @@ export function createManagedHandoffLeaseStore(
         boot.platform === action.lifetime.boot.platform &&
         boot.identity !== action.lifetime.boot.identity
       ) {
-        return true;
+        const repair = (connection: HandoffDatabase) =>
+          readManagedHandoffRepairMetadata(connection, lease, (operation) =>
+            transact(connection, operation),
+          );
+        return action.phase === "closed" || !(db ? repair(db) : withDatabase(true, repair));
       }
       if (!["reserved", "closed"].includes(action.phase)) {
         return false;

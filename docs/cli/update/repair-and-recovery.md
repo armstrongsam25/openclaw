@@ -238,6 +238,12 @@ new lease generation, for a later explicit repair.
 Each repair attempt records its own run before starting finalization work, so a
 later repair also checks for descendants of interrupted repair attempts.
 
+An unfinished package or configuration rollback keeps the handoff and its artifacts
+intact. Inspect `openclaw update status --json` and complete the recorded restoration
+before retrying repair. Verified completed rollback and settlement receipts permit
+repair, including installations without a running Gateway. Skipped rollback steps
+and diagnostic warnings alone do not prevent repair.
+
 When update, post-core continuation, or repair runs under Bun, its OpenClaw
 maintenance children use that same Bun executable, including fresh Doctor,
 config validation, readiness, completion, and non-interactive failure diagnostics.

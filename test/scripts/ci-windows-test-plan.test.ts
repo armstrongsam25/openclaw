@@ -28,8 +28,8 @@ describe("Windows CI whole-file placement", () => {
     expect(shards.flatMap((shard) => shard.targets).toSorted(compareFiles)).toEqual(
       inventory.toSorted(compareFiles),
     );
-    // Repair fixtures round shards to 425s; allow the next whole-second prediction.
-    expect(shards.every((shard) => shard.predicted_seconds < 426)).toBe(true);
+    // Census and repair fixtures round one shard to 426s; retain the approved tiny budget bump.
+    expect(shards.every((shard) => shard.predicted_seconds < 427)).toBe(true);
     expect(
       shards.filter(
         (shard) =>
