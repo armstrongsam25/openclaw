@@ -12,8 +12,8 @@ import {
 } from "../infra/restart-intent.js";
 import { cleanStaleGatewayProcessesSync } from "../infra/restart-stale-pids.js";
 import { resolveUpdateInstallRoot } from "../infra/update-install-root.js";
-import { createManagedHandoffLeaseStore } from "../infra/update-managed-service-handoff-lease.js";
 import { isCurrentManagedServiceUpdateHandoffProcess } from "../infra/update-managed-service-handoff-current.js";
+import { createManagedHandoffLeaseStore } from "../infra/update-managed-service-handoff-lease.js";
 import {
   getFileLockProcessStartTime,
   isPidAlive,
