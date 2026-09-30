@@ -1,6 +1,7 @@
 .github/workflows/pr-crabbox-gate-publisher.yml
 cli-root-options.mjs
 config/ci-test-timings.json
+gateway-shutdown-budget.mjs
 node-compile-cache.mjs
 node-sqlite.mjs
 node-version.mjs
@@ -304,6 +305,7 @@ src/channels/registry-lookup.ts
 src/channels/registry-normalize.ts
 src/channels/registry.ts
 src/cli/command-format.ts
+src/cli/daemon-cli/restart-health.constants.ts
 src/cli/daemon-cli/restart-health.types.ts
 src/cli/parse-bytes.ts
 src/cli/parse-duration.ts
@@ -626,6 +628,7 @@ src/infra/container-environment.ts
 src/infra/crypto-digest.ts
 src/infra/dedupe.ts
 src/infra/deep-merge.ts
+src/infra/deferred-plugin-migrations.contract.ts
 src/infra/deferred-plugin-migrations.ts
 src/infra/delivery-queue-sqlite-bound.ts
 src/infra/delivery-queue-sqlite.types.ts
@@ -686,6 +689,7 @@ src/infra/gateway-lock-payload.ts
 src/infra/gateway-state-owner-directory.ts
 src/infra/gateway-state-owner.ts
 src/infra/gateway-process-argv.ts
+src/infra/gateway-shutdown-budget.ts
 src/infra/gateway-supervision.ts
 src/infra/git-commit.ts
 src/infra/git-exec.ts
@@ -741,6 +745,7 @@ src/infra/node-runner-inventory.ts
 src/infra/node-runtime-executable.ts
 src/infra/node-sqlite.ts
 src/infra/non-fatal-cleanup.ts
+src/infra/npm-command.ts
 src/infra/npm-install-env.ts
 src/infra/npm-registry-spec.ts
 src/infra/openclaw-exec-env.ts

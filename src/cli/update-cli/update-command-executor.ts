@@ -10,7 +10,6 @@ import {
   type ManagedHandoffLease,
   type ManagedHandoffParent,
 } from "../../infra/update-managed-service-handoff-lease.js";
-import { isCurrentManagedServiceUpdateHandoffProcess } from "../../infra/update-managed-service-handoff-current.js";
 import type { UpdateRecoveryFence } from "../../infra/update-run-recovery.js";
 import { hasCommandProcessCleanupError } from "../../process/exec-result.js";
 import { withCommandProcessScope } from "../../process/exec-spawn.js";
@@ -313,6 +312,8 @@ export async function withUpdateCommandExecutor<T>(
               found.lease.helper.pid !== process.pid &&
               found.lease.executor.pid === process.pid
             ) {
+              const { isCurrentManagedServiceUpdateHandoffProcess } =
+                await import("../../infra/update-managed-service-handoff-current.js");
               const handoff = { root: key, runId, store };
               const handedOff = await isCurrentManagedServiceUpdateHandoffProcess(handoff);
               // Retain the exact row observed before the await. Matching the run in
