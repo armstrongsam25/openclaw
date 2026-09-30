@@ -285,8 +285,8 @@ export async function restoreScheduledTaskDefinition(params: {
 async function changeScheduledTaskEnabledState(params: {
   env: GatewayServiceEnv;
   enabled: boolean;
-  beforeMutation?: (phase?: "restore") => Promise<void>;
-  assertCurrent?: (phase?: "restore") => void;
+  beforeMutation?: () => Promise<void>;
+  assertCurrent?: () => void;
   restoreOnFailure?: boolean;
 }): Promise<boolean> {
   const taskName = resolveTaskName(params.env);
@@ -321,8 +321,8 @@ async function changeScheduledTaskEnabledState(params: {
     if (!params.enabled && params.restoreOnFailure !== false) {
       // A timeout can follow a committed /DISABLE, so restore the proven prior state.
       try {
-        await params.beforeMutation?.("restore");
-        params.assertCurrent?.("restore");
+        await params.beforeMutation?.();
+        params.assertCurrent?.();
         const restore = await execSchtasks(["/Change", "/TN", taskName, "/ENABLE"]);
         if (restore.code !== 0) {
           const restoreDetail = (restore.stderr || restore.stdout).trim() || "unknown error";
@@ -344,8 +344,8 @@ async function changeScheduledTaskEnabledState(params: {
 export async function suspendScheduledTaskAutoStartForUpdate(
   env: GatewayServiceEnv = process.env as GatewayServiceEnv,
   options?: {
-    beforeMutation?: (phase?: "restore") => Promise<void>;
-    assertCurrent?: (phase?: "restore") => void;
+    beforeMutation?: () => Promise<void>;
+    assertCurrent?: () => void;
     restoreOnFailure?: boolean;
   },
 ): Promise<boolean> {
@@ -355,9 +355,9 @@ export async function suspendScheduledTaskAutoStartForUpdate(
       env,
       enabled: false,
       ...options,
-      assertCurrent: (phase) => {
+      assertCurrent: () => {
         assertNative();
-        assertCaller?.(phase);
+        assertCaller?.();
       },
     }),
   );
