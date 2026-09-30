@@ -204,7 +204,7 @@ function decodeSqliteWorkerReplyValue(
     : { type: "complete", value };
 }
 
-export function decodeSqliteWorkerReplyError(
+function decodeSqliteWorkerReplyError(
   job: Job,
   error: Extract<SqliteWorkerReply, { ok: false }>["error"],
 ): Error {
@@ -218,7 +218,7 @@ export function decodeSqliteWorkerReplyError(
   return failure;
 }
 
-export function decodeSqliteWorkerCleanupError(payload: OpenClawStateWorkerErrorPayload): Error {
+function decodeSqliteWorkerCleanupError(payload: OpenClawStateWorkerErrorPayload): Error {
   const failure = new Error("SQLite worker native cleanup failed");
   retainOpenClawStateWorkerErrorPayload(failure, payload);
   return hydrateOpenClawStateWorkerError(failure, { includeOrdinary: true });

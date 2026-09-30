@@ -437,10 +437,3 @@ export function hydrateOpenClawStateWorkerError(
   }
   return root.replacement;
 }
-
-/** Decode the closed read-fact error graph without changing the operation's original outcome. */
-export function decodeSqliteWorkerReadFactsError(payload: unknown): Error {
-  const error = new Error("SQLite prepared read facts are unavailable");
-  retainOpenClawStateWorkerErrorPayload(error, payload);
-  return hydrateOpenClawStateWorkerError(error, { includeOrdinary: true });
-}

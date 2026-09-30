@@ -2,8 +2,13 @@ import { availableParallelism } from "node:os";
 import { toErrorObject } from "@openclaw/normalization-core/error-coercion";
 import { getChildLogger } from "../logging/logger.js";
 import { createDeferredCore } from "../shared/deferred.js";
+import { getOpenClawDatabaseMaintenanceScope } from "../state/openclaw-state-db-async-lifecycle.js";
 import { captureSqliteWorkerClosePolicy } from "./bun-sqlite-library.js";
-import { findUnclaimedSharedStateActors } from "./sqlite-worker-broker-admission.js";
+import { createRetainedOperation } from "./retained-operation.js";
+import {
+  assertSqliteWorkerActorExecution,
+  findUnclaimedSharedStateActors,
+} from "./sqlite-worker-broker-admission.js";
 import { SqliteWorkerCallbacks } from "./sqlite-worker-broker-callbacks.js";
 import {
   reserveSqliteWorkerFile,
@@ -28,7 +33,7 @@ import type {
   SqliteWorkerRetainedResult,
 } from "./sqlite-worker-broker.types.js";
 import {
-  bindSqliteWorkerClient,
+  createSqliteWorkerClient,
   getSqliteWorkerClientActorIdentity,
   runSqliteWorkerClientOperation,
 } from "./sqlite-worker-client.js";
@@ -44,7 +49,10 @@ import {
 } from "./sqlite-worker-input-admission.js";
 import type { SqliteWorkerAdmissionFactory } from "./sqlite-worker-operation-admission.js";
 import type { SqliteWorkerOperationSettlement } from "./sqlite-worker-operation-settlement.js";
-import type { SqliteWorkerStateContext } from "./sqlite-worker-state-context.js";
+import {
+  sqliteWorkerRequestBytes,
+  type SqliteWorkerStateContext,
+} from "./sqlite-worker-state-context.js";
 
 const ADMISSION_TIMEOUT_MS = 10_000;
 const MAX_STORES = 64;
@@ -208,20 +216,120 @@ export class SqliteWorkerBroker {
     releasePaths: () => void = () => {},
     opening: () => boolean = () => false,
   ): SqliteWorkerStore<Operations> {
-    return bindSqliteWorkerClient<Operations>(owned, client, {
-      stores: this.stores,
-      clients: this.clients,
-      draining: () => this.retirement.closingRetained,
-      opening,
-      enqueue: (slot, body, bytes, options) => this.enqueue(slot, body, bytes, options),
-      releaseReference: () => this.lifecycle.releaseActorReference(owned),
-      releasePaths,
-      closeActorRetained: () => this.lifecycle.closeActorRetained(owned, maintenanceScope),
-      retireSlotRetained: () => this.lifecycle.retireRetained(owned.slot),
-      retireExecutionRetained: (execution) =>
-        this.lifecycle.retireExecutionRetained(owned.slot, execution),
-      service: () => this.lifecycle.serviceSlot(owned.slot),
+    const lifecycle = this.lifecycle;
+    const execution = assertSqliteWorkerActorExecution(owned);
+    let referenceReleased = false;
+    const detach = () => {
+      if (!referenceReleased) {
+        referenceReleased = true;
+        lifecycle.releaseActorReference(owned);
+        this.stores.delete(store);
+        this.clients.delete(client);
+        releasePaths();
+      }
+    };
+    const { store, client: storeClient } = createSqliteWorkerClient<Operations>({
+      actor: owned,
+      isDraining: () => this.retirement.closingRetained !== undefined,
+      isAvailable: () =>
+        !owned.slot.failed &&
+        !execution.failed &&
+        !execution.exited &&
+        !execution.retiringRetained &&
+        !owned.cleanupState &&
+        !owned.retirementRequested &&
+        !owned.openingError &&
+        !owned.backendClosed,
+      dispatch: (payload, signal, scope, assertCurrent, createAdmission, settled) =>
+        this.enqueue(
+          owned.slot,
+          {
+            type: "execute",
+            actor: owned.id,
+            input: payload,
+            ...(scope?.stateContext ? { stateContext: scope.stateContext } : {}),
+          },
+          sqliteWorkerRequestBytes(payload, scope?.stateContext),
+          {
+            signal,
+            settled,
+            returned: scope?.returned,
+            scope,
+            assertCurrent: () => {
+              assertSqliteWorkerActorExecution(owned);
+              if (owned.openingError) {
+                throw owned.openingError.error;
+              }
+              assertCurrent?.();
+            },
+            createAdmission,
+            maintenanceScope: scope
+              ? scope.maintenanceScope
+              : getOpenClawDatabaseMaintenanceScope(),
+          },
+        ),
+      service: () => lifecycle.serviceSlot(owned.slot),
+      releaseRetained: () => {
+        detach();
+        const draining = this.retirement.closingRetained;
+        // A refused open must finish its own disposal before broker drainage can join opens.
+        const drain = draining && !opening() ? draining : undefined;
+        let cleanup: SqliteWorkerRetainedResult<void> | undefined;
+        let advancing = false;
+        const completion = createRetainedOperation<void>(() => {
+          lifecycle.serviceSlot(owned.slot);
+          drain?.service();
+          cleanup?.service();
+          advance();
+        });
+        function advance() {
+          if (advancing || completion.operation.read().status !== "pending") {
+            return;
+          }
+          advancing = true;
+          try {
+            // Broker drainage is independently owned; a client cannot settle it by detaching.
+            const drainOutcome = drain?.read();
+            if (drainOutcome?.status === "pending") {
+              return;
+            }
+            if (drainOutcome?.status === "rejected") {
+              throw drainOutcome.error;
+            }
+            if (!cleanup) {
+              if (!owned.references) {
+                cleanup = lifecycle.closeActorRetained(owned, maintenanceScope);
+              } else if (owned.slot.failed) {
+                cleanup = lifecycle.retireRetained(owned.slot);
+              } else if (execution.failed) {
+                cleanup = lifecycle.retireExecutionRetained(owned.slot, execution);
+              } else {
+                completion.resolve(undefined);
+                return;
+              }
+              void cleanup.result.then(advance, advance);
+            }
+            const outcome = cleanup.read();
+            if (outcome.status === "fulfilled") {
+              completion.resolve(undefined);
+            } else if (outcome.status === "rejected") {
+              completion.reject(outcome.error);
+            }
+          } catch (error) {
+            completion.reject(error);
+          } finally {
+            advancing = false;
+          }
+        }
+        if (drain) {
+          void drain.result.then(advance, advance);
+        }
+        advance();
+        return completion.operation;
+      },
     });
+    this.stores.set(store, storeClient);
+    return store;
   }
 
   runOperation<Operations extends SqliteWorkerOperations, T>(

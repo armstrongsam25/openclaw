@@ -181,7 +181,7 @@ export type SqliteTransactionOptions = {
 type SqliteTransactionStep = "begin" | "commit";
 type SqliteTransactionMode = "deferred" | "immediate";
 
-export function assertSyncTransactionResult(value: unknown): void {
+function assertSyncTransactionResult(value: unknown): void {
   if (isPromiseLike(value)) {
     throw new Error(
       "SQLite write transactions must be synchronous; Promise returns are not supported.",

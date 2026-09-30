@@ -5,16 +5,11 @@ import { toErrorObject } from "@openclaw/normalization-core/error-coercion";
 import { createDeferredCore } from "../shared/deferred.js";
 import { getOpenClawDatabaseMaintenanceScope } from "../state/openclaw-state-db-async-lifecycle.js";
 import { createRetainedOperation } from "./retained-operation.js";
-import { assertSqliteWorkerActorExecution } from "./sqlite-worker-broker-admission.js";
 import type {
   Actor,
-  SqliteWorkerExecution,
   Job,
   OperationScope,
   StoreClient,
-  Slot,
-  RequestBody,
-  EnqueueOptions,
   SqliteWorkerRetainedResult,
 } from "./sqlite-worker-broker.types.js";
 import {
@@ -25,7 +20,6 @@ import {
 import type { SqliteWorkerAdmissionFactory } from "./sqlite-worker-operation-admission.js";
 import {
   captureSqliteWorkerStateContext,
-  sqliteWorkerRequestBytes,
   type SqliteWorkerStateContext,
 } from "./sqlite-worker-state-context.js";
 
@@ -272,140 +266,4 @@ export function createSqliteWorkerClient<Operations extends SqliteWorkerOperatio
     },
   };
   return { store, client };
-}
-
-/** Bind client references and accepted scopes to their existing broker actor. */
-export function bindSqliteWorkerClient<Operations extends SqliteWorkerOperations>(
-  owned: Actor,
-  client: object,
-  binding: {
-    stores: Map<object, StoreClient>;
-    clients: Set<object>;
-    draining(): SqliteWorkerRetainedResult<void> | undefined;
-    opening(): boolean;
-    enqueue(
-      slot: Slot,
-      body: RequestBody,
-      bytes: number,
-      options: EnqueueOptions,
-    ): Promise<unknown>;
-    releaseReference(): void;
-    releasePaths(): void;
-    closeActorRetained(): SqliteWorkerRetainedResult<void>;
-    retireSlotRetained(): SqliteWorkerRetainedResult<void>;
-    retireExecutionRetained(execution: SqliteWorkerExecution): SqliteWorkerRetainedResult<void>;
-    service(): void;
-  },
-): SqliteWorkerStore<Operations> {
-  const execution = assertSqliteWorkerActorExecution(owned);
-  let referenceReleased = false;
-  const detach = () => {
-    if (!referenceReleased) {
-      referenceReleased = true;
-      binding.releaseReference();
-      binding.stores.delete(store);
-      binding.clients.delete(client);
-      binding.releasePaths();
-    }
-  };
-  const { store, client: storeClient } = createSqliteWorkerClient<Operations>({
-    actor: owned,
-    isDraining: () => binding.draining() !== undefined,
-    isAvailable: () =>
-      !owned.slot.failed &&
-      !execution.failed &&
-      !execution.exited &&
-      !execution.retiringRetained &&
-      !owned.cleanupState &&
-      !owned.retirementRequested &&
-      !owned.openingError &&
-      !owned.backendClosed,
-    dispatch: (payload, signal, scope, assertCurrent, createAdmission, settled) =>
-      binding.enqueue(
-        owned.slot,
-        {
-          type: "execute",
-          actor: owned.id,
-          input: payload,
-          ...(scope?.stateContext ? { stateContext: scope.stateContext } : {}),
-        },
-        sqliteWorkerRequestBytes(payload, scope?.stateContext),
-        {
-          signal,
-          settled,
-          returned: scope?.returned,
-          scope,
-          assertCurrent: () => {
-            assertSqliteWorkerActorExecution(owned);
-            if (owned.openingError) {
-              throw owned.openingError.error;
-            }
-            assertCurrent?.();
-          },
-          createAdmission,
-          maintenanceScope: scope ? scope.maintenanceScope : getOpenClawDatabaseMaintenanceScope(),
-        },
-      ),
-    service: () => binding.service(),
-    releaseRetained: () => {
-      detach();
-      const draining = binding.draining();
-      // A refused open must finish its own disposal before broker drainage can join opens.
-      const drain = draining && !binding.opening() ? draining : undefined;
-      let cleanup: SqliteWorkerRetainedResult<void> | undefined;
-      let advancing = false;
-      const completion = createRetainedOperation<void>(() => {
-        binding.service();
-        drain?.service();
-        cleanup?.service();
-        advance();
-      });
-      function advance() {
-        if (advancing || completion.operation.read().status !== "pending") {
-          return;
-        }
-        advancing = true;
-        try {
-          // Broker drainage is independently owned; a client cannot settle it by detaching.
-          const drainOutcome = drain?.read();
-          if (drainOutcome?.status === "pending") {
-            return;
-          }
-          if (drainOutcome?.status === "rejected") {
-            throw drainOutcome.error;
-          }
-          if (!cleanup) {
-            if (!owned.references) {
-              cleanup = binding.closeActorRetained();
-            } else if (owned.slot.failed) {
-              cleanup = binding.retireSlotRetained();
-            } else if (execution.failed) {
-              cleanup = binding.retireExecutionRetained(execution);
-            } else {
-              completion.resolve(undefined);
-              return;
-            }
-            void cleanup.result.then(advance, advance);
-          }
-          const outcome = cleanup.read();
-          if (outcome.status === "fulfilled") {
-            completion.resolve(undefined);
-          } else if (outcome.status === "rejected") {
-            completion.reject(outcome.error);
-          }
-        } catch (error) {
-          completion.reject(error);
-        } finally {
-          advancing = false;
-        }
-      }
-      if (drain) {
-        void drain.result.then(advance, advance);
-      }
-      advance();
-      return completion.operation;
-    },
-  });
-  binding.stores.set(store, storeClient);
-  return store;
 }

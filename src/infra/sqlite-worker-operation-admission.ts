@@ -12,15 +12,12 @@ import { resolveGlobalSingleton } from "../shared/global-singleton.js";
 import { resolveIdentityPathViaExistingAncestorSync } from "./boundary-path.js";
 import { getSqliteTransactionScope, stageSqliteTransactionState } from "./sqlite-post-commit.js";
 import {
-  captureSqliteWorkerReadFacts,
   captureSqliteWorkerSourceFacts,
   parseSqliteWorkerReadFacts,
   SqliteWorkerError,
 } from "./sqlite-worker-contract.js";
 import {
   deferSqliteWorkerOwnedCommitReceipt,
-  deferSqliteWorkerOwnedReadFacts,
-  deferSqliteWorkerOwnedRollbackReceipt,
   parseSqliteWorkerCommitAuthorities,
   parseSqliteWorkerNativeSettlement,
   parseSqliteWorkerSourceReceipt,
@@ -59,7 +56,7 @@ type AdmissionFailureSource = "authority" | "domain" | "protocol";
 type SqliteWorkerAdmissionFailure = SqliteWorkerRefusalReceipt &
   Readonly<{ source: AdmissionFailureSource }>;
 
-export type SqliteWorkerReadObserver = {
+type SqliteWorkerReadObserver = {
   pending(request: SqliteWorkerAdmissionRequest): void;
   committed(facts: SqliteWorkerReadFacts): void;
 };
@@ -581,42 +578,6 @@ export function deferSqliteWorkerCommitReceipt(database: DatabaseSync, facts: un
   deferSqliteWorkerOwnedCommitReceipt(database, owner, () => captured);
 }
 
-/** Prepare source facts after native state callbacks and before reply settlement. */
-export function deferSqliteWorkerPreparedCommitReceipt(
-  database: DatabaseSync,
-  prepareFacts: () => unknown,
-): void {
-  deferSqliteWorkerOwnedCommitReceipt(database, requireSqliteReceiptOwner(), () =>
-    captureSqliteWorkerSourceFacts(prepareFacts()),
-  );
-}
-
-/** Prepare finite observations only after their actual managed transaction commits. */
-export function deferSqliteWorkerPreparedReadFacts(
-  database: DatabaseSync,
-  prepare: () => unknown,
-): void {
-  deferSqliteWorkerOwnedReadFacts(
-    database,
-    requireSqliteReceiptOwner(),
-    prepare,
-    captureSqliteWorkerReadFacts,
-  );
-}
-
-/** The domain certifies this checkpoint after rollback; a missing fact remains unknown. */
-export function deferSqliteWorkerPreparedRollbackReceipt(
-  database: DatabaseSync,
-  prepareFacts: () => SqliteWorkerSourceReceipt | undefined,
-): void {
-  deferSqliteWorkerOwnedRollbackReceipt(database, requireSqliteReceiptOwner(), () => {
-    const receipt = prepareFacts();
-    return receipt === undefined
-      ? undefined
-      : { facts: captureSqliteWorkerSourceFacts(receipt.facts) };
-  });
-}
-
 /** The executing worker calls this only after its backend's native settlement check. */
 export function settleSqliteWorkerOperationContext(
   owner: SqliteWorkerOperationContext,
@@ -715,14 +676,6 @@ export function requestSqliteWorkerOperationAdmission(
       throw new Error("SQLite retained authority requires its actual transaction owner");
     }
   }
-}
-
-/** Match the actual native exception, never its message, code, or cause. */
-export function isSqliteWorkerOperationRefusal(error: unknown): boolean {
-  const scope = currentAdmission.getStore();
-  return (
-    scope?.active === true && scope.owner.refusal !== undefined && scope.owner.refusal === error
-  );
 }
 
 /** Schema work borrows live host authority through the same retained job port. */

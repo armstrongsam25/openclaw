@@ -3,11 +3,7 @@ import type { MessagePort } from "node:worker_threads";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import type { Result } from "@openclaw/normalization-core/result";
 import type { RetainedOperation } from "./retained-operation.js";
-import {
-  deferSqlitePostCommitPublication,
-  getSqliteTransactionScope,
-  stageSqliteTransactionState,
-} from "./sqlite-post-commit.js";
+import { deferSqlitePostCommitPublication } from "./sqlite-post-commit.js";
 
 export type SqliteWorkerCallbackRequest = {
   port: MessagePort;
@@ -125,99 +121,11 @@ export function parseSqliteWorkerNativeSettlement(
   return { kind: value.kind, ...(current ? { committed: current } : {}) };
 }
 
-type SqliteWorkerRollbackCheckpoint = { receipt?: SqliteWorkerSourceReceipt };
-
-export function deferSqliteWorkerOwnedRollbackReceipt(
-  database: DatabaseSync,
-  owner: {
-    database?: DatabaseSync;
-    rollbackCheckpoint?: SqliteWorkerRollbackCheckpoint;
-  },
-  prepare: () => SqliteWorkerSourceReceipt | undefined,
-): void {
-  if (owner.database !== database || !database.isTransaction || owner.rollbackCheckpoint) {
-    throw new Error("SQLite rollback checkpoint requires its original unregistered transaction");
-  }
-  const checkpoint: SqliteWorkerRollbackCheckpoint = {};
-  if (
-    !stageSqliteTransactionState(database, {
-      stage() {
-        owner.rollbackCheckpoint = checkpoint;
-      },
-      commit() {},
-      rollback() {
-        checkpoint.receipt = prepare();
-      },
-    })
-  ) {
-    throw new Error("SQLite rollback checkpoint requires a managed transaction owner");
-  }
-}
-
 export type SqliteWorkerReadFacts = Result<unknown[], unknown>;
 export type SqliteWorkerReadFactsCollection = {
   current?: { scope: object; preparations: Set<{ prepare: () => unknown }> };
   result?: SqliteWorkerReadFacts;
 };
-
-/** One captured operation owns finite preparations; rollback removes only its affected entries. */
-export function deferSqliteWorkerOwnedReadFacts(
-  database: DatabaseSync,
-  owner: { database?: DatabaseSync; readFacts?: SqliteWorkerReadFactsCollection },
-  prepare: () => unknown,
-  capture: (
-    preparations: readonly (() => unknown)[],
-    previous: SqliteWorkerReadFacts | undefined,
-  ) => SqliteWorkerReadFacts,
-): void {
-  const scope = getSqliteTransactionScope(database);
-  if (owner.database !== database || !database.isTransaction || !scope) {
-    throw new Error("SQLite read facts require their bound managed transaction");
-  }
-  const facts = (owner.readFacts ??= {});
-  if (facts.current && facts.current.scope !== scope) {
-    throw new Error("SQLite read facts changed their active transaction scope");
-  }
-  if (!facts.current) {
-    const collection: NonNullable<SqliteWorkerReadFactsCollection["current"]> = {
-      scope,
-      preparations: new Set(),
-    };
-    const release = () => {
-      if (facts.current === collection) {
-        facts.current = undefined;
-      }
-    };
-    stageSqliteTransactionState(database, {
-      stage() {
-        facts.current = collection;
-      },
-      commit: release,
-      prepareObservers() {
-        const preparations = Array.from(collection.preparations, (entry) => entry.prepare);
-        collection.preparations.clear();
-        if (preparations.length) {
-          facts.result = capture(preparations, facts.result);
-        }
-      },
-      rollback: release,
-    });
-  }
-  const collection = facts.current;
-  if (!collection) {
-    throw new Error("SQLite read facts lost their managed transaction owner");
-  }
-  const preparation = { prepare };
-  stageSqliteTransactionState(database, {
-    stage() {
-      collection.preparations.add(preparation);
-    },
-    commit() {},
-    rollback() {
-      collection.preparations.delete(preparation);
-    },
-  });
-}
 
 export function parseSqliteWorkerCommitAuthorities(message: Record<string, unknown>): Result<
   {

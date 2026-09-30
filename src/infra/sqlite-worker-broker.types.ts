@@ -114,7 +114,7 @@ export type SqliteWorkerCallbackScope = {
   releaseReturn?: () => void;
   completion?: { accepted: false } | { accepted: true; value: Uint8Array<ArrayBuffer> };
 };
-export type SqliteWorkerCallbackDependency = { transportReleased?: true };
+type SqliteWorkerCallbackDependency = { transportReleased?: true };
 export type SqliteWorkerCallbackContext = {
   job: Job;
   scope: SqliteWorkerCallbackScope;

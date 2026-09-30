@@ -73,7 +73,7 @@ function isPendingOrdinaryFileClose(
 }
 
 /** Both awaited and retained admission install the same file actor and native open. */
-export function createSqliteWorkerFileActor(
+function createSqliteWorkerFileActor(
   options: PreparedSqliteWorkerOpen,
   captured: {
     databasePath: string;

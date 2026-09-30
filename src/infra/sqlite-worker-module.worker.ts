@@ -1,14 +1,8 @@
-import { isPromise } from "node:util/types";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { resolveGlobalSingleton } from "../shared/global-singleton.js";
 import { hasSqliteWorkerActiveTransaction } from "./sqlite-worker-callback.worker.js";
 
 export type SqliteWorkerModule = Readonly<Record<string, unknown>>;
-export type SqliteWorkerModulePreparation = {
-  moduleUrl: string;
-  commandTypes?: readonly string[];
-};
-
 type ModuleCode = {
   modules: Map<string, SqliteWorkerModule>;
   sourceLoaderRegistered: boolean;
@@ -21,7 +15,7 @@ const code = resolveGlobalSingleton<ModuleCode>(
   () => ({ modules: new Map(), sourceLoaderRegistered: false }),
 );
 
-export function normalizeSqliteWorkerModuleUrl(value: string): string {
+function normalizeSqliteWorkerModuleUrl(value: string): string {
   const url = new URL(value);
   if (url.protocol !== "file:" || url.search || url.hash) {
     throw new Error("SQLite worker module must be a static local module URL");
@@ -78,46 +72,4 @@ export function loadSqliteWorkerModule(
     code.modules.set(url, module);
     return module;
   }
-}
-
-/** Prepare only the finite command code named by the original domain publisher. */
-export function prepareSqliteWorkerModule(
-  input: SqliteWorkerModulePreparation,
-): void | Promise<void> {
-  const prepare = (module: SqliteWorkerModule): void | Promise<void> => {
-    if (!input.commandTypes?.length) {
-      return;
-    }
-    const prepareCommand = module.prepareSqliteWorkerCommand;
-    if (typeof prepareCommand !== "function") {
-      throw new Error("SQLite worker module must export prepareSqliteWorkerCommand");
-    }
-    const pending: Promise<unknown>[] = [];
-    try {
-      for (const commandType of new Set(input.commandTypes)) {
-        const result: unknown = prepareCommand(commandType);
-        if (isPromise(result)) {
-          if (hasSqliteWorkerActiveTransaction()) {
-            void result.catch(() => undefined);
-            throw new Error(
-              "SQLite callback command was not prepared before its native transaction",
-            );
-          }
-          pending.push(result);
-        } else if (result !== undefined) {
-          throw new Error("SQLite command preparation must return void or a Promise");
-        }
-      }
-    } catch (error) {
-      for (const operation of pending) {
-        void operation.catch(() => undefined);
-      }
-      throw error;
-    }
-    if (pending.length) {
-      return Promise.all(pending).then(() => undefined);
-    }
-  };
-  const module = loadSqliteWorkerModule(input.moduleUrl);
-  return isPromise(module) ? module.then(prepare) : prepare(module);
 }

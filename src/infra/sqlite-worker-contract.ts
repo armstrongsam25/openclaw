@@ -1,4 +1,4 @@
-import { isNativeError, isPromise, isProxy } from "node:util/types";
+import { isNativeError, isProxy } from "node:util/types";
 import { serialize } from "node:v8";
 import type { MessagePort } from "node:worker_threads";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
@@ -253,35 +253,6 @@ function encodeSqliteWorkerReadFactsFailure(error: unknown): SqliteWorkerReadFac
       { includeOrdinary: true },
     ),
   };
-}
-
-/** Bound the accumulated committed facts, not just the latest transaction's contribution. */
-export function captureSqliteWorkerReadFacts(
-  preparations: readonly (() => unknown)[],
-  previous: SqliteWorkerReadFacts | undefined,
-): SqliteWorkerReadFacts {
-  let current: SqliteWorkerReadFacts;
-  try {
-    const contribution = preparations.map((prepare) => {
-      const facts = prepare();
-      if (isPromise(facts)) {
-        void facts.catch(() => undefined);
-        throw new Error("SQLite read fact preparation must remain synchronous");
-      }
-      return facts;
-    });
-    const value = previous?.ok ? [...previous.value, ...contribution] : contribution;
-    if (serialize(value).byteLength > SQLITE_WORKER_MAX_MESSAGE_BYTES) {
-      throw new SqliteWorkerError(
-        "SQLite prepared read facts exceed the transport limit",
-        "overloaded",
-      );
-    }
-    current = { ok: true, value: structuredClone(value) };
-  } catch (error) {
-    current = encodeSqliteWorkerReadFactsFailure(error);
-  }
-  return previous?.ok === false ? previous : current;
 }
 
 export function parseSqliteWorkerReadFacts(value: unknown): SqliteWorkerReadFacts {
