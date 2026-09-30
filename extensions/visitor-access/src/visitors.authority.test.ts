@@ -156,6 +156,48 @@ describe("VisitorAccessService authority", () => {
     expect(fixture.grants.get(grant.email)).toEqual(grant);
   });
 
+  it("does not expire an alias moved to another person while a prior expiration is pending", async () => {
+    const first = visitorGrant("first@example.com");
+    const second = visitorGrant("second@example.com");
+    const fixture = visitorFixture({
+      grants: [first, second],
+      emails: [first.email, second.email],
+      profiles: [{ id: "original-person", emails: [first.email, second.email] }],
+    });
+    await fixture.service.initialize();
+    const retained = fixture.service.authorize([second.email]);
+    const entered = createDeferred<void>();
+    const release = createDeferred<void>();
+    const register = fixture.store.register.bind(fixture.store);
+    fixture.store.register = async (key, value) => {
+      if (key === first.email) {
+        entered.resolve();
+        await release.promise;
+      }
+      await register(key, value);
+    };
+    const revoking = fixture.service.revoke(
+      { profileId: "original-person" },
+      fixture.authority.assertCurrent,
+    );
+    await entered.promise;
+    fixture.gatewayRequest.mockResolvedValue({
+      profiles: [
+        { id: "original-person", emails: [first.email] },
+        { id: "another-person", emails: [second.email] },
+      ],
+    });
+    release.resolve();
+    await expect(revoking).rejects.toThrow(/bindings changed/);
+    expect(fixture.grants.get(first.email)).toMatchObject({ expiresAt: NOW });
+    expect(fixture.grants.get(second.email)).toEqual(second);
+    expect(() => retained.assertCurrent()).not.toThrow();
+    expect(fixture.mutations()).toEqual([]);
+    await fixture.service.sweep();
+    expect(fixture.emails()).toEqual([second.email]);
+    expect(fixture.grants.get(second.email)).toEqual(second);
+  });
+
   it("does not start a durable revocation after closing during the grant read", async () => {
     const grant = visitorGrant("visitor@example.com");
     const fixture = visitorFixture({ grants: [grant], emails: [grant.email] });
