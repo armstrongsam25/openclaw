@@ -138,6 +138,21 @@ export async function runStep(opts: RunStepOptions): Promise<UpdateStepResult> {
   return stepResult;
 }
 
+/** Retain the result before owner classification, then publish its final completion once. */
+export async function runStepWithDeferredCompletion<T>(
+  opts: RunStepOptions,
+  classify: (result: UpdateStepResult) => T | Promise<T>,
+): Promise<T> {
+  const result = await runStep({
+    ...opts,
+    progress: { ...opts.progress, onStepComplete: undefined },
+  });
+  const classification = classify(result);
+  const classified = classification instanceof Promise ? await classification : classification;
+  opts.progress?.onStepComplete?.({ ...result, index: opts.stepIndex, total: opts.totalSteps });
+  return classified;
+}
+
 export function normalizeFallbackFailureReason(
   stepName: string,
 ): NonNullable<UpdateRunResult["reason"]> {

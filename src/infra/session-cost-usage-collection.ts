@@ -441,15 +441,12 @@ export function resolveExistingUsageSessionFile(params: {
         storePath: normalizeOptionalString(params.sessionTarget.storePath),
       }
     : undefined;
-  const completeTarget = Boolean(
-    target?.agentId && target.sessionId && target.sessionKey && target.storePath,
-  );
-  if (target && completeTarget) {
+  if (target?.agentId && target.sessionId && target.sessionKey && target.storePath) {
     const targetKeyAgentId = parseAgentSessionKey(target.sessionKey)?.agentId;
     const targetKeyEntry = loadSessionEntryReadOnly({
-      agentId: target.agentId!,
-      sessionKey: target.sessionKey!,
-      storePath: target.storePath!,
+      agentId: target.agentId,
+      sessionKey: target.sessionKey,
+      storePath: target.storePath,
       projection: "list",
     });
     // Complete targets remain authoritative after metadata cleanup; reject
@@ -463,9 +460,9 @@ export function resolveExistingUsageSessionFile(params: {
       return undefined;
     }
     return formatCanonicalUsageCostSqliteMarker({
-      agentId: target.agentId!,
-      sessionId: target.sessionId!,
-      storePath: target.storePath!,
+      agentId: target.agentId,
+      sessionId: target.sessionId,
+      storePath: target.storePath,
     });
   }
   const legacySessionFile = (params.sessionEntry as { sessionFile?: unknown } | undefined)
@@ -492,7 +489,7 @@ export function resolveExistingUsageSessionFile(params: {
   const sqliteMarker = matchingEntryMarker ?? matchingExplicitMarker;
   const targetKeyAgentId = parseAgentSessionKey(target?.sessionKey)?.agentId;
   const targetKeyEntry =
-    target?.sessionKey && sqliteMarker && !completeTarget
+    target?.sessionKey && sqliteMarker
       ? loadSessionEntryReadOnly({
           agentId: sqliteMarker.agentId,
           sessionKey: target.sessionKey,
@@ -502,7 +499,6 @@ export function resolveExistingUsageSessionFile(params: {
       : undefined;
   if (
     target &&
-    !completeTarget &&
     sqliteMarker &&
     ((target.agentId && target.agentId !== sqliteMarker.agentId) ||
       (target.sessionId && target.sessionId !== sqliteMarker.sessionId) ||

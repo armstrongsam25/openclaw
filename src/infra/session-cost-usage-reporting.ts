@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { truncateUtf16Safe } from "@openclaw/normalization-core/utf16-slice";
+import { resolveAgentDir } from "../agents/agent-scope-config.js";
 import { stripInboundMetadata } from "../auto-reply/reply/strip-inbound-meta.js";
 import { stripUserEnvelopeForDisplay } from "../auto-reply/reply/user-envelope-display.js";
 import { isToolCallContentType } from "../chat/tool-content.js";
@@ -9,10 +10,7 @@ import { isPrimarySessionTranscriptFileName } from "../config/sessions/artifacts
 import { parseSqliteSessionFileMarker } from "../config/sessions/legacy-sqlite-marker.js";
 import type { SessionEntry } from "../config/sessions/types.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import {
-  refreshCostUsageCacheForAgent,
-  resolveUsageCostAgentDir,
-} from "./session-cost-usage-aggregation.js";
+import { refreshCostUsageCacheForAgent } from "./session-cost-usage-aggregation.js";
 import {
   readTranscriptRecords,
   readTranscriptRecordsBestEffort,
@@ -40,10 +38,6 @@ import type {
 
 const USAGE_COST_DIRECT_REFRESH_RETRY_MS = 25;
 
-/**
- * Scan all transcript files to discover sessions not in the session store.
- * Returns basic metadata for each discovered session.
- */
 export async function discoverAllSessions(params: {
   agentId: string;
   startMs?: number;
@@ -86,10 +80,7 @@ export async function discoverAllSessions(params: {
     }
   }
 
-  // Sort by mtime descending (most recent first)
-  const sessions = Array.from(discovered.values());
-  sessions.sort((a, b) => b.mtime - a.mtime);
-  return sessions;
+  return Array.from(discovered.values()).toSorted((a, b) => b.mtime - a.mtime);
 }
 
 export async function loadSessionCostSummary(params: {
@@ -181,7 +172,7 @@ export async function loadSessionUsageTimeSeries(params: {
   }
 
   let points: Array<Omit<SessionUsageTimePoint, "cumulativeTokens" | "cumulativeCost">> = [];
-  const agentDir = resolveUsageCostAgentDir(params.config, params.agentId);
+  const agentDir = resolveAgentDir(params.config ?? {}, params.agentId);
   const resolveCost = createUsageCostResolver({ config: params.config, agentDir });
 
   for await (const record of readTranscriptRecords(sessionFile)) {
@@ -276,7 +267,7 @@ export async function loadSessionLogs(params: {
   const limit = params.limit ?? 50;
   const boundedLimit = Number.isInteger(limit);
   const retentionLimit = limit * 2;
-  const agentDir = resolveUsageCostAgentDir(params.config, params.agentId);
+  const agentDir = resolveAgentDir(params.config ?? {}, params.agentId);
   const resolveCost = createUsageCostResolver({ config: params.config, agentDir });
 
   for await (const parsed of readTranscriptRecordsBestEffort(sessionFile)) {
@@ -307,12 +298,10 @@ export async function loadSessionLogs(params: {
         contentParts.push("[Tool Result]");
       }
 
-      // Extract content
       const rawContent = message.content;
       if (typeof rawContent === "string") {
         contentParts.push(rawContent);
       } else if (Array.isArray(rawContent)) {
-        // Handle content blocks (text, tool_use, etc.)
         const contentText = rawContent
           .map((block: unknown) => {
             if (typeof block === "string") {
@@ -346,15 +335,13 @@ export async function loadSessionLogs(params: {
         : rawToolCalls
           ? [rawToolCalls]
           : [];
-      if (toolCalls.length > 0) {
-        for (const call of toolCalls) {
-          const callObj = call as Record<string, unknown>;
-          const directName = typeof callObj.name === "string" ? callObj.name : undefined;
-          const fn = callObj.function as Record<string, unknown> | undefined;
-          const fnName = typeof fn?.name === "string" ? fn.name : undefined;
-          const name = directName ?? fnName ?? "unknown";
-          contentParts.push(`[Tool: ${name}]`);
-        }
+      for (const call of toolCalls) {
+        const callObj = call as Record<string, unknown>;
+        const directName = typeof callObj.name === "string" ? callObj.name : undefined;
+        const fn = callObj.function as Record<string, unknown> | undefined;
+        const fnName = typeof fn?.name === "string" ? fn.name : undefined;
+        const name = directName ?? fnName ?? "unknown";
+        contentParts.push(`[Tool: ${name}]`);
       }
 
       const rawText = contentParts.join("\n");
@@ -366,7 +353,6 @@ export async function loadSessionLogs(params: {
         continue;
       }
 
-      // Truncate very long content.
       const maxLen = 2000;
       if (content.length > maxLen) {
         content = truncateUtf16Safe(content, maxLen) + "…";

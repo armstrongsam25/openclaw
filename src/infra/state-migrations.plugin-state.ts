@@ -15,7 +15,7 @@ import {
   withPluginLifecycleLease,
   type PluginLifecycleLeaseContext,
 } from "../plugins/plugin-lifecycle-lease.js";
-import { ensureMigrationDir, migrationFileExists } from "./state-migrations.fs.js";
+import { migrationFileExists } from "./state-migrations.fs.js";
 import {
   archiveLegacyImportSource,
   archiveLegacyInstalledPluginIndex,
@@ -408,7 +408,7 @@ export async function runLegacyMigrationPlans(
       if (migrationFileExists(plan.targetPath)) {
         continue;
       }
-      ensureMigrationDir(path.dirname(plan.targetPath));
+      fs.mkdirSync(path.dirname(plan.targetPath), { recursive: true });
       if (plan.kind === "move") {
         fs.renameSync(plan.sourcePath, plan.targetPath);
         changes.push(`Moved ${plan.label} → ${plan.targetPath}`);

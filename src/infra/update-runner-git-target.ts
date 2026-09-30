@@ -22,7 +22,7 @@ import { compareSemverStrings } from "./update-check.js";
 import type { DevUpdateTarget } from "./update-dev-target.js";
 import { cleanupUpdateTemporaryDirectory } from "./update-maintenance.js";
 import { isFailedUpdateStep } from "./update-run-step.js";
-import { runStep } from "./update-runner-command.js";
+import { runStep, runStepWithDeferredCompletion } from "./update-runner-command.js";
 import { gitCleanCheckArgs } from "./update-runner-git-commands.js";
 import { runGitCandidatePreflight } from "./update-runner-git-preflight.js";
 import type { CommandRunner, RunStepOptions, UpdateRunnerOptions } from "./update-runner-types.js";
@@ -359,7 +359,6 @@ export async function prepareGitMutation(params: {
 export async function selectGitInspectionTarget(
   params: Parameters<typeof runGitCandidatePreflight>[0] & {
     channel: UpdateChannel;
-    beforeCandidate: (revision: string) => Promise<void>;
   },
 ) {
   const tag =
@@ -496,32 +495,26 @@ export async function fetchGitUpdateTarget(params: {
       ["git", "-C", root, "fetch", fetchRemote, "--prune", "--no-tags", "--no-prune-tags"],
       root,
     );
-    const fetch = await runStep({
-      ...options,
-      progress: { ...options.progress, onStepComplete: undefined },
-    });
-    const interrupted =
-      fetch.termination === "signal" || fetch.exitCode === 130 || fetch.exitCode === 143;
-    const fetchedSuccessfully = fetch.exitCode === 0 && !isFailedUpdateStep(fetch);
-    if (fetchedSuccessfully && !interrupted) {
-      refreshedRemotes.push(fetchRemote);
-      if (authority && remotes.some((candidate) => candidate !== authority)) {
-        fetch.warnings = [
-          `Fetched only the update remote ${authority}; unrelated remotes were left untouched.`,
-        ];
+    const fetchOutcome = await runStepWithDeferredCompletion(options, (fetch) => {
+      const interrupted =
+        fetch.termination === "signal" || fetch.exitCode === 130 || fetch.exitCode === 143;
+      const fetchedSuccessfully = fetch.exitCode === 0 && !isFailedUpdateStep(fetch);
+      if (fetchedSuccessfully && !interrupted) {
+        refreshedRemotes.push(fetchRemote);
+        if (authority && remotes.some((candidate) => candidate !== authority)) {
+          fetch.warnings = [
+            `Fetched only the update remote ${authority}; unrelated remotes were left untouched.`,
+          ];
+        }
+      } else if (!authority && !interrupted) {
+        fetch.advisory = {
+          kind: "recoverable-maintenance",
+          message: `Could not refresh optional target remote ${fetchRemote}; continuing target resolution. ${fetch.stderrTail ?? ""}`,
+        };
       }
-    } else if (!authority && !interrupted) {
-      fetch.advisory = {
-        kind: "recoverable-maintenance",
-        message: `Could not refresh optional target remote ${fetchRemote}; continuing target resolution. ${fetch.stderrTail ?? ""}`,
-      };
-    }
-    options.progress?.onStepComplete?.({
-      ...fetch,
-      index: options.stepIndex,
-      total: options.totalSteps,
+      return { interrupted, fetchedSuccessfully };
     });
-    if (interrupted || (!fetchedSuccessfully && authority)) {
+    if (fetchOutcome.interrupted || (!fetchOutcome.fetchedSuccessfully && authority)) {
       return result(false);
     }
   }

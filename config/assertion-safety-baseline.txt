@@ -2340,7 +2340,6 @@ src/infra/clawhub-client.ts	2
 src/infra/clawhub-install-trust.ts	2
 src/infra/control-ui-assets.ts	1
 src/infra/delivery-queue-sqlite-bound.ts	2
-src/infra/delivery-queue-sqlite.types.ts	1
 src/infra/delivery-recovery.shared.ts	4
 src/infra/device-pairing-store.ts	4
 src/infra/diagnostic-event-listener-presence.ts	3
@@ -2398,7 +2397,7 @@ src/infra/outbound/deliver-prepare.ts	1
 src/infra/outbound/delivery-queue-media-spool.ts	2
 src/infra/outbound/delivery-queue-storage.ts	3
 src/infra/outbound/format.ts	1
-src/infra/outbound/message-account-selection.ts	2
+src/infra/outbound/message-account-selection.ts	1
 src/infra/outbound/message-action-execution.ts	3
 src/infra/outbound/message-action-runner.ts	1
 src/infra/outbound/message-action-send.ts	1
@@ -2411,7 +2410,6 @@ src/infra/package-dist-inventory.ts	2
 src/infra/pairing-files.ts	1
 src/infra/ports.ts	2
 src/infra/private-mode.ts	2
-src/infra/provider-usage.auth.ts	1
 src/infra/provider-usage.fetch.codex.ts	1
 src/infra/provider-usage.fetch.deepseek.ts	1
 src/infra/provider-usage.fetch.minimax.ts	1
@@ -2469,10 +2467,9 @@ src/infra/state-migrations.update-check.ts	2
 src/infra/state-migrations.workspace-setup-store.ts	2
 src/infra/state-migrations.workspace-setup.ts	1
 src/infra/system-presence.ts	1
-src/infra/system-run-approval-binding.ts	1
 src/infra/tailscale.ts	7
 src/infra/tmp-openclaw-dir.ts	3
-src/infra/unhandled-rejections.ts	5
+src/infra/unhandled-rejections.ts	2
 src/infra/update-check-package-target.ts	2
 src/infra/update-global.ts	3
 src/infra/update-package-manager.ts	1

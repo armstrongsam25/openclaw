@@ -4,7 +4,7 @@ import {
   type PluginUiCapability,
 } from "../../packages/gateway-protocol/src/plugin-ui-capabilities.js";
 import type { ExternalPluginCompatibility } from "../../packages/plugin-package-contract/src/index.js";
-import { readClawHubStringArrayField, readClawHubStringField } from "./clawhub-client.js";
+import { readClawHubNonEmptyStringFields, readClawHubStringArrayField } from "./clawhub-client.js";
 
 export type ClawHubPluginCapabilities = {
   contracts?: Record<string, string[]>;
@@ -61,14 +61,10 @@ export function parseClawHubPluginCompatibility(
   if (!value) {
     return undefined;
   }
-  const compatibility = {
-    pluginApiRange: readClawHubStringField(value, "pluginApiRange", context),
-    builtWithOpenClawVersion: readClawHubStringField(value, "builtWithOpenClawVersion", context),
-    pluginSdkVersion: readClawHubStringField(value, "pluginSdkVersion", context),
-    minGatewayVersion: readClawHubStringField(value, "minGatewayVersion", context),
-  };
-  const entries = Object.entries(compatibility).filter((entry): entry is [string, string] =>
-    Boolean(entry[1]),
+  const compatibility = readClawHubNonEmptyStringFields(
+    value,
+    ["pluginApiRange", "builtWithOpenClawVersion", "pluginSdkVersion", "minGatewayVersion"],
+    context,
   );
-  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+  return Object.keys(compatibility).length > 0 ? compatibility : undefined;
 }

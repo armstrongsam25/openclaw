@@ -101,6 +101,7 @@ export function createManagedHandoffLeaseStore(
   const {
     row,
     handle,
+    descendants,
     deleteRow,
     updateRow,
     read,
@@ -122,17 +123,8 @@ export function createManagedHandoffLeaseStore(
     if (lease.version === 3 || lease.version === 4) {
       return true;
     }
-    const prefix = `${lease.key}/.openclaw-update-child-`;
     const inspect = (db: HandoffDatabase) => {
-      const children = executeSqliteQuerySync(
-        db,
-        leaseQueries(db)
-          .selectFrom("managed_update_handoffs")
-          .select(["install_root", "owner", "payload_json", "updated_at"])
-          .where("install_root", ">=", prefix)
-          .where("install_root", "<", prefix + "\uffff"),
-      ).rows;
-      return children.some((entry) => {
+      return descendants(db, lease).some((entry) => {
         const child = handle(entry.install_root, entry);
         return (
           child.version === 3 ||
@@ -304,6 +296,7 @@ export function createManagedHandoffLeaseStore(
     childAliases,
     canRelease,
     handle,
+    descendants,
     updateRow,
     deleteRow,
     processState,

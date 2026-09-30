@@ -21,8 +21,6 @@ import type { IndexedOutboundAuditTerminal } from "./outbound-audit.js";
 import type { PreparedOutboundBatch } from "./prepared-batch.js";
 import type { OutboundSessionContext } from "./session-context.js";
 
-export type QueuedRenderedMessageBatchPlan = RenderedMessageBatchPlan;
-
 export function hasActiveDeliveryOwner(entry: DeliveryQueueEntryState, now: number): boolean {
   return (
     (typeof entry.completionRetention === "object" ||
@@ -55,7 +53,7 @@ export type QueuedDeliveryPayload = {
   requiresProducerClaim?: boolean;
   preparedBatch?: PreparedOutboundBatch;
   payloads?: ReplyPayload[];
-  renderedBatchPlan?: QueuedRenderedMessageBatchPlan;
+  renderedBatchPlan?: RenderedMessageBatchPlan;
   threadId?: string | number | null;
   reply?: OutboundReplyFacts;
   formatting?: OutboundDeliveryFormattingOptions;

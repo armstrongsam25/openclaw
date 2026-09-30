@@ -20,7 +20,6 @@ import {
   recordCompletedLegacyAgentDirMigration,
 } from "./state-migrations.agent-dir-receipt.js";
 import {
-  ensureMigrationDir,
   migrationFileExists,
   readSessionStoreJson5,
   safeReadDir,
@@ -207,7 +206,7 @@ export async function migrateLegacySessions(
     return { changes, warnings };
   }
 
-  ensureMigrationDir(detected.sessions.targetDir);
+  fs.mkdirSync(detected.sessions.targetDir, { recursive: true });
   const targetParsed = migrationFileExists(detected.sessions.targetStorePath)
     ? readSessionStoreJson5(detected.sessions.targetStorePath)
     : { store: {}, ok: true };
@@ -641,7 +640,7 @@ export async function migrateLegacyAgentDir(
         continue;
       }
       const stateRoot = fs.realpathSync(detected.stateDir);
-      ensureMigrationDir(targetDir);
+      fs.mkdirSync(targetDir, { recursive: true });
       targetRoot = fs.realpathSync(targetDir);
       if (
         !fs.lstatSync(targetDir).isDirectory() ||

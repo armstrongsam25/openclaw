@@ -3,7 +3,7 @@ import { hasCommandProcessCleanupError } from "../process/exec-result.js";
 import { formatErrorMessage } from "./errors.js";
 import { trimLogTail } from "./restart-sentinel.js";
 import { formatUpdateCleanupCommand } from "./update-maintenance.js";
-import { MAX_LOG_CHARS, runStep } from "./update-runner-command.js";
+import { MAX_LOG_CHARS, runStepWithDeferredCompletion } from "./update-runner-command.js";
 import type { StepFactory } from "./update-runner-git-commands.js";
 import type { CommandRunner } from "./update-runner-types.js";
 
@@ -47,59 +47,53 @@ export async function cleanupGitPreflight(
     });
   // Interrupted creation can retain Git's initialization lock. This exact temporary
   // worktree is owned here, so force twice instead of leaving a stale registration.
-  const removeStep = await runStep({
-    ...options,
-    progress: { ...options.progress, onStepComplete: undefined },
-    runCommand: runCleanupCommand,
-    timeoutMs: cleanupTimeoutMs,
-  });
-  if (removeStep.exitCode !== 0 && (await repairPreflightCleanup(worktreeDir, preflightRoot))) {
-    removeStep.exitCode = 0;
-    const message =
-      process.platform === "win32"
-        ? "windows fallback cleanup removed preflight tree"
-        : "fallback cleanup removed preflight tree";
-    removeStep.stderrTail = trimLogTail(
-      [removeStep.stderrTail, message].filter(Boolean).join("\n"),
-      MAX_LOG_CHARS,
-    );
-  }
-  await runCleanupCommand(["git", "-C", options.cwd, "worktree", "prune"], {
-    cwd: options.cwd,
-  }).catch((error: unknown) => {
-    if (hasCommandProcessCleanupError(error)) {
-      throw error;
-    }
-    return null;
-  });
-  const removed = await fs
-    .rm(preflightRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 })
-    .then(
-      () => true,
-      (error: unknown) => {
+  return runStepWithDeferredCompletion(
+    { ...options, runCommand: runCleanupCommand, timeoutMs: cleanupTimeoutMs },
+    async (removeStep) => {
+      if (removeStep.exitCode !== 0 && (await repairPreflightCleanup(worktreeDir, preflightRoot))) {
+        removeStep.exitCode = 0;
+        const message =
+          process.platform === "win32"
+            ? "windows fallback cleanup removed preflight tree"
+            : "fallback cleanup removed preflight tree";
+        removeStep.stderrTail = trimLogTail(
+          [removeStep.stderrTail, message].filter(Boolean).join("\n"),
+          MAX_LOG_CHARS,
+        );
+      }
+      await runCleanupCommand(["git", "-C", options.cwd, "worktree", "prune"], {
+        cwd: options.cwd,
+      }).catch((error: unknown) => {
         if (hasCommandProcessCleanupError(error)) {
           throw error;
         }
-        if (removeStep.exitCode === 0) {
-          removeStep.exitCode = 1;
-        }
-        removeStep.stderrTail = trimLogTail(
-          [removeStep.stderrTail, formatErrorMessage(error)].filter(Boolean).join("\n"),
-          MAX_LOG_CHARS,
+        return null;
+      });
+      const removed = await fs
+        .rm(preflightRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 })
+        .then(
+          () => true,
+          (error: unknown) => {
+            if (hasCommandProcessCleanupError(error)) {
+              throw error;
+            }
+            if (removeStep.exitCode === 0) {
+              removeStep.exitCode = 1;
+            }
+            removeStep.stderrTail = trimLogTail(
+              [removeStep.stderrTail, formatErrorMessage(error)].filter(Boolean).join("\n"),
+              MAX_LOG_CHARS,
+            );
+            return false;
+          },
         );
-        return false;
-      },
-    );
-  if (removeStep.exitCode !== 0) {
-    removeStep.advisory = {
-      kind: "recoverable-maintenance",
-      message: `Skipped preflight cleanup. Remove the retained temporary copy with: ${formatUpdateCleanupCommand(preflightRoot)}. Reason: ${removeStep.stderrTail || "temporary worktree removal failed"}`,
-    };
-  }
-  options.progress?.onStepComplete?.({
-    ...removeStep,
-    index: options.stepIndex,
-    total: options.totalSteps,
-  });
-  return removed;
+      if (removeStep.exitCode !== 0) {
+        removeStep.advisory = {
+          kind: "recoverable-maintenance",
+          message: `Skipped preflight cleanup. Remove the retained temporary copy with: ${formatUpdateCleanupCommand(preflightRoot)}. Reason: ${removeStep.stderrTail || "temporary worktree removal failed"}`,
+        };
+      }
+      return removed;
+    },
+  );
 }

@@ -23,11 +23,6 @@ export function existsDir(dir: string): boolean {
   return safeStatSync(dir)?.isDirectory() ?? false;
 }
 
-/** Creates a directory tree for migration targets. */
-export function ensureMigrationDir(dir: string) {
-  fs.mkdirSync(dir, { recursive: true });
-}
-
 /** Returns whether a path exists and resolves to a regular file. */
 export function migrationFileExists(p: string): boolean {
   return safeStatSync(p)?.isFile() ?? false;
