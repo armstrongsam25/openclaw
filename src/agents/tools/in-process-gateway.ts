@@ -4,7 +4,7 @@ import {
   type CronMutationCompletion,
 } from "../../cron/mutation-completion.js";
 import type { AgentRuntimeIdentity } from "../../gateway/agent-runtime-identity-token.js";
-import type { CallGatewayOptions } from "../../gateway/call.js";
+import { callGateway, type CallGatewayOptions } from "../../gateway/call.js";
 import { withInProcessAgentRuntimeIdentity } from "../../gateway/in-process-agent-runtime-identity.js";
 import { readInProcessSessionDeliveryGeneration } from "../../gateway/in-process-session-delivery.js";
 import {
@@ -241,7 +241,6 @@ async function callAgentToolGatewayRequestBound<T>(
     if (boundGateway && !forceTransport) {
       throw new Error(`Gateway instance unavailable for ${method}`);
     }
-    const { callGateway } = await import("../../gateway/call.js");
     const {
       agentRunTracking: _agentRunTracking,
       agentToolCaller: _agentToolCaller,

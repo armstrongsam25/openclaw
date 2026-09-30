@@ -1,3 +1,5 @@
+// Install the shared mocks before Gateway event imports capture their dependencies.
+import "./run.test-harness.js";
 import path from "node:path";
 import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 import { afterEach, beforeEach, describe, expect, it, vi, assert } from "vitest";
