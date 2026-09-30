@@ -455,7 +455,6 @@ export const PR_PROTECTED_RUNTIME_TEST_FILES: readonly string[] = [
   "extensions/discord/src/monitor/agent-components.live-policy-deadline.test.ts",
   "extensions/discord/src/monitor/agent-components.modal-presentation-failure.test.ts",
   "extensions/discord/src/monitor/listeners.thread-delete.session-store.integration.test.ts",
-  "extensions/discord/src/monitor/listeners.thread-delete.test.ts",
   "extensions/discord/src/monitor/message-handler.context-history.test.ts",
   "extensions/discord/src/monitor/message-handler.context.test.ts",
   "extensions/discord/src/monitor/message-handler.draft-preview.rest.test.ts",
