@@ -71,7 +71,11 @@ it("keeps snapshot bytes and their creator lock after supervisor loss until orig
         }).result;
         supervisor = registrations.mock.contexts.find((receiver) => receiver instanceof Worker);
         expect(captures).toHaveBeenCalledOnce();
-        broker = captures.mock.contexts[0];
+        const capturedBroker = captures.mock.contexts[0];
+        if (!(capturedBroker instanceof SpawnBrokerHost)) {
+          throw new Error("Original snapshot resource broker was not observed");
+        }
+        broker = capturedBroker;
       } finally {
         registrations.mockRestore();
         captures.mockRestore();

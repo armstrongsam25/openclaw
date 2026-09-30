@@ -417,6 +417,7 @@ export function captureRetainedNativeWorkerSource(options?: {
       const closing = closeNativeBroker(source);
       const attempts = automatic && automatic !== closing ? [automatic, closing] : [closing];
       const outcomes = await Promise.allSettled(attempts);
+      // Child exit does not certify cleanup. A terminal memoized failure stays sealed until restart.
       if (outcomes.at(-1)?.status === "fulfilled") {
         forgetNativeSource(source);
         owners.clear();
