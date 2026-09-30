@@ -19,6 +19,7 @@ import { advanceCliHistoryBoundaryInTransaction } from "./session-accessor.sqlit
 import type {
   TranscriptEvent,
   TranscriptMessageAppendOptions,
+  ResolvedTranscriptScope,
 } from "./session-accessor.sqlite-contract.js";
 import {
   createTranscriptIdentityReader,
@@ -32,7 +33,6 @@ import {
   getSessionKysely,
   resolveSqliteTranscriptScope,
   toDatabaseOptions,
-  type ResolvedTranscriptScope,
 } from "./session-accessor.sqlite-scope.js";
 import {
   advanceTranscriptMutationAtInTransaction,
