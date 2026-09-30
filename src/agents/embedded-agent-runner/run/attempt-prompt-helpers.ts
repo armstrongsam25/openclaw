@@ -6,7 +6,6 @@ import type {
 } from "../../../context-engine/types.js";
 import { pruneMapToMaxSize } from "../../../infra/map-size.js";
 import type { HookRunner } from "../../../plugins/hooks.js";
-import { drainPluginNextTurnInjectionContext } from "../../../plugins/host-hook-state.js";
 import { buildPluginAgentTurnPrepareContext } from "../../../plugins/host-hooks.js";
 import type {
   PluginNextTurnInjectionRecord,
@@ -72,7 +71,9 @@ export async function resolvePromptBuildHookResult(params: {
         queuedInjections: cachedInjections,
         ...buildPluginAgentTurnPrepareContext({ queuedInjections: cachedInjections }),
       }
-    : await drainPluginNextTurnInjectionContext({
+    : await (
+        await import("../../../plugins/host-hook-next-turn.runtime.js")
+      ).drainPluginNextTurnInjectionContext({
         cfg: params.config,
         sessionKey: params.hookCtx.sessionKey,
         agentId: params.hookCtx.agentId,

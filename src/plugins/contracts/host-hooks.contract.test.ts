@@ -48,11 +48,13 @@ import { registerPluginCommandInRegistry } from "../command-registration.js";
 import { executePluginCommand } from "../commands.js";
 import { createHookRunner } from "../hooks.js";
 import { createPluginHostRegistryRetirement, runPluginHostCleanup } from "../host-hook-cleanup.js";
-import { getPluginRunContext, setPluginRunContext } from "../host-hook-runtime.js";
-import { listPluginSessionSchedulerJobs } from "../host-hook-runtime.test-fixtures.js";
 import {
   drainPluginNextTurnInjectionContext,
   enqueuePluginNextTurnInjection,
+} from "../host-hook-next-turn.runtime.js";
+import { getPluginRunContext, setPluginRunContext } from "../host-hook-runtime.js";
+import { listPluginSessionSchedulerJobs } from "../host-hook-runtime.test-fixtures.js";
+import {
   getPluginSessionExtensionStateSync,
   patchPluginSessionExtension,
   projectPluginSessionExtensionsSync,

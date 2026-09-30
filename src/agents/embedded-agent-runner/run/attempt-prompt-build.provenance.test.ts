@@ -22,7 +22,7 @@ import { prepareEmbeddedAttemptPromptAssembly } from "./attempt-prompt-build.js"
 import { forgetPromptBuildDrainCacheForRun } from "./attempt-prompt-helpers.js";
 import type { EmbeddedRunAttemptParams } from "./types.js";
 
-vi.mock("../../../plugins/host-hook-state.js", () => ({
+vi.mock("../../../plugins/host-hook-next-turn.runtime.js", () => ({
   drainPluginNextTurnInjectionContext: vi.fn(async () => ({ queuedInjections: [] })),
 }));
 

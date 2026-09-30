@@ -85,6 +85,8 @@ afterEach(() => {
   vi.doUnmock("../../channels/plugins/index.js");
   vi.doUnmock("../../channels/plugins/registry.js");
   vi.doUnmock("../../plugins/runtime.js");
+  vi.doUnmock("../host-hook-state.js");
+  vi.doUnmock("../host-hook-next-turn.runtime.js");
 });
 
 describe("runtime import side-effect contracts", () => {
@@ -121,6 +123,18 @@ describe("runtime import side-effect contracts", () => {
     mockChannelRegistry();
     await importModule();
     expectNoChannelRegistryDuringImport(moduleId);
+  });
+
+  it("keeps registry composition off next-turn state", async () => {
+    const loadHookState = vi.fn(() => {
+      throw new Error("Registry import must not load next-turn session state");
+    });
+    vi.doMock("../host-hook-state.js", loadHookState);
+    vi.doMock("../host-hook-next-turn.runtime.js", loadHookState);
+
+    await import("../registry.js");
+
+    expect(loadHookState).not.toHaveBeenCalled();
   });
 
   it("keeps runtime-channel off direct channel registry imports", () => {

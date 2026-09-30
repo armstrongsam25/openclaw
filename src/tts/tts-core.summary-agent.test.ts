@@ -7,8 +7,7 @@ import type { ResolvedTtsConfig } from "./tts-types.js";
 // Only the network call is stubbed; model acquisition and selection run for real.
 const completeWithPreparedSimpleCompletionModel = vi.hoisted(() => vi.fn());
 
-vi.mock("../agents/simple-completion-runtime.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../agents/simple-completion-runtime.js")>()),
+vi.mock("../agents/simple-completion-execution.js", () => ({
   completeWithPreparedSimpleCompletionModel,
 }));
 

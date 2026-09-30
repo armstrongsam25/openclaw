@@ -13,7 +13,7 @@ import {
 import {
   drainPluginNextTurnInjectionContext,
   enqueuePluginNextTurnInjection,
-} from "../host-hook-state.js";
+} from "../host-hook-next-turn.runtime.js";
 import { createEmptyPluginRegistry } from "../registry-empty.js";
 import { setActivePluginRegistry } from "../runtime.js";
 import { clearActivePluginRegistry } from "../runtime.test-support.js";

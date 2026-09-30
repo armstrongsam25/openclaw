@@ -4,7 +4,7 @@ const hostHookStateMocks = vi.hoisted(() => ({
   drainPluginNextTurnInjectionContext: vi.fn(),
 }));
 
-vi.mock("../../../plugins/host-hook-state.js", () => hostHookStateMocks);
+vi.mock("../../../plugins/host-hook-next-turn.runtime.js", () => hostHookStateMocks);
 
 import {
   forgetPromptBuildDrainCacheForRun,

@@ -2646,7 +2646,7 @@ src/plugins/hooks.ts	9
 src/plugins/host-hook-attachments.ts	1
 src/plugins/host-hook-runtime.ts	1
 src/plugins/host-hook-scheduled-turns.ts	4
-src/plugins/host-hook-state.ts	6
+src/plugins/host-hook-state.ts	5
 src/plugins/install-managed-npm-state.ts	2
 src/plugins/install-npm-metadata.ts	1
 src/plugins/install-persistence.ts	1
