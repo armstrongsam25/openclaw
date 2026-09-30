@@ -3765,7 +3765,6 @@ export const PR_PROTECTED_RUNTIME_TEST_FILES: readonly string[] = [
   "src/tui/commands.test.ts",
   "src/tui/embedded-backend.test.ts",
   "src/tui/embedded-prepared-runtime.test.ts",
-  "src/tui/gateway-chat.scopes.test.ts",
   "src/tui/gateway-chat.test.ts",
   "src/tui/tui-autocomplete.test.ts",
   "src/tui/tui-command-handlers.test.ts",
