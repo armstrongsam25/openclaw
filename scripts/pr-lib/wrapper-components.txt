@@ -655,6 +655,7 @@ src/infra/dotenv-global-core.ts
 src/infra/dotenv-global.ts
 src/infra/dotenv.ts
 src/infra/ed25519-signature.ts
+src/infra/env-logging.runtime.ts
 src/infra/env.ts
 src/infra/errno.ts
 src/infra/error-graph-internal.ts
@@ -857,6 +858,7 @@ src/infra/state-lease-process-owner.ts
 src/infra/state-migrations.cron-run-logs.ts
 src/infra/state-migrations.receipts.ts
 src/infra/tcp-port.ts
+src/infra/temp-artifact-cleanup.runtime.ts
 src/infra/temp-artifact-cleanup.ts
 src/infra/temp-artifact-removal.ts
 src/infra/test-runtime-env.ts

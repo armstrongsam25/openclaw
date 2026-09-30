@@ -1,3 +1,5 @@
+// Install the registry spies before the requester-yield runtime imports their owners.
+import "../../agents/subagents/registry/subagent-control.test-support.js";
 import fs from "node:fs/promises";
 import { expectDefined } from "@openclaw/normalization-core";
 import { afterEach, expect, it, vi } from "vitest";
