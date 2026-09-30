@@ -11,7 +11,6 @@ import { createRequesterYieldCallback } from "../../agents/openclaw-tools.reques
 import { withLocalSessionPlacementTurnSettlement } from "../../agents/session-placement-admission.js";
 import { setSubagentAnnounceDeliveryDepsForTest } from "../../agents/subagents/announce/subagent-announce-overrides.test-support.js";
 import { dispatchGatewayMethodInProcess } from "../../agents/subagents/announce/subagent-announce.runtime.js";
-import { useSubagentControlFixture } from "../../agents/subagents/registry/subagent-control.test-support.js";
 import { subagentRuns } from "../../agents/subagents/registry/subagent-registry-memory.js";
 import { markSubagentRunPausedAfterYield } from "../../agents/subagents/registry/subagent-registry-run-pause.js";
 import {
@@ -41,6 +40,8 @@ import type { GatewayRequestHandler, RespondFn } from "./types.js";
 const chatSend = vi.hoisted(() => vi.fn<GatewayRequestHandler>());
 vi.mock("./chat-send-external-entry.js", () => ({ handleDirectExternalChatSend: chatSend }));
 
+const { useSubagentControlFixture } =
+  await import("../../agents/subagents/registry/subagent-control.test-support.js");
 const fixture = useSubagentControlFixture();
 afterEach(() => {
   requesterAuthority.revokeRequesterCronAuthority("agent:main:main");

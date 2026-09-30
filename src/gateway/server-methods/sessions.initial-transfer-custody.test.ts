@@ -9,7 +9,6 @@ import {
   observeParentSqlite,
 } from "../../../test/helpers/sqlite-parent-observer.js";
 import { createRequesterYieldCallback } from "../../agents/openclaw-tools.requester-yield.js";
-import { useSubagentControlFixture } from "../../agents/subagents/registry/subagent-control.test-support.js";
 import { subagentRuns } from "../../agents/subagents/registry/subagent-registry-memory.js";
 import * as registryState from "../../agents/subagents/registry/subagent-registry-state.js";
 import { observeRootWork } from "../../agents/subagents/registry/subagent-registry.browser-cleanup.test-support.js";
@@ -36,6 +35,8 @@ import * as sessionSharing from "../session-sharing-preparation.js";
 import { withRequesterTestAuthority } from "./sessions-initial-transfer.test-support.js";
 import { sessionSharingTestContext } from "./sessions-sharing.test-support.js";
 
+const { useSubagentControlFixture } =
+  await import("../../agents/subagents/registry/subagent-control.test-support.js");
 const fixture = useSubagentControlFixture();
 const requesterSessionKey = "agent:main:main";
 afterEach(() => {
