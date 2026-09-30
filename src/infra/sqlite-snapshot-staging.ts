@@ -32,6 +32,7 @@ import {
   SQLITE_SNAPSHOT_LEGACY_MARKER as legacyMarker,
   SQLITE_SNAPSHOT_PREFIX as prefix,
 } from "./sqlite-snapshot-retirement.js";
+import { allocateWorkerOwnedSqliteSnapshotDirectory } from "./sqlite-snapshot-staging-owner.js";
 import type { SqliteStagingToken as SnapshotToken } from "./sqlite-staging-token.js";
 
 type ReclamationPass = { controller: AbortController; done: Promise<void> };
@@ -239,8 +240,8 @@ async function allocateSqliteSnapshotStagingDirectory(
     const controller = new AbortController();
     return retainSnapshotWork(
       (async () => {
-        const { allocateWorkerOwnedSqliteSnapshotDirectory } =
-          await import("./sqlite-snapshot-staging-owner.js");
+        // Retain cleanup before allocation can create a worker-owned directory.
+        await Promise.resolve();
         signal?.throwIfAborted();
         controller.signal.throwIfAborted();
         const owned = await allocateWorkerOwnedSqliteSnapshotDirectory(
