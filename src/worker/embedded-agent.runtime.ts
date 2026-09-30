@@ -12,9 +12,9 @@ import { copyAgentToolMetadata } from "../agents/agent-tool-metadata.js";
 import { wrapToolWithAbortSignal } from "../agents/agent-tools.abort.js";
 import { wrapToolWithBeforeToolCallHook } from "../agents/agent-tools.before-tool-call.wrapper.js";
 import { projectMemoryFlushTools } from "../agents/agent-tools.memory-flush.js";
-import { buildBootstrapContextForFiles } from "../agents/bootstrap-files.js";
+import { createNativeModelOwnedRuntimeModel } from "../agents/defaults.js";
+import { buildBootstrapContextForFiles } from "../agents/embedded-agent-helpers/bootstrap.js";
 import { createEmbeddedAgentResourceLoader } from "../agents/embedded-agent-runner/resource-loader.js";
-import { createNativeModelOwnedRuntimeModel } from "../agents/embedded-agent-runner/run/setup.js";
 import { recordModelFallbackStop } from "../agents/failover-error.js";
 import type { PreparedGitHubToolEnvironment } from "../agents/github-tool-identity.js";
 import { guardSessionManager } from "../agents/session-tool-result-guard-wrapper.js";
@@ -28,8 +28,8 @@ import { wrapToolWithGatewayCallerIdentity } from "../agents/tools/gateway-calle
 import type { loadWorkspaceBootstrapFiles } from "../agents/workspace.js";
 import type { AssistantMessage } from "../llm/types.js";
 import { materializeSkillResources } from "../skills/runtime/resources.js";
-import { createWorkerBrowserToolRuntime, type WorkerBrowserRuntime } from "./browser-runtime.js";
-import { createWorkerComputerTool } from "./computer-runtime.js";
+import type { WorkerBrowserRuntime } from "./browser-runtime.js";
+import type { createWorkerComputerTool } from "./computer-runtime.js";
 import { createWorkerLiveRuntime, type WorkerLiveClient } from "./embedded-agent-live.runtime.js";
 import {
   createWorkerTranscriptRuntime,
@@ -169,7 +169,9 @@ export async function runWorkerEmbeddedTurn(params: RunWorkerEmbeddedTurnParams)
     );
     const browserRuntime =
       params.browser && activeToolNames.includes("browser")
-        ? await createWorkerBrowserToolRuntime({
+        ? await (
+            await import("./browser-runtime.js")
+          ).createWorkerBrowserToolRuntime({
             descriptor: params.browser,
             sessionKey: params.sessionKey,
             stateDir: params.stateDir,
@@ -207,7 +209,7 @@ export async function runWorkerEmbeddedTurn(params: RunWorkerEmbeddedTurnParams)
       try {
         const computerTool =
           params.computer && activeToolNames.includes("computer")
-            ? createWorkerComputerTool({
+            ? (await import("./computer-runtime.js")).createWorkerComputerTool({
                 ...params.computer,
                 runId: params.runId,
                 registerRunCleanup: (cleanup) => {

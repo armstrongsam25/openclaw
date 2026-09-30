@@ -16,6 +16,7 @@ import {
   prepareSqliteTranscriptReadScope,
   toDatabaseOptions,
 } from "../config/sessions/session-accessor.sqlite-scope.js";
+import { readRestoredSessionTranscript } from "../config/sessions/session-cold-storage-read.js";
 import { resolveSessionTranscriptReadFence } from "../config/sessions/session-transcript-read-fence.js";
 import { startSessionTranscriptIndexReconcile } from "../config/sessions/session-transcript-reconcile.js";
 import { redactToolPayloadText } from "../logging/redact.js";
@@ -96,8 +97,6 @@ export async function readActivitySummarySource(
     assertCurrent: () => void;
   },
 ) {
-  const { readRestoredSessionTranscript } =
-    await import("../config/sessions/session-cold-storage-read.js");
   const { withSessionHistoryWorkerDatabase } =
     await import("../config/sessions/session-transcript-worker-runtime.js");
   const resolved = await prepareSqliteTranscriptReadScope(params.scope);
