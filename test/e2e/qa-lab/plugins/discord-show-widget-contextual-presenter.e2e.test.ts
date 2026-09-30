@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -14,6 +14,7 @@ import {
   type QaGatewayChild,
   startQaMockOpenAiServer,
 } from "../../../../extensions/qa-lab/api.js";
+import { redactSensitiveText } from "../../../../src/logging/redact.js";
 import { stopQaGatewayFixture } from "../../../helpers/qa-gateway-cleanup.js";
 import { useAutoCleanupTempDirTracker } from "../../../helpers/temp-dir.js";
 
@@ -26,6 +27,7 @@ const DISCORD_COMPONENTS_V2_FLAG = 1 << 15;
 const DISCORD_SESSION_KEY = `agent:qa:discord:channel:${DISCORD_CHANNEL_ID}`;
 const INLINE_SESSION_KEY = "agent:qa:inline-widget-proof";
 const INVENTORY_MARKER = "DISCORD_WIDGET_PRESENTER_INVENTORY";
+const BINDING_FIXTURE_PLUGIN_ID = "qa-discord-widget-bindings";
 
 type JsonRecord = Record<string, unknown>;
 type DiscordRestRequest = {
@@ -173,6 +175,56 @@ globalThis.fetch = async (input, init) => {
   return preloadPath;
 }
 
+async function writeDiscordBindingFixture(root: string): Promise<string> {
+  const pluginDir = path.join(root, BINDING_FIXTURE_PLUGIN_ID);
+  await mkdir(pluginDir, { mode: 0o700 });
+  await writeFile(
+    path.join(pluginDir, "package.json"),
+    JSON.stringify({
+      name: BINDING_FIXTURE_PLUGIN_ID,
+      version: "0.0.0",
+      type: "module",
+      openclaw: { extensions: ["./index.js"] },
+    }),
+  );
+  await writeFile(
+    path.join(pluginDir, "openclaw.plugin.json"),
+    JSON.stringify({
+      id: BINDING_FIXTURE_PLUGIN_ID,
+      activation: { onStartup: true },
+      configSchema: { type: "object", additionalProperties: false, properties: {} },
+    }),
+  );
+  const discordModule = pathToFileURL(
+    path.join(REPO_ROOT, "dist", "extensions", "discord", "channel-plugin-api.js"),
+  ).href;
+  await writeFile(
+    path.join(pluginDir, "index.js"),
+    `export default {
+  id: ${JSON.stringify(BINDING_FIXTURE_PLUGIN_ID)},
+  register(api) {
+    let manager;
+    api.registerService({
+      id: ${JSON.stringify(BINDING_FIXTURE_PLUGIN_ID)},
+      async start(context) {
+        const { discordPlugin } = await import(${JSON.stringify(discordModule)});
+        manager = await discordPlugin.conversationBindings.createManager({
+          cfg: context.config,
+          accountId: "default",
+        });
+      },
+      async stop() {
+        await manager?.stop();
+        manager = undefined;
+      },
+    });
+  },
+};
+`,
+  );
+  return pluginDir;
+}
+
 async function readMockRequests(baseUrl: string): Promise<MockOpenAiRequestSnapshot[]> {
   const response = await fetch(`${baseUrl}/debug/requests`);
   if (!response.ok) {
@@ -292,6 +344,8 @@ describe("Discord show_widget contextual presenter process proof", () => {
     discord = await startDiscordRestLoopback();
     cleanups.push(() => discord.stop());
     const preloadPath = await writeDiscordFetchPreload(scratch);
+    // Skipped Discord transport startup otherwise leaves its binding owner unavailable.
+    const bindingPluginDir = await writeDiscordBindingFixture(scratch);
     mock = await startQaMockOpenAiServer();
     cleanups.push(() => mock.stop());
     const gatewayOwner = createQaGatewayChild();
@@ -321,10 +375,20 @@ describe("Discord show_widget contextual presenter process proof", () => {
         // Public message actions do not need QA Lab's private runtime tools.
         plugins: {
           ...cfg.plugins,
-          allow: cfg.plugins?.allow?.filter((id) => id !== "qa-lab"),
-          entries: Object.fromEntries(
-            Object.entries(cfg.plugins?.entries ?? {}).filter(([id]) => id !== "qa-lab"),
-          ),
+          allow: [
+            ...(cfg.plugins?.allow ?? []).filter((id) => id !== "qa-lab"),
+            BINDING_FIXTURE_PLUGIN_ID,
+          ],
+          load: {
+            ...cfg.plugins?.load,
+            paths: [...(cfg.plugins?.load?.paths ?? []), bindingPluginDir],
+          },
+          entries: {
+            ...Object.fromEntries(
+              Object.entries(cfg.plugins?.entries ?? {}).filter(([id]) => id !== "qa-lab"),
+            ),
+            [BINDING_FIXTURE_PLUGIN_ID]: { enabled: true },
+          },
         },
         tools: {
           ...cfg.tools,
@@ -641,13 +705,12 @@ describe("Discord show_widget contextual presenter process proof", () => {
       })) as { runId?: string; status?: string };
       expect(started.status).toBe("started");
       expect(started.runId).toBeTruthy();
-      await expect(
-        gateway.call(
-          "agent.wait",
-          { runId: started.runId, timeoutMs: 60_000 },
-          { timeoutMs: 65_000 },
-        ),
-      ).resolves.toMatchObject({ status: "ok" });
+      const terminal = (await gateway.call(
+        "agent.wait",
+        { runId: started.runId, timeoutMs: 60_000 },
+        { timeoutMs: 65_000 },
+      )) as { status?: string; error?: string };
+      expect(terminal, redactSensitiveText(terminal.error ?? "")).toMatchObject({ status: "ok" });
 
       const request = (await readMockRequests(mock.baseUrl)).find((entry) =>
         entry.allInputText.includes(INVENTORY_MARKER),
