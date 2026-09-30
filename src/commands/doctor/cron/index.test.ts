@@ -5,6 +5,7 @@ import path from "node:path";
 // Doctor cron index tests cover cron doctor checks and repair entrypoints.
 import { createRequireRecord } from "openclaw/plugin-sdk/test-fixtures";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { observeHostDataSql } from "../../../../test/helpers/sqlite-statement-execution-counter.js";
 import { parseCodeModeScriptSyntax } from "../../../agents/code-mode-script-syntax.js";
 import type { OpenClawConfig } from "../../../config/config.js";
 import { readCronRunHistoryPageForTests } from "../../../cron/run-history.test-support.js";
@@ -24,6 +25,7 @@ import {
   maybeRepairLegacyCronStore,
   noteLegacyWhatsAppCrontabHealthCheck,
 } from "./index.js";
+import { createCurrentCronJob, createLegacyCronJob } from "./job-fixtures.test-support.js";
 
 type TerminalNote = (message: string, title?: string) => void;
 
@@ -81,42 +83,6 @@ function repairCronStore(
     options: {},
     prompter,
   });
-}
-
-function createLegacyCronJob(overrides: Record<string, unknown> = {}) {
-  return {
-    jobId: "legacy-job",
-    name: "Legacy job",
-    notify: true,
-    createdAtMs: Date.parse("2026-02-01T00:00:00.000Z"),
-    updatedAtMs: Date.parse("2026-02-02T00:00:00.000Z"),
-    schedule: { kind: "cron", cron: "0 7 * * *", tz: "UTC" },
-    payload: {
-      kind: "systemEvent",
-      text: "Morning brief",
-    },
-    state: {},
-    ...overrides,
-  };
-}
-
-function createCurrentCronJob(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "sqlite-job",
-    name: "SQLite job",
-    enabled: true,
-    createdAtMs: Date.parse("2026-02-03T00:00:00.000Z"),
-    updatedAtMs: Date.parse("2026-02-03T00:00:00.000Z"),
-    schedule: { kind: "cron", expr: "0 8 * * *", tz: "UTC" },
-    sessionTarget: "isolated",
-    wakeMode: "now",
-    payload: {
-      kind: "systemEvent",
-      text: "SQLite brief",
-    },
-    state: {},
-    ...overrides,
-  };
 }
 
 async function writeCronStore(storePath: string, jobs: Array<Record<string, unknown>>) {
@@ -268,7 +234,7 @@ describe("collectLegacyCronStoreHealthFindings", () => {
   it("reports quarantined cron rows while leaving the active store untouched", async () => {
     const storePath = await makeTempStorePath();
     await writeCurrentCronStore(storePath, []);
-    saveCronQuarantinedJobs({
+    await saveCronQuarantinedJobs({
       storePath,
       nowMs: Date.parse("2026-05-29T09:00:00.000Z"),
       entries: [
@@ -773,7 +739,7 @@ describe("maybeRepairLegacyCronStore", () => {
   it("reports quarantined cron rows even when the active store is already sanitized", async () => {
     const storePath = await makeTempStorePath();
     await writeCurrentCronStore(storePath, []);
-    saveCronQuarantinedJobs({
+    await saveCronQuarantinedJobs({
       storePath,
       nowMs: Date.parse("2026-05-29T09:00:00.000Z"),
       entries: [
@@ -795,7 +761,7 @@ describe("maybeRepairLegacyCronStore", () => {
     const storePath = await makeTempStorePath();
     vi.stubEnv("OPENCLAW_STATE_DIR", path.dirname(path.dirname(storePath)));
     await writeCurrentCronStore(storePath, []);
-    saveCronQuarantinedJobs({
+    await saveCronQuarantinedJobs({
       storePath,
       nowMs: Date.parse("2026-08-30T18:50:02.000Z"),
       entries: [
@@ -853,13 +819,19 @@ describe("maybeRepairLegacyCronStore", () => {
     await fs.writeFile(quarantinePath, JSON.stringify({ version: 1, jobs: [historicalJob] }));
     const prompter = makePrompter(true);
 
-    await repairCronStore(storePath, prompter);
+    const observation = observeHostDataSql();
+    try {
+      await repairCronStore(storePath, prompter);
+    } finally {
+      observation.restore();
+    }
 
     expect(await loadCronQuarantinedJobs(storePath)).toEqual([historicalJob]);
     await expect(fs.stat(quarantinePath)).rejects.toMatchObject({ code: "ENOENT" });
     await expect(fs.stat(`${quarantinePath}.migrated`)).resolves.toBeDefined();
     expect(prompter.confirm).toHaveBeenCalledTimes(1);
     expectNoteContaining("Cron quarantine migrated to SQLite", "Doctor changes");
+    expect(observation.queries.filter((sql) => sql.includes("diagnostic_events"))).toEqual([]);
   });
 
   it("deduplicates migrated quarantine records when sidecar archival must be retried", async () => {
