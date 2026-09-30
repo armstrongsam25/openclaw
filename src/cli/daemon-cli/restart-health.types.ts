@@ -2,19 +2,7 @@ import type { GatewayServiceRuntime } from "../../daemon/service-runtime.js";
 import type { PluginHealthErrorSummary } from "../../gateway/health/types.js";
 import type { GatewayStaleConnectionReason } from "../../gateway/stale-install.js";
 import type { PortUsage } from "../../infra/ports.js";
-
-export const GATEWAY_RESTART_WAIT_OUTCOMES = [
-  "healthy",
-  "plugin-errors",
-  "channel-errors",
-  "version-mismatch",
-  "build-id-mismatch",
-  "stale-pids",
-  "stopped-free",
-  "timeout",
-  "still-starting",
-  "generation-changed",
-] as const;
+import type { GATEWAY_RESTART_WAIT_OUTCOMES } from "./restart-health.constants.js";
 
 export type GatewayRestartWaitOutcome = (typeof GATEWAY_RESTART_WAIT_OUTCOMES)[number];
 

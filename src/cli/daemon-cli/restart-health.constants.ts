@@ -1,5 +1,18 @@
 import { GATEWAY_RESTART_REPLACEMENT_TIMEOUT_MS } from "../../infra/gateway-shutdown-budget.js";
 
+export const GATEWAY_RESTART_WAIT_OUTCOMES = [
+  "healthy",
+  "plugin-errors",
+  "channel-errors",
+  "version-mismatch",
+  "build-id-mismatch",
+  "stale-pids",
+  "stopped-free",
+  "timeout",
+  "still-starting",
+  "generation-changed",
+] as const;
+
 export const DEFAULT_RESTART_HEALTH_TIMEOUT_MS = GATEWAY_RESTART_REPLACEMENT_TIMEOUT_MS;
 
 export const DEFAULT_RESTART_HEALTH_DELAY_MS = 500;

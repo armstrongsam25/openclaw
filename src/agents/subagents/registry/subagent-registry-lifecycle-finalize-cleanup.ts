@@ -1,5 +1,5 @@
 import type { OpenClawStateWorkerContext } from "../../../state/openclaw-state-worker-context.types.js";
-import type { SubagentAnnounceFlowOutcome } from "../announce/subagent-announce.js";
+import type { SubagentAnnounceFlowOutcome } from "../announce/subagent-announce-dispatch.js";
 import {
   ensureCompletionState,
   ensureDeliveryState,

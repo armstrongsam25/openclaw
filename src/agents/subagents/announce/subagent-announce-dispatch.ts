@@ -50,6 +50,10 @@ export type SubagentAnnounceDeliveryResult = {
   phases?: SubagentAnnounceDispatchPhaseResult[];
 };
 
+export type SubagentAnnounceFlowOutcome =
+  | NonNullable<SubagentAnnounceDeliveryResult["disposition"]>
+  | "requester_turn_pending";
+
 type SubagentAnnounceDispatchPhase = "steer-primary" | "direct-primary" | "steer-fallback";
 
 type SubagentAnnounceDispatchPhaseResult = {

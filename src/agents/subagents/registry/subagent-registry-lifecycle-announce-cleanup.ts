@@ -5,6 +5,7 @@ import { defaultRuntime } from "../../../runtime.js";
 import { normalizeDeliveryContext } from "../../../utils/delivery-context.shared.js";
 import { resolveSubagentRequesterAgentId } from "../../subagent-requester-owner.js";
 import { loadSessionEntryByKey } from "../announce/subagent-announce-delivery.runtime.js";
+import type { SubagentAnnounceFlowOutcome } from "../announce/subagent-announce-dispatch.js";
 import {
   ensureDeliveryState,
   getDeliveryLastError,
@@ -53,7 +54,6 @@ import { deleteSubagentSessionForCleanup } from "./subagent-session-cleanup.js";
 
 type RunSubagentAnnounceFlow =
   (typeof import("../announce/subagent-announce.js"))["runSubagentAnnounceFlow"];
-type SubagentAnnounceFlowOutcome = Awaited<ReturnType<RunSubagentAnnounceFlow>>;
 
 export const resumeAncestorCleanup = (
   context: SubagentLifecycleAnnounceCleanupContext,
