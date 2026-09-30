@@ -152,7 +152,7 @@ describe("detectBrowserOpenSupport", () => {
 
   it("prefers the registry-backed Windows system root over process env", async () => {
     vi.resetModules();
-    const { detectBrowserOpenSupport, openUrl } = await import("./browser-open.js");
+    const browserOpen = await import("./browser-open.js");
     vi.spyOn(fs, "accessSync").mockImplementation(() => undefined);
     execFileSyncMock.mockImplementation((_file: string, args: readonly string[]) =>
       args[3] === "SystemRoot" ? "SystemRoot    REG_SZ    D:\\Windows\r\n" : "",
@@ -161,10 +161,13 @@ describe("detectBrowserOpenSupport", () => {
     vi.stubEnv("SystemRoot", "C:\\PoisonedWindows");
 
     const rundll32 = path.win32.join("D:\\Windows", "System32", "rundll32.exe");
-    await expect(detectBrowserOpenSupport()).resolves.toEqual({ ok: true, command: rundll32 });
+    await expect(browserOpen.detectBrowserOpenSupport()).resolves.toEqual({
+      ok: true,
+      command: rundll32,
+    });
     vi.stubEnv("VITEST", "");
     vi.stubEnv("NODE_ENV", "development");
-    await expect(openUrl("https://example.com/")).resolves.toBe(true);
+    await expect(browserOpen.openUrl("https://example.com/")).resolves.toBe(true);
     expect(runCommandWithTimeoutMock).toHaveBeenCalledWith(
       [rundll32, "url.dll,FileProtocolHandler", "https://example.com/"],
       { timeoutMs: 5_000 },
