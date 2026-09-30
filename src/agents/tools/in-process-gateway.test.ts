@@ -11,7 +11,10 @@ import {
   readInProcessSubagentResume,
 } from "../../gateway/in-process-subagent-resume.js";
 import type { GatewayRequestContext } from "../../gateway/server-methods/types.js";
-import { createOperationalRunInstanceRef } from "../admitted-run-context.js";
+import {
+  createOperationalRunInstanceRef,
+  prepareSystemAgentRunAdmission,
+} from "../admitted-run-context.js";
 
 const mocks = vi.hoisted(() => ({
   hasContext: true,
@@ -42,7 +45,6 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-import { prepareSystemAgentRunAdmission } from "../admitted-run-context.js";
 import {
   createAdmittedGatewayToolCallerIdentity,
   withGatewayToolCallerIdentity,
