@@ -10,7 +10,6 @@ import type {
 } from "../../gateway/artifact-download-projection.js";
 import type { ArtifactRecord } from "../../gateway/server-methods/artifacts-content.js";
 import type { AgentHistoryActivity } from "../../infra/agent-activity-events.js";
-import type { ConversationRecord } from "./conversation-registry.js";
 import type {
   TranscriptAnchorPageOptions,
   TranscriptRecentReadLimits,
@@ -19,6 +18,7 @@ import type {
   TranscriptReadWindow,
   TranscriptReadWindowOptions,
 } from "../../sessions/transcript-read-window.js";
+import type { ConversationRecord } from "./session-accessor.sqlite-conversation-read.js";
 import type {
   SessionTranscriptRawDeltaLimits,
   SessionTranscriptRawDeltaResult,
