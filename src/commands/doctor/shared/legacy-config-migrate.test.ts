@@ -1197,22 +1197,32 @@ describe("legacy agent runtime and sandbox config migrate", () => {
 });
 
 describe("legacy migrate MCP server type aliases", () => {
-  it("normalizes CLI-native transports while preserving explicit canonical transport", () => {
-    const res = migrateLegacyConfigForTest({
-      mcp: {
-        servers: {
-          http: { type: "http", url: "https://example.com/mcp" },
-          sse: { type: "sse", url: "https://example.com/sse" },
-          canonical: { type: "http", transport: "sse", url: "https://example.com/canonical" },
-        },
-      },
-    });
-    expect(res.config?.mcp?.servers).toEqual({
-      http: { transport: "streamable-http", url: "https://example.com/mcp" },
-      sse: { transport: "sse", url: "https://example.com/sse" },
-      canonical: { transport: "sse", url: "https://example.com/canonical" },
-    });
-  });
+  it.each(["mcp", "nodeHost"] as const)(
+    "normalizes %s CLI transports with canonical precedence",
+    (owner) => {
+      const servers = {
+        http: { type: "http", url: "https://example.com/mcp" },
+        sse: { type: "sse", url: "https://example.com/sse" },
+        canonical: { type: "http", transport: "sse", url: "https://example.com/canonical" },
+        local: { type: "stdio", command: "node", args: ["server.js"] },
+      };
+      const raw = owner === "mcp" ? { mcp: { servers } } : { nodeHost: { mcp: { servers } } };
+      expect(findLegacyConfigIssues(raw)).toContainEqual({
+        path: owner === "mcp" ? "mcp.servers" : "nodeHost.mcp.servers",
+        message: expect.stringContaining("CLI-native type aliases"),
+      });
+      const res = migrateLegacyConfigForTest(raw);
+      expect(
+        owner === "mcp" ? res.config?.mcp?.servers : res.config?.nodeHost?.mcp?.servers,
+      ).toEqual({
+        http: { transport: "streamable-http", url: "https://example.com/mcp" },
+        sse: { transport: "sse", url: "https://example.com/sse" },
+        canonical: { transport: "sse", url: "https://example.com/canonical" },
+        local: { command: "node", args: ["server.js"] },
+      });
+      expect(migrateLegacyConfigForTest(res.config)).toEqual({ config: null, changes: [] });
+    },
+  );
 });
 
 describe("legacy migrate x_search auth", () => {
