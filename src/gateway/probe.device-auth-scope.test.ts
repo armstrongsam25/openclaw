@@ -17,66 +17,71 @@ type WebSocketEvent = "open" | "message" | "close" | "error" | "unexpected-respo
 
 let onSocketCreated: ((socket: ProbeWebSocket) => void) | undefined;
 
-class ProbeWebSocket {
-  static readonly CONNECTING = 0;
-  static readonly OPEN = 1;
-  static readonly CLOSING = 2;
-  static readonly CLOSED = 3;
+const { ProbeWebSocket } = vi.hoisted(() => {
+  class FakeWebSocket {
+    static readonly CONNECTING = 0;
+    static readonly OPEN = 1;
+    static readonly CLOSING = 2;
+    static readonly CLOSED = 3;
 
-  readonly firstSent = createDeferred<string>();
-  readyState = ProbeWebSocket.CONNECTING;
-  binaryType = "nodebuffer";
-  private readonly handlers: Record<WebSocketEvent, Array<(...args: unknown[]) => void>> = {
-    open: [],
-    message: [],
-    close: [],
-    error: [],
-    "unexpected-response": [],
-  };
+    readonly firstSent = createDeferred<string>();
+    readyState = FakeWebSocket.CONNECTING;
+    binaryType = "nodebuffer";
+    private readonly handlers: Record<WebSocketEvent, Array<(...args: unknown[]) => void>> = {
+      open: [],
+      message: [],
+      close: [],
+      error: [],
+      "unexpected-response": [],
+    };
 
-  constructor(_url: string, _options?: unknown) {
-    onSocketCreated?.(this);
-  }
-
-  on(event: WebSocketEvent, handler: (...args: unknown[]) => void): void {
-    this.handlers[event].push(handler);
-  }
-
-  send(data: string): void {
-    this.firstSent.resolve(data);
-  }
-
-  close(code = 1000, reason = ""): void {
-    if (this.readyState === ProbeWebSocket.CLOSED) {
-      return;
+    constructor(_url: string, _options?: unknown) {
+      onSocketCreated?.(this);
     }
-    this.emitClose(code, reason);
-  }
 
-  terminate(): void {
-    this.emitClose(1006, "terminated");
-  }
+    on(event: WebSocketEvent, handler: (...args: unknown[]) => void): void {
+      this.handlers[event].push(handler);
+    }
 
-  emitOpen(): void {
-    this.readyState = ProbeWebSocket.OPEN;
-    for (const handler of this.handlers.open) {
-      handler();
+    send(data: string): void {
+      this.firstSent.resolve(data);
+    }
+
+    close(code = 1000, reason = ""): void {
+      if (this.readyState === FakeWebSocket.CLOSED) {
+        return;
+      }
+      this.emitClose(code, reason);
+    }
+
+    terminate(): void {
+      this.emitClose(1006, "terminated");
+    }
+
+    emitOpen(): void {
+      this.readyState = FakeWebSocket.OPEN;
+      for (const handler of this.handlers.open) {
+        handler();
+      }
+    }
+
+    emitMessage(data: string): void {
+      for (const handler of this.handlers.message) {
+        handler(data);
+      }
+    }
+
+    emitClose(code: number, reason: string): void {
+      this.readyState = FakeWebSocket.CLOSED;
+      for (const handler of this.handlers.close) {
+        handler(code, Buffer.from(reason));
+      }
     }
   }
+  return { ProbeWebSocket: FakeWebSocket };
+});
 
-  emitMessage(data: string): void {
-    for (const handler of this.handlers.message) {
-      handler(data);
-    }
-  }
-
-  emitClose(code: number, reason: string): void {
-    this.readyState = ProbeWebSocket.CLOSED;
-    for (const handler of this.handlers.close) {
-      handler(code, Buffer.from(reason));
-    }
-  }
-}
+type ProbeWebSocket = InstanceType<typeof ProbeWebSocket>;
 
 vi.mock("../../packages/gateway-client/src/websocket.js", () => ({ WebSocket: ProbeWebSocket }));
 vi.mock("../cli/daemon-cli/diagnostic-readiness.js", () => ({
