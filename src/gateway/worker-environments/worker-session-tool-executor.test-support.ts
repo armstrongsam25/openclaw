@@ -142,6 +142,8 @@ vi.mock("../../agents/tools/in-process-gateway.js", () => ({
 }));
 
 vi.mock("../../agents/tools/gateway.js", () => ({
+  callInProcessGatewayTool: (method: string, params: Record<string, unknown>) =>
+    sharedMocks.gatewayRequest({ method, params }),
   callInProcessGatewayToolWithCreation: (
     method: string,
     params: Record<string, unknown>,
