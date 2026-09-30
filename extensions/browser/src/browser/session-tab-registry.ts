@@ -10,7 +10,6 @@ import {
   readCurrentBrowserState,
   type BrowserSessionTabAuthority,
 } from "../browser-runtime-state.js";
-import { browserCloseTabByRawTargetId } from "./client.js";
 import {
   type CleanupKind,
   type CloseParams,
@@ -79,8 +78,8 @@ async function performVolatileCleanup(
       return 0;
     }
     params.authority?.assertCurrent?.();
-    const tab = resolveCurrent();
-    if (!tab) {
+    const current = resolveCurrent();
+    if (!current) {
       return 0;
     }
     const existing = inFlight.get(targetKey);
@@ -97,9 +96,18 @@ async function performVolatileCleanup(
     // Completion retires only the acquired registrations.
     const owner = { registrations: volatileRegistrationsForTarget(targetKey), promise: cleanup };
     const performClose = async () => {
+      let tab = current;
       let closeTab = params.closeTab;
       try {
         if (!closeTab && tab.route.kind === "browser-control") {
+          const { browserCloseTabByRawTargetId } = await import("./client.js");
+          const latest = resolveCurrent();
+          if (!latest) {
+            // No dispatch occurred: a lifecycle joiner may retry a touched sweep.
+            owner.registrations = [];
+            return 0;
+          }
+          tab = latest;
           closeTab = ({ baseUrl, targetId, profile }) =>
             browserCloseTabByRawTargetId(baseUrl, targetId, { profile });
         }

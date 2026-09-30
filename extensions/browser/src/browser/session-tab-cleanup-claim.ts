@@ -4,20 +4,13 @@
  */
 import { randomUUID } from "node:crypto";
 import type { SessionEntryCurrentPreparation } from "openclaw/plugin-sdk/plugin-state-runtime";
-import { getRuntimeConfig } from "openclaw/plugin-sdk/runtime-config-snapshot";
 import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/string-coerce-runtime";
 import {
   getBrowserStateRuntime,
   type BrowserSessionTabAuthority,
 } from "../browser-runtime-state.js";
-import { resolveCdpControlPolicy } from "./cdp-reachability-policy.js";
 import type { CloseTrackedCdpTargetResult } from "./cdp.helpers.js";
-import {
-  isLocalManagedProfile,
-  resolveBrowserConfig,
-  resolveProfile,
-  type ResolvedBrowserConfig,
-} from "./config.js";
+import type { ResolvedBrowserConfig } from "./config.js";
 import { BROWSER_TAB_UNREACHABLE_RETIRE_MS } from "./constants.js";
 import type { BrowserSessionTabRoute } from "./session-tab-route.js";
 import {
@@ -159,17 +152,23 @@ async function closeCurrentDurableTab(
   getResolvedBrowserConfig?: CloseParams["getResolvedBrowserConfig"],
 ): Promise<DurableCleanupResult> {
   // Empty session cleanup must not initialize Browser control or its CDP graph.
-  const { closeTrackedCdpTarget } = await import("./cdp.helpers.js");
+  const [{ getRuntimeConfig }, { resolveCdpControlPolicy }, { closeTrackedCdpTarget }, config] =
+    await Promise.all([
+      import("openclaw/plugin-sdk/runtime-config-snapshot"),
+      import("./cdp-reachability-policy.js"),
+      import("./cdp.helpers.js"),
+      import("./config.js"),
+    ]);
   let resolved = await getResolvedBrowserConfig?.();
   if (!resolved) {
     const cfg = getRuntimeConfig();
-    resolved = resolveBrowserConfig(cfg.browser, cfg);
+    resolved = config.resolveBrowserConfig(cfg.browser, cfg);
   }
-  const profile = resolveProfile(resolved, tab.profile);
+  const profile = config.resolveProfile(resolved, tab.profile);
   if (!profile?.cdpUrl) {
     return { status: "ownership-mismatch" };
   }
-  if (tab.dashboard && !isLocalManagedProfile(profile)) {
+  if (tab.dashboard && !config.isLocalManagedProfile(profile)) {
     return { status: "ownership-mismatch" };
   }
   if (profile.driver === "extension" && !resolved.extensionRelayInternalTokens[profile.name]) {
