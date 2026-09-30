@@ -462,7 +462,7 @@ describe("server-runtime-services", () => {
       });
       const { services, log } = activateScheduledServicesForTest({ scheduler });
       let stopPromise: Promise<void> | undefined;
-      let waking: void | Promise<void>;
+      let waking: void | Promise<void> = undefined;
       try {
         waking = clock.advanceBy(1_250);
         await importStarted.promise;
