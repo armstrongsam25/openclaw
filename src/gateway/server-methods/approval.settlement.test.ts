@@ -6,7 +6,7 @@ import {
   type ExecApprovalRequestPayload,
 } from "../../infra/exec-approvals.js";
 import type { PluginApprovalRequestPayload } from "../../infra/plugin-approvals.js";
-import { withSqliteWorkerCleanupFailure } from "../../infra/sqlite-worker-broker-reply.js";
+import { withSqliteWorkerCleanupFailure } from "../../infra/sqlite-worker-broker-settlement.js";
 import { SqliteWorkerError } from "../../infra/sqlite-worker-contract.js";
 import * as workerAdmission from "../../infra/sqlite-worker-operation-admission.js";
 import { closeOpenClawStateDatabaseByPathAsync } from "../../state/openclaw-state-db-cache.js";
@@ -76,10 +76,9 @@ vi.mock("../../state/openclaw-state-worker-store.js", async (importOriginal) => 
                   ) {
                     resultDelivery.wrapRefusal = false;
                     resultDelivery.wrappedRefusal = error;
-                    throw withSqliteWorkerCleanupFailure(
-                      error,
-                      new Error("synthetic cleanup failure"),
-                    );
+                    throw withSqliteWorkerCleanupFailure(error, {
+                      error: new Error("synthetic cleanup failure"),
+                    });
                   }
                   throw error;
                 });

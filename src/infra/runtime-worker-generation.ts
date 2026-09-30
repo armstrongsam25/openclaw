@@ -45,7 +45,17 @@ export async function withRuntimeWorkerGeneration<T>(
         const failures = settled.flatMap((result) =>
           result.status === "rejected" ? [result.reason] : [],
         );
+        const terminate = settled.flatMap((result) =>
+          result.status === "fulfilled" && result.value ? [result.value] : [],
+        );
         if (failures.length) {
+          // A failed owner cannot abandon another owner's completed settlement and native cleanup.
+          const cleanup = await Promise.allSettled(
+            terminate.map((close) => Promise.resolve().then(close)),
+          );
+          failures.push(
+            ...cleanup.flatMap((result) => (result.status === "rejected" ? [result.reason] : [])),
+          );
           const reason = "retained updater workers did not settle; keep it until the workers stop";
           const directory = retainedDirectory?.(reason);
           throw new AggregateError(
@@ -54,9 +64,6 @@ export async function withRuntimeWorkerGeneration<T>(
               (directory ? `. Runtime retained at ${directory}: ${reason}.` : ""),
           );
         }
-        const terminate = settled.flatMap((result) =>
-          result.status === "fulfilled" && result.value ? [result.value] : [],
-        );
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {
           const terminated = await Promise.race([

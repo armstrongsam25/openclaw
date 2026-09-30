@@ -12,6 +12,9 @@ async function runFixture(
     | "terminate"
     | "natural-exit"
     | "generation"
+    | "generation-settlement-error"
+    | "generation-settlement-undefined"
+    | "generation-direct-error"
     | "explicit-unbound"
     | "supervisor-loss"
     | "native-resource"
@@ -165,16 +168,70 @@ describe("retained native worker lifecycle", () => {
     20_000,
   );
 
-  it("joins all admitted owners before releasing their shared supervisor and generation", async () => {
+  it.each([
+    "generation-settlement-error",
+    "generation-settlement-undefined",
+    "generation-direct-error",
+  ] as const)(
+    "retains one original failure and joins the successful sibling native finalizer during %s",
+    async (ending) => {
+      expect(await runFixture(ending)).toEqual({
+        ending,
+        order:
+          ending === "generation-direct-error"
+            ? [
+                "operation",
+                "owner-settle-start",
+                "queued-worker-started",
+                "worker-usable-during-settlement",
+                "owner-settled",
+                "sibling-owner-settle",
+                "sibling-settled",
+                "direct-owner-settlement-failed",
+                "owner-native-final",
+                "native-joined",
+                "sibling-native-final",
+                "sibling-native-joined",
+              ]
+            : [
+                "operation",
+                "owner-settle-start",
+                "queued-worker-started",
+                "worker-usable-during-settlement",
+                "failed-owner-close",
+                "native-joined",
+                "owner-settlement-failed",
+                "sibling-owner-settle",
+                "sibling-settled",
+                "sibling-native-final",
+                "sibling-native-joined",
+              ],
+        nativeJoined: true,
+        siblingJoined: true,
+        supervisorJoined: true,
+        directoryReleased: false,
+        terminalSamplesRejected: true,
+        originalFailureOccurrences: 1,
+        sourceFailureOccurrences: ending === "generation-direct-error" ? 0 : 1,
+      });
+    },
+    20_000,
+  );
+
+  it("joins both returned native finalizers before releasing their shared supervisor and generation", async () => {
     expect(await runFixture("generation")).toEqual({
       ending: "generation",
       order: [
         "operation",
-        "owner-close-start",
+        "owner-settle-start",
         "queued-worker-started",
-        "worker-usable-during-close",
+        "worker-usable-during-settlement",
+        "owner-settled",
+        "sibling-owner-settle",
+        "sibling-settled",
+        "owner-native-final",
         "native-joined",
-        "sibling-owner-close",
+        "sibling-native-final",
         "sibling-native-joined",
         "release",
       ],

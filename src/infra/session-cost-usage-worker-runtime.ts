@@ -63,7 +63,7 @@ import {
   type UsageCostWorkerResult,
 } from "./session-cost-usage-worker.types.js";
 import type { UsageDailyBucket } from "./session-cost-usage.types.js";
-import { withSqliteWorkerCleanupFailure } from "./sqlite-worker-broker-reply.js";
+import { withSqliteWorkerCleanupFailure } from "./sqlite-worker-broker-settlement.js";
 
 const USAGE_COST_WORKER_TIMEOUT_MS = 5 * 60_000;
 const logger = createSubsystemLogger("usage-cost-cache");
@@ -172,16 +172,15 @@ function restoreWorkerFailure(error: unknown, hostErrors: Map<number, unknown>):
           ? original
           : withSqliteWorkerCleanupFailure(
               toErrorObject(original, "Usage cache host effect failed"),
-              restored,
+              { error: restored },
             );
       }
       result =
         current === error
           ? restored
-          : withSqliteWorkerCleanupFailure(
-              toErrorObject(restored, "Usage cost worker failed"),
-              result,
-            );
+          : withSqliteWorkerCleanupFailure(toErrorObject(restored, "Usage cost worker failed"), {
+              error: result,
+            });
     }
   }
   // Cancellation can retire the worker before an accepted write returns its failure.
@@ -189,7 +188,7 @@ function restoreWorkerFailure(error: unknown, hostErrors: Map<number, unknown>):
     if (!restoredOrigins.has(origin)) {
       result = withSqliteWorkerCleanupFailure(
         toErrorObject(failure, "Usage cache host effect failed"),
-        result,
+        { error: result },
       );
     }
   }
@@ -540,10 +539,9 @@ export async function runUsageCostWorker(
             { assertCurrent },
           );
         } catch (healthError) {
-          failure = withSqliteWorkerCleanupFailure(
-            toErrorObject(failure, "Usage refresh failed"),
-            healthError,
-          );
+          failure = withSqliteWorkerCleanupFailure(toErrorObject(failure, "Usage refresh failed"), {
+            error: healthError,
+          });
         }
       }
       throw failure;

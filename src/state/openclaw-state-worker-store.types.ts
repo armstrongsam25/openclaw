@@ -28,7 +28,7 @@ export type Entry = {
   store?: Store;
   actor?: ReturnType<typeof getSqliteWorkerActorIdentity>;
   bound?: boolean;
-  cleanup?: SqliteWorkerAdmissionCleanup;
+  readonly cleanup?: SqliteWorkerAdmissionCleanup;
   activeOperations: number;
   operationGeneration: number;
   idleTimer?: IdleTimer;

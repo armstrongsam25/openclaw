@@ -81,14 +81,18 @@ it.each(["grant", "revoke", "close", "self-fence", "request-revoke", "late-revok
         expect(write).not.toThrow();
         expect(mutate).toHaveBeenCalledOnce();
         expect(admission.failure).toBeUndefined();
-        expect(admission.failureSource).toBeUndefined();
       } else {
         expect(write).toThrow("SQLite transaction admission was refused");
         expect(mutate).not.toHaveBeenCalled();
-        expect(admission.failure).toMatchObject({
+        const failure = admission.failure;
+        expect(failure?.transportError).toMatchObject({
           message: outcome === "close" ? "SQLite worker admission is closed" : revoked.message,
         });
-        expect(admission.failureSource).toBe(outcome === "revoke" ? "domain" : "authority");
+        expect(failure?.original).toBe(failure?.transportError);
+        expect(failure?.source).toBe(outcome === "revoke" ? "domain" : "authority");
+        if (outcome !== "close") {
+          expect(failure?.original).toBe(revoked);
+        }
       }
     } finally {
       admission.finish();
@@ -126,10 +130,12 @@ it("rechecks database ownership after a worker request crosses the message port"
     admission.service();
     expect(Atomics.load(pending, 0)).toBe(2);
     expect(admit).not.toHaveBeenCalled();
-    expect(admission.failure).toMatchObject({
+    const failure = admission.failure;
+    expect(failure?.transportError).toMatchObject({
       message: expect.stringContaining("undergoing offline maintenance"),
     });
-    expect(admission.failureSource).toBe("authority");
+    expect(failure?.original).toBe(failure?.transportError);
+    expect(failure?.source).toBe("authority");
   } finally {
     admission.finish();
     maintenance?.release();
@@ -172,7 +178,9 @@ it("retains exact-target schema authority until settlement and rechecks access f
       { stage: "transaction", facts: "ordinary write" },
       expect.any(Function),
     );
-    expect(admission.failure).toBe(revoked);
+    expect(admission.failure?.original).toBe(revoked);
+    expect(admission.failure?.transportError).toBe(revoked);
+    expect(admission.failure?.source).toBe("authority");
     expect(release).not.toHaveBeenCalled();
     admission.finish();
     expect(release).toHaveBeenCalledOnce();
@@ -197,9 +205,12 @@ it("refuses schema maintenance for a different database before acquiring authori
         requestSqliteWorkerSchemaMaintenance(path.resolve("another-schema.sqlite")),
       ),
     ).toThrow("SQLite transaction admission was refused");
-    expect(admission.failure).toMatchObject({
+    const failure = admission.failure;
+    expect(failure?.transportError).toMatchObject({
       message: "SQLite schema maintenance target differs from its admitted database",
     });
+    expect(failure?.original).toBe(failure?.transportError);
+    expect(failure?.source).toBe("authority");
     expect(acquireSchema).not.toHaveBeenCalled();
     expect(admit).not.toHaveBeenCalled();
   } finally {
@@ -382,9 +393,12 @@ it.each(["malformed", "after settlement"] as const)(
       );
       admission.finish();
       expect(admission.committed).toEqual({ facts: { value: 1 } });
-      expect(admission.failure).toMatchObject({
+      const failure = admission.failure;
+      expect(failure?.transportError).toMatchObject({
         message: "SQLite worker commit receipt is invalid",
       });
+      expect(failure?.original).toBe(failure?.transportError);
+      expect(failure?.source).toBe("protocol");
       expect(() => admission.waitForSettlement(performance.now())).toThrow(
         "SQLite worker commit receipt is invalid",
       );

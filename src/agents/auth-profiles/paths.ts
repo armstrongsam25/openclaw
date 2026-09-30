@@ -7,7 +7,7 @@ import { toErrorObject } from "@openclaw/normalization-core/error-coercion";
 import type { Result } from "@openclaw/normalization-core/result";
 import { cloneEnvWithPlatformSemantics } from "../../config/config-env-vars.js";
 import { resolveStateDir } from "../../config/paths.js";
-import { withSqliteWorkerCleanupFailure } from "../../infra/sqlite-worker-broker-reply.js";
+import { withSqliteWorkerCleanupFailure } from "../../infra/sqlite-worker-broker-settlement.js";
 import { captureOpenClawStateWorkerContext } from "../../state/openclaw-state-worker-context.js";
 import { resolveUserPath } from "../../utils.js";
 import {
@@ -122,7 +122,7 @@ export async function withPreparedAuthStorePathForDisplay<T>(
       ? error
       : withSqliteWorkerCleanupFailure(
           toErrorObject(result.error, "Auth display path read failed"),
-          error,
+          { error },
         );
   }
   if (!result.ok) {

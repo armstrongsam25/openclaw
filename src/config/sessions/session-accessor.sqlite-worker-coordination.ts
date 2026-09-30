@@ -94,14 +94,16 @@ export async function withSqliteWorkerLifecycleCoordination<T>(
     try {
       await settleFailure();
     } catch (exitError) {
+      const failure = admission?.failure;
       throw new AggregateError(
-        [admission?.failure ?? error, exitError],
+        [failure !== undefined ? failure.original : error, exitError],
         "SQLite mutation and Worker exit failed",
         { cause: exitError },
       );
     }
     // A refused grant retires the worker; confirmed exit must not hide the owner's refusal.
-    throw admission?.failure ?? error;
+    const failure = admission?.failure;
+    throw failure !== undefined ? failure.original : error;
   } finally {
     admission?.finish();
     releaseService?.();

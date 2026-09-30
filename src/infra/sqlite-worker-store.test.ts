@@ -20,10 +20,9 @@ import { drainGlobalSingletonLifecycleState } from "../shared/global-singleton.j
 import { resolveIncognitoOpenClawAgentSqlitePath } from "../state/openclaw-agent-db.paths.js";
 import { createNodeEvalArgs } from "../test-utils/node-process.js";
 import { initializeSqliteRuntimeCapabilities } from "./bun-sqlite-library.js";
-import {
-  SQLITE_WORKER_MAX_RESULT_BYTES,
-  type SqliteWorkerReply,
-} from "./sqlite-worker-contract.js";
+import { createRetainedOperation } from "./retained-operation.js";
+import * as brokerReply from "./sqlite-worker-broker-reply.js";
+import { SQLITE_WORKER_MAX_RESULT_BYTES } from "./sqlite-worker-contract.js";
 import {
   useSqliteWorkerStoreFixture,
   appendWorkerRow as append,
@@ -38,6 +37,8 @@ import {
 import type { FixtureOpenInput, FixtureOperations } from "./sqlite-worker-store.test-support.js";
 import { SQLITE_WORKER_TRANSFER_FRAME_BYTES } from "./sqlite-worker-transfer.js";
 import { getTrackedWorkerCpuSources } from "./worker-cpu.js";
+import * as workerCpu from "./worker-cpu.js";
+import { NativeWorker } from "./worker-native-handle.js";
 
 vi.mock("node:os", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:os")>()),
@@ -67,15 +68,96 @@ async function expectRejectedOpen(
 const { explicitSqliteCloseReleasesNativeResources } = await initializeSqliteRuntimeCapabilities();
 const poolIt = explicitSqliteCloseReleasesNativeResources ? it : it.skip;
 
+function observeCpuRegistrations() {
+  type CpuSource = ReturnType<typeof getTrackedWorkerCpuSources>["workers"][number];
+  type CpuWorker = Parameters<typeof workerCpu.trackNativeWorkerForCpu>[0];
+  const carriers: Array<{ worker: CpuWorker; threadId: number; source: CpuSource }> = [];
+  const supervisors: Array<{ worker: Worker; source: CpuSource }> = [];
+  const addedSource = (before: CpuSource[]) => {
+    const added = getTrackedWorkerCpuSources().workers.filter((source) => !before.includes(source));
+    expect(added).toHaveLength(1);
+    const source = added[0];
+    if (!source) {
+      throw new Error("Native worker CPU registration was not recorded");
+    }
+    return source;
+  };
+  const create = workerCpu.createCpuTrackedWorker;
+  const track = workerCpu.trackNativeWorkerForCpu;
+  const created = vi.spyOn(workerCpu, "createCpuTrackedWorker").mockImplementation((...args) => {
+    const before = getTrackedWorkerCpuSources().workers;
+    const worker = create(...args);
+    supervisors.push({ worker, source: addedSource(before) });
+    return worker;
+  });
+  const tracked = vi.spyOn(workerCpu, "trackNativeWorkerForCpu").mockImplementation((...args) => {
+    const before = getTrackedWorkerCpuSources().workers;
+    track(...args);
+    const worker = args[0];
+    carriers.push({ worker, threadId: worker.threadId, source: addedSource(before) });
+  });
+  return {
+    carriers,
+    supervisors,
+    restore() {
+      tracked.mockRestore();
+      created.mockRestore();
+    },
+  };
+}
+
+function holdNativeStop(stop: () => ReturnType<NativeWorker["stop"]>, release: Promise<void>) {
+  let native: ReturnType<NativeWorker["stop"]> | undefined;
+  const held = createRetainedOperation<void>(() => {
+    native?.service();
+    observe();
+  });
+  function observe() {
+    const outcome = native?.read();
+    if (outcome?.status === "fulfilled") {
+      held.resolve(undefined);
+    } else if (outcome?.status === "rejected") {
+      held.reject(outcome.error);
+    }
+  }
+  void release.then(() => {
+    try {
+      native = stop();
+      void native.result.then(observe, observe);
+      observe();
+    } catch (error) {
+      held.reject(error);
+    }
+  });
+  return held.operation;
+}
+
 describe("SQLite worker store", () => {
   it("registers storage-worker CPU sources until native close", async () => {
     const initial = getTrackedWorkerCpuSources();
-    const store = await open(databasePath());
-    const opened = getTrackedWorkerCpuSources();
-    expect(opened.workers).toHaveLength(initial.workers.length + 1);
-    await store.close();
-    expect(getTrackedWorkerCpuSources().workers).toEqual(initial.workers);
-    expect(getTrackedWorkerCpuSources().revision).toBeGreaterThan(opened.revision);
+    const observed = observeCpuRegistrations();
+    try {
+      const store = await open(databasePath());
+      const opened = getTrackedWorkerCpuSources();
+      expect(observed.carriers).toHaveLength(1);
+      const carrier = observed.carriers[0];
+      if (!carrier) {
+        throw new Error("Storage carrier was not registered");
+      }
+      expect(carrier.threadId).toBeGreaterThan(0);
+      const remaining = [...initial.workers, ...observed.supervisors.map(({ source }) => source)];
+      expect(opened.workers).toEqual([...remaining, carrier.source]);
+      await store.close();
+      expect(carrier.worker.threadId).toBe(-1);
+      expect(getTrackedWorkerCpuSources().workers).toEqual(remaining);
+      // The default source owns its supervisor until source cleanup, not one store close.
+      for (const { worker } of observed.supervisors) {
+        expect(worker.threadId).toBeGreaterThan(0);
+      }
+      expect(getTrackedWorkerCpuSources().revision).toBeGreaterThan(opened.revision);
+    } finally {
+      observed.restore();
+    }
   });
   it.each(["read", "client close", "global close", "abort", "failed frame"] as const)(
     "preserves a complete large result through %s",
@@ -91,43 +173,42 @@ describe("SQLite worker store", () => {
       const frames: Array<{ bytes: number; backingBytes: number }> = [];
       const aborted = new AbortController();
       let closing: Promise<void> | undefined;
-      // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply preserves the emitting worker below.
-      const originalEmit = Worker.prototype.emit;
-      const messages = vi.spyOn(Worker.prototype, "emit").mockImplementation(function (
-        this: Worker,
-        event: string | symbol,
-        reply: SqliteWorkerReply,
-      ) {
-        if (event === "message" && reply.ok) {
-          if (!reply.transfer) {
-            inlineReplies.push(Object.keys(reply).toSorted());
-          } else if (reply.transfer === "frame") {
-            frames.push({
-              bytes: reply.value.byteLength,
-              backingBytes: reply.value.buffer.byteLength,
-            });
-            if (frames.length === 1) {
-              if (action === "client close") {
-                closing = store.close();
-              }
-              if (action === "global close") {
-                closing = drainGlobalSingletonLifecycleState("restart");
-              }
-              if (action === "abort") {
-                aborted.abort(new Error("Canceled after read dispatch"));
-              }
-              if (action === "failed frame") {
-                return Reflect.apply(originalEmit, this, [
-                  event,
-                  { ...reply, value: new Uint8Array([0]) },
-                ]);
+      const receive = brokerReply.receiveSqliteWorkerReply;
+      const messages = vi
+        .spyOn(brokerReply, "receiveSqliteWorkerReply")
+        .mockImplementation((slot, reply, owner, executionWorker) => {
+          if (reply.ok) {
+            if (!reply.transfer) {
+              inlineReplies.push(Object.keys(reply).toSorted());
+            } else if (reply.transfer === "frame") {
+              frames.push({
+                bytes: reply.value.byteLength,
+                backingBytes: reply.value.buffer.byteLength,
+              });
+              if (frames.length === 1) {
+                if (action === "client close") {
+                  closing = store.close();
+                }
+                if (action === "global close") {
+                  closing = drainGlobalSingletonLifecycleState("restart");
+                }
+                if (action === "abort") {
+                  aborted.abort(new Error("Canceled after read dispatch"));
+                }
+                if (action === "failed frame") {
+                  return receive(
+                    slot,
+                    { ...reply, value: new Uint8Array([0]) },
+                    owner,
+                    executionWorker,
+                  );
+                }
               }
             }
           }
-        }
-        return Reflect.apply(originalEmit, this, [event, reply]);
-      });
-      const requests = vi.spyOn(Worker.prototype, "postMessage");
+          return receive(slot, reply, owner, executionWorker);
+        });
+      const requests = vi.spyOn(NativeWorker.prototype, "postMessage");
       try {
         for (const value of values) {
           await append(store, value);
@@ -157,9 +238,11 @@ describe("SQLite worker store", () => {
           }
           await closing;
         }
-        expect(requests.mock.calls.filter(([request]) => request.type === "execute")).toHaveLength(
-          1,
-        );
+        expect(
+          requests.mock.calls.filter(
+            ([request]) => isRecord(request) && request.type === "execute",
+          ),
+        ).toHaveLength(1);
         expect(
           frames.every((frame) => frame.bytes <= SQLITE_WORKER_TRANSFER_FRAME_BYTES + 1024),
         ).toBe(true);
@@ -212,23 +295,33 @@ describe("SQLite worker store", () => {
     const unrelated = await open(unrelatedPath);
     const retiring = createDeferredCore();
     const releaseRetirement = createDeferredCore();
-    const requests = vi.spyOn(Worker.prototype, "postMessage");
+    const requests = vi.spyOn(NativeWorker.prototype, "postMessage");
     let exited = false;
     let recoverySettled = false;
     let recoveredBeforeExit = false;
     let recovering: Promise<SqliteWorkerStore<FixtureOperations>> | undefined;
-    // oxlint-disable-next-line typescript/unbound-method -- call preserves the retiring worker.
-    const terminate = Worker.prototype.terminate;
-    const retirement = vi
-      .spyOn(Worker.prototype, "terminate")
-      .mockImplementationOnce(async function (this: Worker) {
+    // oxlint-disable-next-line typescript/unbound-method -- call preserves the original retained owner.
+    const stop = NativeWorker.prototype.stop;
+    let heldStop: ReturnType<NativeWorker["stop"]> | undefined;
+    const retirement = vi.spyOn(NativeWorker.prototype, "stop").mockImplementation(function (
+      this: NativeWorker,
+    ) {
+      const opening = requests.mock.calls.findIndex(
+        ([request]) =>
+          isRecord(request) && request.type === "open" && request.databasePath === file,
+      );
+      if (opening < 0 || requests.mock.contexts[opening] !== this) {
+        return stop.call(this);
+      }
+      if (!heldStop) {
         this.once("exit", () => {
           exited = true;
         });
+        heldStop = holdNativeStop(() => stop.call(this), releaseRetirement.promise);
         retiring.resolve();
-        await releaseRetirement.promise;
-        return terminate.call(this);
-      });
+      }
+      return heldStop;
+    });
     let settled = false;
     const opening = Promise.allSettled([
       openSharedStateSqliteWorkerStore(
@@ -256,7 +349,8 @@ describe("SQLite worker store", () => {
       expect(recoverySettled).toBe(false);
       expect(
         requests.mock.calls.filter(
-          ([request]) => request.type === "open" && request.databasePath === file,
+          ([request]) =>
+            isRecord(request) && request.type === "open" && request.databasePath === file,
         ),
       ).toHaveLength(1);
       releaseRetirement.resolve();
@@ -275,7 +369,8 @@ describe("SQLite worker store", () => {
       expect(recoveredBeforeExit).toBe(false);
       expect(
         requests.mock.calls.filter(
-          ([request]) => request.type === "open" && request.databasePath === file,
+          ([request]) =>
+            isRecord(request) && request.type === "open" && request.databasePath === file,
         ),
       ).toHaveLength(2);
       expect(await read(recovered)).toEqual(["committed before failed open"]);
@@ -319,11 +414,11 @@ describe("SQLite worker store", () => {
       const result = await runNodeScript(
         createNodeEvalArgs(
           `import assert from "node:assert/strict";
-           import { Worker } from "node:worker_threads";
+           import { NativeWorker } from ${JSON.stringify(new URL("./worker-native-handle.ts", import.meta.url).href)};
            import { openSqliteWorkerStore } from ${JSON.stringify(new URL("./sqlite-worker-store.ts", import.meta.url).href)};
-           const originalPostMessage = Worker.prototype.postMessage;
+           const originalPostMessage = NativeWorker.prototype.postMessage;
            let requests = 0;
-           Worker.prototype.postMessage = function (...args) {
+           NativeWorker.prototype.postMessage = function (...args) {
              requests += 1;
              return Reflect.apply(originalPostMessage, this, args);
            };
@@ -337,7 +432,7 @@ describe("SQLite worker store", () => {
              assert.match(result.reason.message, /file-backed|memory|incognito/i);
              assert.equal(requests, 0);
            } finally {
-             Worker.prototype.postMessage = originalPostMessage;
+             NativeWorker.prototype.postMessage = originalPostMessage;
            }`,
           { imports: [import.meta.resolve("tsx/esm")] },
         ),
@@ -512,41 +607,58 @@ describe("SQLite worker store", () => {
   });
 
   poolIt("keeps a new database usable while another worker retires at capacity", async () => {
-    const first = await open(databasePath());
-    // Fill the documented four-worker budget before retiring an otherwise idle worker.
-    for (let index = 0; index < 3; index += 1) {
-      await open(databasePath());
-    }
-    const retiring = createDeferredCore();
-    const release = createDeferredCore();
-    const spy = vi.spyOn(Worker.prototype, "terminate").mockImplementationOnce(async function (
-      this: Worker,
-    ) {
-      retiring.resolve();
-      await release.promise;
-      spy.mockRestore();
-      return this.terminate();
-    });
-    const closed = first.close();
-    let replacement: SqliteWorkerStore<FixtureOperations> | undefined;
+    const file = databasePath();
+    const requests = vi.spyOn(NativeWorker.prototype, "postMessage");
     try {
-      await retiring.promise;
-      replacement = await open(databasePath());
-      release.resolve();
-      await closed;
-      await expect(append(replacement, "survives retirement")).resolves.toMatchObject({
-        writes: 1,
-      });
-      expect(await read(replacement)).toEqual(["survives retirement"]);
-    } finally {
-      release.resolve();
-      spy.mockRestore();
-      await closed;
-      if (replacement) {
-        // The regressed broker loses this actor too; join its cleanup without masking the assertion.
-        await Promise.allSettled([replacement.close()]);
-        stores.delete(replacement);
+      const first = await open(file);
+      // Fill the documented four-worker budget before retiring an otherwise idle worker.
+      for (let index = 0; index < 3; index += 1) {
+        await open(databasePath());
       }
+      const retiring = createDeferredCore();
+      const release = createDeferredCore();
+      // oxlint-disable-next-line typescript/unbound-method -- call preserves the original retained owner.
+      const stop = NativeWorker.prototype.stop;
+      let heldStop: ReturnType<NativeWorker["stop"]> | undefined;
+      const spy = vi.spyOn(NativeWorker.prototype, "stop").mockImplementation(function (
+        this: NativeWorker,
+      ) {
+        const opening = requests.mock.calls.findIndex(
+          ([request]) =>
+            isRecord(request) && request.type === "open" && request.databasePath === file,
+        );
+        if (opening < 0 || requests.mock.contexts[opening] !== this) {
+          return stop.call(this);
+        }
+        if (!heldStop) {
+          heldStop = holdNativeStop(() => stop.call(this), release.promise);
+          retiring.resolve();
+        }
+        return heldStop;
+      });
+      const closed = first.close();
+      let replacement: SqliteWorkerStore<FixtureOperations> | undefined;
+      try {
+        await retiring.promise;
+        replacement = await open(databasePath());
+        release.resolve();
+        await closed;
+        await expect(append(replacement, "survives retirement")).resolves.toMatchObject({
+          writes: 1,
+        });
+        expect(await read(replacement)).toEqual(["survives retirement"]);
+      } finally {
+        release.resolve();
+        spy.mockRestore();
+        await closed;
+        if (replacement) {
+          // The regressed broker loses this actor too; join its cleanup without masking the assertion.
+          await Promise.allSettled([replacement.close()]);
+          stores.delete(replacement);
+        }
+      }
+    } finally {
+      requests.mockRestore();
     }
   });
 
@@ -591,16 +703,14 @@ describe("SQLite worker store", () => {
 
     const replyReady = createDeferredCore();
     let publish: (() => void) | undefined;
-    const messages = vi.spyOn(Worker.prototype, "emit").mockImplementationOnce(function (
-      this: Worker,
-      event: string | symbol,
-      reply: SqliteWorkerReply,
-    ) {
-      messages.mockRestore();
-      publish = () => this.emit(event, reply);
-      replyReady.resolve();
-      return true;
-    });
+    const receive = brokerReply.receiveSqliteWorkerReply;
+    const messages = vi
+      .spyOn(brokerReply, "receiveSqliteWorkerReply")
+      .mockImplementationOnce((slot, reply, owner, executionWorker) => {
+        messages.mockRestore();
+        publish = () => receive(slot, reply, owner, executionWorker);
+        replyReady.resolve();
+      });
     const write = append(retiring, "write before close");
     const closed = retiring.close();
     try {
@@ -638,18 +748,16 @@ describe("SQLite worker store", () => {
     }
     const repliesReady = createDeferredCore();
     const replies: (() => void)[] = [];
-    const messages = vi.spyOn(Worker.prototype, "emit").mockImplementation(function (
-      this: Worker,
-      event: string | symbol,
-      reply: SqliteWorkerReply,
-    ) {
-      replies.push(() => this.emit(event, reply));
-      if (replies.length === active.length) {
-        messages.mockRestore();
-        repliesReady.resolve();
-      }
-      return true;
-    });
+    const receive = brokerReply.receiveSqliteWorkerReply;
+    const messages = vi
+      .spyOn(brokerReply, "receiveSqliteWorkerReply")
+      .mockImplementation((slot, reply, owner, executionWorker) => {
+        replies.push(() => receive(slot, reply, owner, executionWorker));
+        if (replies.length === active.length) {
+          messages.mockRestore();
+          repliesReady.resolve();
+        }
+      });
     function releaseReplies(): void {
       messages.mockRestore();
       for (const publish of replies.splice(0)) {
@@ -758,27 +866,27 @@ describe("SQLite worker store", () => {
       await append(store, "preserved");
       await store.execute({ type: "delayClose", input: { markerPath, reject } });
       stores.delete(store);
-      // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply preserves the emitting worker below.
-      const originalEmit = Worker.prototype.emit;
       const events = vi.spyOn(Worker.prototype, "emit");
+      const carrierEvents = vi.spyOn(NativeWorker.prototype, "emit");
+      const receive = brokerReply.receiveSqliteWorkerReply;
+      const replies = vi.spyOn(brokerReply, "receiveSqliteWorkerReply");
       const replyHeld = createDeferredCore();
       let resumeReply: (() => void) | undefined;
       if (peer) {
-        events.mockImplementation(function (this: Worker, ...args: Parameters<Worker["emit"]>) {
-          const [event, reply] = args;
-          if (event === "message" && isRecord(reply) && reply.ok === true && !resumeReply) {
+        replies.mockImplementation((slot, reply, replyOwner, executionWorker) => {
+          if (reply.ok && !resumeReply) {
             let delivered = false;
             resumeReply = () => {
               if (delivered) {
                 return;
               }
               delivered = true;
-              Reflect.apply(originalEmit, this, args);
+              receive(slot, reply, replyOwner, executionWorker);
             };
             replyHeld.resolve();
-            return true;
+            return;
           }
-          return Reflect.apply(originalEmit, this, args);
+          receive(slot, reply, replyOwner, executionWorker);
         });
       }
       const cleanup = Promise.allSettled([
@@ -802,6 +910,7 @@ describe("SQLite worker store", () => {
         }
         const [result] = await cleanup;
         expect(events.mock.calls.filter(([event]) => event === "error")).toEqual([]);
+        expect(carrierEvents.mock.calls.filter(([event]) => event === "error")).toEqual([]);
         expect(await readFile(markerPath, "utf8")).toBe("native database closed");
         if (reject) {
           expect(result).toEqual({
@@ -817,6 +926,8 @@ describe("SQLite worker store", () => {
         }
       } finally {
         events.mockRestore();
+        carrierEvents.mockRestore();
+        replies.mockRestore();
         resumeReply?.();
         await cleanup;
         await clientCleanup;
@@ -836,6 +947,7 @@ describe("SQLite worker store", () => {
       const store = await open(file);
       await append(store, "before");
       const events = vi.spyOn(Worker.prototype, "emit");
+      const carrierEvents = vi.spyOn(NativeWorker.prototype, "emit");
       try {
         const operation = store.execute({
           type: "illegalAsync",
@@ -848,9 +960,11 @@ describe("SQLite worker store", () => {
           { status: "rejected", reason: expect.objectContaining({ code: "unavailable" }) },
         ]);
         expect(events.mock.calls.filter(([event]) => event === "error")).toEqual([]);
+        expect(carrierEvents.mock.calls.filter(([event]) => event === "error")).toEqual([]);
         await writeFile(gatePath, "released after operation settled");
       } finally {
         events.mockRestore();
+        carrierEvents.mockRestore();
         await writeFile(gatePath, "released for cleanup");
         await Promise.allSettled([store.close()]);
         stores.delete(store);
@@ -864,16 +978,19 @@ describe("SQLite worker store", () => {
   it("retires a worker after a committed result cannot be deserialized without dispatching queued writes", async () => {
     const file = databasePath();
     const store = await open(file);
-    const messages = vi.spyOn(Worker.prototype, "emit").mockImplementationOnce(function (
-      this: Worker,
-      event: string | symbol,
-      reply: SqliteWorkerReply,
-    ) {
-      messages.mockRestore();
-      expect(event).toBe("message");
-      expect(reply.ok).toBe(true);
-      return this.emit(event, { ...reply, value: new Uint8Array([0]) });
-    });
+    const receive = brokerReply.receiveSqliteWorkerReply;
+    const messages = vi
+      .spyOn(brokerReply, "receiveSqliteWorkerReply")
+      .mockImplementationOnce((slot, reply, owner, executionWorker) => {
+        messages.mockRestore();
+        expect(executionWorker).toBe(slot.current?.executionWorker);
+        expect(reply.id).toBe(slot.current?.request.id);
+        expect(reply.ok).toBe(true);
+        if (!reply.ok) {
+          throw new Error("Expected committed result before reply corruption");
+        }
+        return receive(slot, { ...reply, value: new Uint8Array([0]) }, owner, executionWorker);
+      });
     try {
       const committed = append(store, "committed once");
       const queued = append(store, "never dispatched");

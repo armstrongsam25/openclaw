@@ -150,7 +150,7 @@ describe("managed media worker custody", () => {
         const receive = brokerReply.receiveSqliteWorkerReply;
         const replySpy = vi
           .spyOn(brokerReply, "receiveSqliteWorkerReply")
-          .mockImplementation((slot, reply, owner) => {
+          .mockImplementation((slot, reply, owner, executionWorker) => {
             if (
               slot.current?.request.type === "execute" &&
               reply.ok &&
@@ -164,11 +164,16 @@ describe("managed media worker custody", () => {
                   active = false;
                 }
                 if (failure === "lost ordinary reply" || failure === "lost native receipt") {
-                  return receive(slot, { ...reply, value: new Uint8Array([0]) }, owner);
+                  return receive(
+                    slot,
+                    { ...reply, value: new Uint8Array([0]) },
+                    owner,
+                    executionWorker,
+                  );
                 }
               }
             }
-            return receive(slot, reply, owner);
+            return receive(slot, reply, owner, executionWorker);
           });
         try {
           const outcome = await withChannelReadAuthority(

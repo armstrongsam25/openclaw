@@ -6,7 +6,7 @@ import {
   type UsageCostWorkerInput,
   type UsageCostWorkerResult,
 } from "../../infra/session-cost-usage-worker.types.js";
-import { withSqliteWorkerCleanupFailure } from "../../infra/sqlite-worker-broker-reply.js";
+import { withSqliteWorkerCleanupFailure } from "../../infra/sqlite-worker-broker-settlement.js";
 import { assertExistingDatabaseIdentity } from "../../infra/sqlite-worker-identity.js";
 import { WorkerTaskError } from "../../infra/worker-task-pool.js";
 import type { WorkerTaskOptions, WorkerTaskResponse } from "../../infra/worker-task-pool.types.js";
@@ -542,10 +542,9 @@ export async function withSessionCostUsageWorkerDatabases<T>(
           try {
             await rotateDatabaseWorkers(lane);
           } catch (cleanupError) {
-            throw withSqliteWorkerCleanupFailure(
-              toErrorObject(error, "Usage cost worker failed"),
-              cleanupError,
-            );
+            throw withSqliteWorkerCleanupFailure(toErrorObject(error, "Usage cost worker failed"), {
+              error: cleanupError,
+            });
           }
         }
         throw error;
@@ -588,10 +587,9 @@ export async function withSessionCostUsageWorkerDatabases<T>(
   } catch (cleanupError) {
     throw result.ok
       ? cleanupError
-      : withSqliteWorkerCleanupFailure(
-          toErrorObject(result.error, "Usage cost operation failed"),
-          cleanupError,
-        );
+      : withSqliteWorkerCleanupFailure(toErrorObject(result.error, "Usage cost operation failed"), {
+          error: cleanupError,
+        });
   } finally {
     phase = "closed";
     for (const resource of resources) {

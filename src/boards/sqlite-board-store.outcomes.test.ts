@@ -2,12 +2,13 @@ import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import type { BoardWidgetPutResult } from "../../packages/gateway-protocol/src/index.js";
 import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 import { replaceSessionEntrySync } from "../config/sessions/session-accessor.entry.js";
+import { createRetainedOperation } from "../infra/retained-operation.js";
+import { receiveSqliteWorkerReply } from "../infra/sqlite-worker-broker-reply.js";
 import {
-  receiveSqliteWorkerReply,
   settleFailedSqliteWorkerJobs,
   settleSqliteWorkerJob,
   withSqliteWorkerCleanupFailure,
-} from "../infra/sqlite-worker-broker-reply.js";
+} from "../infra/sqlite-worker-broker-settlement.js";
 import type { Job } from "../infra/sqlite-worker-broker.types.js";
 import {
   isSqliteWorkerError,
@@ -98,7 +99,56 @@ function fixture() {
 async function receiveExecutedFailure(retire: boolean) {
   const rejected = createDeferredCore<unknown>();
   const events: string[] = [];
+  // This fixture uses execution identity only; native operations are forbidden.
+  const executionWorker: Job["executionWorker"] = {
+    get threadId(): number {
+      throw new Error("Board outcome fixture must not inspect a native thread");
+    },
+    get started(): boolean {
+      throw new Error("Board outcome fixture must not inspect native startup");
+    },
+    get executionStopped(): boolean {
+      throw new Error("Board outcome fixture must not inspect native termination");
+    },
+    postMessage() {
+      throw new Error("A failure reply must not request another result frame");
+    },
+    ref() {
+      throw new Error("Board outcome fixture must not reference a native worker");
+    },
+    unref() {
+      throw new Error("Board outcome fixture must not unreference a native worker");
+    },
+    terminate() {
+      throw new Error("Board outcome fixture must not terminate a native worker");
+    },
+    on() {
+      throw new Error("Board outcome fixture must not subscribe to native events");
+    },
+    once() {
+      throw new Error("Board outcome fixture must not subscribe to native exit");
+    },
+    removeListener() {
+      throw new Error("Board outcome fixture must not remove a native listener");
+    },
+    removeAllListeners() {
+      throw new Error("Board outcome fixture must not remove native listeners");
+    },
+    cpuUsage() {
+      throw new Error("Board outcome fixture must not inspect native CPU usage");
+    },
+    getHeapStatistics() {
+      throw new Error("Board outcome fixture must not inspect native heap statistics");
+    },
+    service() {
+      throw new Error("Board outcome fixture must not service a native worker");
+    },
+    stop() {
+      throw new Error("Board outcome fixture must not stop a native worker");
+    },
+  };
   const job: Job = {
+    executionWorker,
     request: { type: "execute", id: 1, actor: 1, input: new Uint8Array() },
     bytes: 0,
     nativeDispatched: true,
@@ -112,11 +162,6 @@ async function receiveExecutedFailure(retire: boolean) {
   };
   const slot: Parameters<typeof receiveSqliteWorkerReply>[0] = {
     current: job,
-    worker: {
-      postMessage() {
-        throw new Error("A failure reply must not request another result frame");
-      },
-    },
   };
   receiveSqliteWorkerReply(
     slot,
@@ -147,15 +192,32 @@ async function receiveExecutedFailure(retire: boolean) {
           error: reason,
           currentError,
           openOutcome,
-          retire: async () => {
+          retire: () => {
+            const retirement = createRetainedOperation<void>(() => {
+              throw new Error("Board outcome fixture must not service native retirement");
+            });
             events.push("retired");
+            retirement.resolve(undefined);
+            return retirement.operation;
           },
           finish: settleSqliteWorkerJob,
         });
       },
-      finish: settleSqliteWorkerJob,
+      finish(current, error, value, settlement, closeReceipt) {
+        if (closeReceipt !== undefined) {
+          throw new Error("Board execution failure must not publish a close receipt");
+        }
+        settleSqliteWorkerJob(current, error, value, settlement);
+      },
       dispatch: () => events.push("dispatch"),
+      returnProvisional() {
+        throw new Error("Ordinary Board failure must not publish a provisional result");
+      },
+      resumeReply() {
+        throw new Error("Ordinary Board failure must not resume a deferred reply");
+      },
     },
+    executionWorker,
   );
   return { error: await rejected.promise, events };
 }
@@ -223,8 +285,8 @@ it("invalidates the original Board target for a nested cleanup aggregate without
   const { store, params, change, changes } = fixture();
   const original = new SqliteWorkerError("Native Board outcome is unknown", "outcome-unknown");
   const failure = withSqliteWorkerCleanupFailure(
-    withSqliteWorkerCleanupFailure(original, new Error("Native cleanup failed")),
-    new Error("Later cleanup failed"),
+    withSqliteWorkerCleanupFailure(original, { error: new Error("Native cleanup failed") }),
+    { error: new Error("Later cleanup failed") },
   );
   boundary.execute.mockImplementation(async () => {
     params.sessionKey = "agent:main:replacement";

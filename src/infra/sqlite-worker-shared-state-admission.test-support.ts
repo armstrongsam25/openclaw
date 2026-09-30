@@ -1,5 +1,5 @@
 import { deserialize } from "node:v8";
-import { Worker } from "node:worker_threads";
+import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { expect, it, vi } from "vitest";
 import type { NativeHookRelayBridgeRecord } from "../agents/harness/native-hook-relay-bridge-record.js";
 import { createOpenClawDatabaseMaintenanceScope } from "../state/openclaw-state-db-async-lifecycle.js";
@@ -26,6 +26,28 @@ import {
   openSharedStateSqliteWorkerStore,
   runSqliteWorkerStoreOperation,
 } from "./sqlite-worker-store.js";
+import { NativeWorker } from "./worker-native-handle.js";
+
+export function observeSharedStateWorkerCommands() {
+  const commands: { worker: NativeWorker; command: Record<string, unknown> }[] = [];
+  // oxlint-disable-next-line typescript/unbound-method -- apply preserves the original retained owner.
+  const postMessage = NativeWorker.prototype.postMessage;
+  const messages = vi.spyOn(NativeWorker.prototype, "postMessage").mockImplementation(function (
+    this: NativeWorker,
+    ...args: Parameters<NativeWorker["postMessage"]>
+  ) {
+    const [request] = args;
+    if (isRecord(request) && request.type === "execute" && request.input instanceof Uint8Array) {
+      const command: unknown = deserialize(request.input);
+      if (isRecord(command)) {
+        // Completed Jobs release their request bytes, so retain the observed command at dispatch.
+        commands.push({ worker: this, command });
+      }
+    }
+    return postMessage.apply(this, args);
+  });
+  return { messages, commands };
+}
 
 export function registerSharedStateWorkerAdmissionTests(
   createContext: () => OpenClawStateWorkerContext,
@@ -262,7 +284,9 @@ export function registerSharedStateWorkerAdmissionTests(
               }
               // Only the head reached the worker; the queued mutation never acquired authority.
               expect(
-                posts.mock.calls.filter(([request]) => request.type === "execute"),
+                posts.mock.calls.filter(
+                  ([request]) => isRecord(request) && request.type === "execute",
+                ),
               ).toHaveLength(1);
             } finally {
               foreign.release();
@@ -357,7 +381,7 @@ export function registerSharedStateWorkerAdmissionTests(
     const foreign = holdForeignWriter(captured);
     const canceled = new AbortController();
     const stopped = new Error("synthetic queued write canceled");
-    const posts = vi.spyOn(Worker.prototype, "postMessage");
+    const { messages: posts, commands } = observeSharedStateWorkerCommands();
     let factories = 0;
     try {
       await runOpenClawStateWorkerOperation(
@@ -428,15 +452,14 @@ export function registerSharedStateWorkerAdmissionTests(
           },
         },
       );
-      const dispatched = posts.mock.calls.flatMap(([request]) => {
-        if (request.type !== "execute") {
+      const dispatched = commands.flatMap(({ command }) => {
+        if (command.type !== "nativeHookRelay.write") {
           return [];
         }
-        const command = deserialize(request.input) as {
-          type: string;
-          input: { record: NativeHookRelayBridgeRecord };
-        };
-        return command.type === "nativeHookRelay.write" ? [command.input.record.pid] : [];
+        if (!isRecord(command.input) || !isRecord(command.input.record)) {
+          throw new Error("Expected the observed native hook relay record");
+        }
+        return [command.input.record.pid];
       });
       expect(dispatched).toEqual([0, ...Array.from({ length: 255 }, (_, index) => index + 2)]);
       expect(factories).toBe(256);
@@ -453,12 +476,14 @@ export function registerSharedStateWorkerAdmissionTests(
   });
 }
 
-async function prepareSharedStateWorker(captured: OpenClawStateWorkerContext): Promise<Worker> {
-  const posts = vi.spyOn(Worker.prototype, "postMessage");
+async function prepareSharedStateWorker(
+  captured: OpenClawStateWorkerContext,
+): Promise<NativeWorker> {
+  const { messages: posts, commands } = observeSharedStateWorkerCommands();
   try {
     await executeOpenClawStateWorker(captured, { type: "deviceAuth.prepare", input: undefined });
-    const worker = posts.mock.contexts[0];
-    if (!(worker instanceof Worker)) {
+    const worker = commands.find(({ command }) => command.type === "deviceAuth.prepare")?.worker;
+    if (!(worker instanceof NativeWorker)) {
       throw new Error("Expected the prepared shared-state worker");
     }
     return worker;

@@ -221,7 +221,34 @@ describe("shared-state worker error transport", () => {
   it("keeps outcome-unknown explicit instead of hydrating a maintenance payload", () => {
     const payload = encodeOpenClawStateWorkerError(new SqliteSchemaVersionError("newer schema"));
     assert(payload);
+    const forbidden = (): never => {
+      throw new Error("Unexpected native dispatch");
+    };
+    const executionWorker: Job["executionWorker"] = {
+      get threadId(): never {
+        return forbidden();
+      },
+      get started(): never {
+        return forbidden();
+      },
+      get executionStopped(): never {
+        return forbidden();
+      },
+      postMessage: forbidden,
+      ref: forbidden,
+      unref: forbidden,
+      terminate: forbidden,
+      on: forbidden,
+      once: forbidden,
+      removeListener: forbidden,
+      removeAllListeners: forbidden,
+      cpuUsage: forbidden,
+      getHeapStatistics: forbidden,
+      service: forbidden,
+      stop: forbidden,
+    };
     const job: Job = {
+      executionWorker,
       request: {
         type: "execute",
         id: 1,
@@ -238,14 +265,7 @@ describe("shared-state worker error transport", () => {
     };
     let failure: unknown;
     receiveSqliteWorkerReply(
-      {
-        current: job,
-        worker: {
-          postMessage: () => {
-            throw new Error("Unexpected native dispatch");
-          },
-        },
-      },
+      { current: job },
       {
         id: 1,
         ok: false,
@@ -264,7 +284,10 @@ describe("shared-state worker error transport", () => {
           failure = error;
         },
         dispatch() {},
+        returnProvisional: forbidden,
+        resumeReply: forbidden,
       },
+      executionWorker,
     );
     assert(failure instanceof Error, "Expected the broker to settle the original failure");
     expect(hydrateOpenClawStateWorkerError(failure)).toBe(failure);

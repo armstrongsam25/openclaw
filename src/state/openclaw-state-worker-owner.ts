@@ -549,6 +549,8 @@ function createSharedStateWorkerOwner() {
         const databaseAdmission = captureOpenClawStateDatabaseReadAdmission(admission.databasePath);
         assertAdmission();
         const openingGuard = captureOpenClawStateWorkerOpeningGuard(context, assertCurrent);
+        // Cleanup may be retained before the opening Promise has been constructed.
+        let retainedCleanup: Entry["cleanup"];
         const open = async () => {
           try {
             return await openSharedStateSqliteWorkerStore<StoreOperations>(
@@ -563,7 +565,7 @@ function createSharedStateWorkerOwner() {
                 maintenanceScope: context.maintenanceScope,
                 preparation,
                 retainCleanup: (cleanup) => {
-                  admitted.cleanup = cleanup;
+                  retainedCleanup = cleanup;
                 },
               },
             );
@@ -572,6 +574,9 @@ function createSharedStateWorkerOwner() {
           }
         };
         const admitted: Entry = {
+          get cleanup() {
+            return retainedCleanup;
+          },
           source,
           context,
           databaseAdmission,

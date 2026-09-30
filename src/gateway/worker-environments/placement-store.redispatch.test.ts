@@ -48,20 +48,27 @@ describe("failed worker placement redispatch", () => {
   it("continues a committed dispatch after its real worker reply is corrupted", async () => {
     const receive = brokerReply.receiveSqliteWorkerReply;
     let corrupted = 0;
-    vi.spyOn(brokerReply, "receiveSqliteWorkerReply").mockImplementation((slot, reply, owner) => {
-      if (slot.current?.request.type === "execute" && reply.ok && !reply.transfer && !reply.input) {
-        const value: unknown = deserialize(reply.value);
+    vi.spyOn(brokerReply, "receiveSqliteWorkerReply").mockImplementation(
+      (slot, reply, owner, executionWorker) => {
         if (
-          isRecord(value) &&
-          value.sessionId === SESSION.sessionId &&
-          value.state === "requested"
+          slot.current?.request.type === "execute" &&
+          reply.ok &&
+          !reply.transfer &&
+          !reply.input
         ) {
-          corrupted += 1;
-          return receive(slot, { ...reply, value: new Uint8Array([0]) }, owner);
+          const value: unknown = deserialize(reply.value);
+          if (
+            isRecord(value) &&
+            value.sessionId === SESSION.sessionId &&
+            value.state === "requested"
+          ) {
+            corrupted += 1;
+            return receive(slot, { ...reply, value: new Uint8Array([0]) }, owner, executionWorker);
+          }
         }
-      }
-      return receive(slot, reply, owner);
-    });
+        return receive(slot, reply, owner, executionWorker);
+      },
+    );
     const placement = await store.startDispatch(SESSION);
     expect(corrupted).toBe(1);
     expect(placement).toEqual(store.get(SESSION.sessionId));

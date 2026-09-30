@@ -4,6 +4,8 @@ import { withExistingOpenClawStateSchema } from "../state/openclaw-state-db-sche
 
 /** Resolved host facts for the canonical shared-state owner, never authority. */
 export type SqliteWorkerStateContext = {
+  /** Current shared-state target supplied by its live owner, never a memory locator. */
+  stateDatabasePath?: string;
   environment: NodeJS.ProcessEnv & {
     OPENCLAW_STATE_DIR: string;
     OPENCLAW_SUPERVISOR_MODE?: "external";
@@ -19,6 +21,7 @@ export function captureSqliteWorkerStateContext(
   context: SqliteWorkerStateContext,
 ): SqliteWorkerStateContext {
   return {
+    stateDatabasePath: context.stateDatabasePath,
     environment: { ...context.environment },
     ...(context.initializationEnvironment
       ? { initializationEnvironment: { ...context.initializationEnvironment } }
@@ -48,7 +51,10 @@ export function sqliteWorkerRequestBytes(
           total + Buffer.byteLength(key, "utf8") + Buffer.byteLength(value ?? "", "utf8"),
         bytes,
       ),
-    input.byteLength + (preparation?.byteLength ?? 0) + agentPathBytes,
+    input.byteLength +
+      (preparation?.byteLength ?? 0) +
+      agentPathBytes +
+      Buffer.byteLength(context?.stateDatabasePath ?? "", "utf8"),
   );
 }
 

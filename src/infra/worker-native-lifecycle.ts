@@ -51,7 +51,7 @@ export type RetainedNativeWorkerSource = {
     connect?: () => NativeWorkerResourceConnection,
   ): NativeWorkerResourceDescriptor;
   /** The domain joins admitted work and its resources before shared native cleanup. */
-  retain(owner: object, closeOwner: () => Promise<void>): void;
+  retain(owner: object, settleOwner: Parameters<RuntimeWorkerGeneration["retain"]>[1]): void;
 };
 
 type NativeSource = RetainedNativeWorkerSource & {
@@ -288,17 +288,7 @@ export function captureRetainedNativeWorkerSource(options?: {
       : resolveRuntimeProcessEntrypointUrl("spawnBroker"),
     closing: false,
     close() {
-      return (closingOwners ??= Promise.resolve().then(async () => {
-        const closing = [...owners.values()].map((owner) => owner.close());
-        joinSource();
-        const results = await Promise.allSettled(closing.length ? closing : [joined.promise]);
-        const errors = results.flatMap((result) =>
-          result.status === "rejected" ? [result.reason] : [],
-        );
-        if (errors.length) {
-          throw new AggregateError(errors, "Native worker execution owner cleanup failed");
-        }
-      }));
+      return finalizeOwners();
     },
     create(filename, workerOptions, resource) {
       if (captured.runtimeGeneration && !owners.size) {
@@ -337,14 +327,17 @@ export function captureRetainedNativeWorkerSource(options?: {
       resources.add(resource);
       return resource;
     },
-    retain(owner, closeOwner) {
-      if (closingOwners || source.closing) {
+    retain(owner, settleOwner) {
+      if (ownerSettlement || closingOwners || source.closing) {
         throw new Error("Native worker source is closing");
       }
+      let settlement: ReturnType<typeof settleOwner> | undefined;
+      const settle = () => (settlement ??= Promise.resolve().then(settleOwner));
       const close = async () => {
         let outcome: { status: "fulfilled" } | { status: "rejected"; error: unknown };
         try {
-          await closeOwner();
+          const nativeFinal = await settle();
+          await nativeFinal?.();
           outcome = { status: "fulfilled" };
         } catch (error) {
           outcome = { status: "rejected", error };
@@ -368,16 +361,47 @@ export function captureRetainedNativeWorkerSource(options?: {
           throw outcome.error;
         }
       };
-      const record = { close, settled: false };
-      captured.runtimeGeneration?.retain(owner, close);
+      const record = { settle, close, settled: false };
+      captured.runtimeGeneration?.retain(source, async () => {
+        const results = await settleOwners();
+        if (results.some((result) => result.status === "rejected")) {
+          // Failed settlement still joins all recorded cleanup before it can escape.
+          await finalizeOwners();
+        }
+        return finalizeOwners;
+      });
       owners.set(owner, record);
     },
   };
-  const owners = new Map<object, { close: () => Promise<void>; settled: boolean }>();
+  const owners = new Map<
+    object,
+    {
+      settle: Parameters<RuntimeWorkerGeneration["retain"]>[1];
+      close: () => Promise<void>;
+      settled: boolean;
+    }
+  >();
   const joined = createDeferredCore();
   void joined.promise.catch(() => undefined);
   let joining = false;
   let closingOwners: Promise<void> | undefined;
+  let ownerSettlement: Promise<PromiseSettledResult<void | (() => Promise<void>)>[]> | undefined;
+  const settleOwners = () =>
+    (ownerSettlement ??= Promise.allSettled([...owners.values()].map((owner) => owner.settle())));
+  const finalizeOwners = () =>
+    (closingOwners ??= Promise.resolve().then(async () => {
+      // Await raw domain settlement, never a generation callback that waits on this finalizer.
+      await settleOwners();
+      const closing = [...owners.values()].map((owner) => owner.close());
+      joinSource();
+      const results = await Promise.allSettled(closing.length ? closing : [joined.promise]);
+      const errors = results.flatMap((result) =>
+        result.status === "rejected" ? [result.reason] : [],
+      );
+      if (errors.length) {
+        throw new AggregateError(errors, "Native worker execution owner cleanup failed");
+      }
+    }));
   const joinSource = () => {
     if (joining || [...owners.values()].some((owner) => !owner.settled)) {
       return;

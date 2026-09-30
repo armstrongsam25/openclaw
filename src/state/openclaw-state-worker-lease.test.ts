@@ -1,5 +1,6 @@
 import { deserialize } from "node:v8";
 import { afterEach, expect, it, vi } from "vitest";
+import { createRetainedOperation } from "../infra/retained-operation.js";
 import type { Actor } from "../infra/sqlite-worker-broker.types.js";
 import { createSqliteWorkerClient } from "../infra/sqlite-worker-client.js";
 import type { SqliteWorkerStore } from "../infra/sqlite-worker-contract.js";
@@ -108,8 +109,19 @@ afterEach(() => {
 
 function createLeaseFixture() {
   const actor: Actor = {
-    nativeStopped: Promise.resolve(),
-    markNativeStopped() {},
+    kind: "file",
+    get executionWorker(): never {
+      throw new Error("Lease client must not access the native execution handle");
+    },
+    get nativeStopped(): never {
+      throw new Error("Lease client must not observe native termination");
+    },
+    get nativeStoppedRecorded(): never {
+      throw new Error("Lease client must not inspect native termination");
+    },
+    markNativeStopped() {
+      throw new Error("Lease client must not record native termination");
+    },
     id: 1,
     key: "synthetic-state",
     databasePath: "/synthetic/state.sqlite",
@@ -134,8 +146,20 @@ function createLeaseFixture() {
       assertCurrent?.();
       physical.events.push(deserialize(payload));
     },
-    release: async () => {
+    service() {
+      if (physical.client?.client.actor !== actor) {
+        throw new Error("Synthetic lease lost its original client during retained service");
+      }
+    },
+    releaseRetained: () => {
+      const released = createRetainedOperation<void>(() => {
+        if (released.operation.read().status === "pending") {
+          throw new Error("Logical lease release must settle synchronously");
+        }
+      });
       physical.events.push("physical-close");
+      released.resolve(undefined);
+      return released.operation;
     },
   });
   const maintenance = createOpenClawDatabaseMaintenanceScope();

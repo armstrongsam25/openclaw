@@ -1,5 +1,6 @@
 import { expect, it, vi } from "vitest";
 import { createDeferred } from "../../test/helpers/promise.js";
+import { createRetainedOperation } from "./retained-operation.js";
 import type { Actor } from "./sqlite-worker-broker.types.js";
 import {
   createSqliteWorkerClient,
@@ -11,8 +12,19 @@ const closedError = { code: "closed", message: "SQLite worker store is closed" }
 
 function createActor(): Actor {
   return {
-    nativeStopped: Promise.resolve(),
-    markNativeStopped() {},
+    kind: "file",
+    get executionWorker(): never {
+      throw new Error("Client scope must not access the native execution handle");
+    },
+    get nativeStopped(): never {
+      throw new Error("Client scope must not observe native termination");
+    },
+    get nativeStoppedRecorded(): never {
+      throw new Error("Client scope must not inspect native termination");
+    },
+    markNativeStopped() {
+      throw new Error("Client scope must not record native termination");
+    },
     id: 1,
     key: "client-fixture",
     databasePath: "/fixture/state.sqlite",
@@ -39,7 +51,18 @@ it.each(["missing", "sealed"] as const)(
       isDraining: () => boundary === "sealed",
       isAvailable: () => true,
       dispatch,
-      release: async () => {},
+      releaseRetained: () => {
+        const released = createRetainedOperation<void>(() => {
+          if (released.operation.read().status === "pending") {
+            throw new Error("Logical client release must settle synchronously");
+          }
+        });
+        released.resolve(undefined);
+        return released.operation;
+      },
+      service() {
+        throw new Error("Refused operation must not service native work");
+      },
     });
     const operation = vi.fn(() => store.execute({ type: "write", input: "must not enter" }));
     const track = vi.fn(() => () => {});
@@ -73,8 +96,15 @@ it("lets an admitted scope finish through close before releasing its owner", asy
   const committed = createDeferred<string>();
   const events: string[] = [];
   let draining = false;
-  const release = vi.fn(async () => {
+  const release = vi.fn(() => {
+    const released = createRetainedOperation<void>(() => {
+      if (released.operation.read().status === "pending") {
+        throw new Error("Logical client release must settle synchronously");
+      }
+    });
     events.push("released");
+    released.resolve(undefined);
+    return released.operation;
   });
   const { client, store } = createSqliteWorkerClient<Operations>({
     actor: createActor(),
@@ -85,7 +115,10 @@ it("lets an admitted scope finish through close before releasing its owner", asy
       dispatched.resolve();
       return committed.promise;
     },
-    release,
+    releaseRetained: release,
+    service() {
+      throw new Error("Awaited scope must not service native work");
+    },
   });
   const accepted = runSqliteWorkerClientOperation<Operations, string>(
     client,
@@ -124,3 +157,97 @@ it("lets an admitted scope finish through close before releasing its owner", asy
     await Promise.allSettled([accepted, closing]);
   }
 });
+
+it.each(["fulfilled", "rejected"] as const)(
+  "public close reentered during dispatch waits for the %s command promise",
+  async (outcome) => {
+    const commandResult = createDeferred<string>();
+    const closeEntered = createDeferred<{ closing: Promise<void> }>();
+    const failure = new Error("Command promise rejected after native settlement");
+    let closeSettled = false;
+    let closing: Promise<void> | undefined;
+    const releaseLogicalClient = () => {
+      const released = createRetainedOperation<void>(() => {
+        throw new Error("Logical client release must not service native work");
+      });
+      released.resolve(undefined);
+      return released.operation;
+    };
+    const release = vi.fn(releaseLogicalClient);
+    const { client, store } = createSqliteWorkerClient<Operations>({
+      actor: createActor(),
+      isDraining: () => false,
+      isAvailable: () => true,
+      dispatch: (_payload, _signal, _scope, _assertCurrent, _createAdmission, settled) => {
+        if (!settled) {
+          throw new Error("Client dispatch must retain its original settlement callback");
+        }
+        settled(
+          outcome === "fulfilled"
+            ? { status: "fulfilled", value: "committed" }
+            : { status: "rejected", error: failure },
+          { settlement: { kind: "completed" } },
+        );
+        return commandResult.promise;
+      },
+      releaseRetained: release,
+      service() {
+        throw new Error("Public close must not service native work in this logical fixture");
+      },
+    });
+    const command = client.execute(
+      { type: "write", input: "accepted before reentrant close" },
+      {},
+      undefined,
+      () => {
+        closing = store.close();
+        void closing.then(
+          () => {
+            closeSettled = true;
+          },
+          () => {
+            closeSettled = true;
+          },
+        );
+        closeEntered.resolve({ closing });
+      },
+    );
+    void command.catch(() => undefined);
+    try {
+      const reentered = await closeEntered.promise;
+      expect(release).toHaveBeenCalledOnce();
+
+      // A later independent public close can finish while this accepted command remains pending.
+      const independentRelease = vi.fn(releaseLogicalClient);
+      const independent = createSqliteWorkerClient<Operations>({
+        actor: createActor(),
+        isDraining: () => false,
+        isAvailable: () => true,
+        dispatch() {
+          throw new Error("Independent client must not dispatch work");
+        },
+        releaseRetained: independentRelease,
+        service() {
+          throw new Error("Independent logical close must not service native work");
+        },
+      });
+      await independent.store.close();
+      expect(independentRelease).toHaveBeenCalledOnce();
+      expect(closeSettled).toBe(false);
+
+      if (outcome === "fulfilled") {
+        commandResult.resolve("committed");
+        await expect(command).resolves.toBe("committed");
+      } else {
+        commandResult.reject(failure);
+        await expect(command).rejects.toBe(failure);
+      }
+      await expect(reentered.closing).resolves.toBeUndefined();
+      expect(closeSettled).toBe(true);
+      expect(release).toHaveBeenCalledOnce();
+    } finally {
+      commandResult.resolve("committed");
+      await Promise.allSettled([command, closing]);
+    }
+  },
+);

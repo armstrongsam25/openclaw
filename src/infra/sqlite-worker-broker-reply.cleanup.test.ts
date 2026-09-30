@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import type { MessagePort } from "node:worker_threads";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createDeferredCore } from "../shared/deferred.js";
+import { createRetainedOperation } from "./retained-operation.js";
 import {
   settleFailedSqliteWorkerJobs,
   settleSqliteWorkerJob,
   withSqliteWorkerCleanupFailure,
-} from "./sqlite-worker-broker-reply.js";
+} from "./sqlite-worker-broker-settlement.js";
 import type { Job } from "./sqlite-worker-broker.types.js";
 import { SqliteWorkerError } from "./sqlite-worker-contract.js";
 import type { SqliteWorkerOperationAdmission } from "./sqlite-worker-operation-admission.js";
@@ -62,18 +62,47 @@ function jobWithCleanup(admissionFailures: readonly unknown[] = []) {
       return effects.forbidden();
     },
     failure: undefined,
-    failureSource: undefined,
     cleanupFailures: admissionFailures,
     committed: undefined,
     settlement: undefined,
     waitForSettlement: effects.forbidden,
     service: effects.forbidden,
     bindDatabaseAuthority: effects.forbidden,
+    bindRequestAuthority: effects.forbidden,
+    bindRefusalProvenance: effects.forbidden,
+    retainCommitAuthority: effects.forbidden,
+    assertCommitAuthority: effects.forbidden,
+    bindCommitAuthority: effects.forbidden,
+    bindReadObserver: effects.forbidden,
+    deliverReadFacts: effects.forbidden,
     finish() {
       effects.events.push("finish-admission");
     },
   };
   const job: Job = {
+    executionWorker: {
+      get threadId(): number {
+        return effects.forbidden();
+      },
+      get started(): boolean {
+        return effects.forbidden();
+      },
+      get executionStopped(): boolean {
+        return effects.forbidden();
+      },
+      postMessage: effects.forbidden,
+      ref: effects.forbidden,
+      unref: effects.forbidden,
+      terminate: effects.forbidden,
+      on: effects.forbidden,
+      once: effects.forbidden,
+      removeListener: effects.forbidden,
+      removeAllListeners: effects.forbidden,
+      cpuUsage: effects.forbidden,
+      getHeapStatistics: effects.forbidden,
+      service: effects.forbidden,
+      stop: effects.forbidden,
+    },
     request: { type: "execute", id: 1, actor: 1, input: new Uint8Array() },
     bytes: 0,
     nativeDispatched: true,
@@ -154,14 +183,14 @@ describe("SQLite worker settlement cleanup lineage", { concurrent: false }, () =
       const cleanup = new Error("Native operation cleanup failed");
       const retirementFailure = new Error("Worker retirement could not be confirmed");
       const queuedError = new SqliteWorkerError("Worker retired before queued work", "unavailable");
-      const retirement = createDeferredCore();
+      const retirement = createRetainedOperation<void>(effects.forbidden);
       settleFailedSqliteWorkerJobs({
         current: current.job,
         queued: [queued.job],
         error: cleanup,
         queuedError,
         completed: outcome === "value" ? { value } : { error: original },
-        retire: () => retirement.promise,
+        retire: () => retirement.operation,
         finish: settleSqliteWorkerJob,
       });
       expect(current.resolve).not.toHaveBeenCalled();
@@ -169,11 +198,11 @@ describe("SQLite worker settlement cleanup lineage", { concurrent: false }, () =
       expect(current.settleNative).not.toHaveBeenCalled();
       expect(queued.reject).not.toHaveBeenCalled();
       if (retired) {
-        retirement.resolve();
+        retirement.resolve(undefined);
       } else {
         retirement.reject(retirementFailure);
       }
-      await retirement.promise.catch(() => {});
+      await retirement.operation.result.catch(() => {});
       expect(current.settleNative).toHaveBeenCalledExactlyOnceWith(
         retired ? { kind: "completed" } : { kind: "unknown", error: retirementFailure },
       );
@@ -285,7 +314,7 @@ describe("SQLite worker settlement cleanup lineage", { concurrent: false }, () =
       const failure =
         kind === "canonical error"
           ? original
-          : withSqliteWorkerCleanupFailure(original, earlierCleanup);
+          : withSqliteWorkerCleanupFailure(original, { error: earlierCleanup });
       const getter = vi.fn((): never => {
         throw new Error("Helper aggregate.code must not be queried");
       });
@@ -293,7 +322,7 @@ describe("SQLite worker settlement cleanup lineage", { concurrent: false }, () =
         Object.defineProperty(failure, "code", { get: getter, enumerable: true });
       }
       vi.resetModules();
-      const duplicate = await import("./sqlite-worker-broker-reply.js");
+      const duplicate = await import("./sqlite-worker-broker-settlement.js");
       const { SqliteWorkerError: DuplicateWorkerError } =
         await import("./sqlite-worker-contract.js");
       expect(duplicate.settleSqliteWorkerJob).not.toBe(settleSqliteWorkerJob);

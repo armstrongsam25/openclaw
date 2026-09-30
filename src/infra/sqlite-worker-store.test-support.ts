@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, linkSync, renameSync, writeFileSync } from "node:fs";
-import { parentPort, threadId } from "node:worker_threads";
+import { MessagePort, parentPort, threadId, workerData } from "node:worker_threads";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import type { Generated } from "kysely";
 import { clearNodeSqliteKyselyCacheForDatabase } from "./kysely-sync-cache-state.js";
@@ -17,13 +17,19 @@ import { requestSqliteWorkerOperationAdmission } from "./sqlite-worker-operation
 let pendingCloses = 0;
 type ReplyOwnership = { kind: string; before: number; after: number };
 const replyOwnership: ReplyOwnership[] = [];
-if (parentPort) {
-  const postMessage = parentPort.postMessage.bind(parentPort);
-  parentPort.postMessage = (...args) => {
-    if (pendingCloses > 0) {
+const replyPort =
+  workerData === null || workerData === undefined
+    ? parentPort
+    : isRecord(workerData) && workerData.replyPort instanceof MessagePort
+      ? workerData.replyPort
+      : undefined;
+if (replyPort) {
+  const postMessage = replyPort.postMessage.bind(replyPort);
+  replyPort.postMessage = (...args) => {
+    const reply: unknown = args[0];
+    if (pendingCloses > 0 && isRecord(reply) && reply.ok === true) {
       throw new Error("Fixture close acknowledgement preceded native cleanup");
     }
-    const reply: unknown = args[0];
     const bytes =
       isRecord(reply) && reply.ok === true && reply.value instanceof Uint8Array
         ? reply.value
@@ -43,6 +49,7 @@ if (parentPort) {
 export type FixtureOpenInput =
   | { type: "link"; existingPath: string }
   | { type: "observe"; markerPath: string }
+  | { type: "prepareOpen"; markerPath: string; gatePath: string }
   | { type: "prepare"; markerPath: string; gatePath: string; reject?: boolean; guarded?: boolean }
   | { type: "replace"; backupPath: string; replacementPath?: string };
 
@@ -86,7 +93,14 @@ function waitForFile(file: string): Promise<void> {
 export function createSqliteWorkerBackend(
   input: FixtureOpenInput | undefined,
   context: { databasePath: string },
-): SqliteWorkerPreparedBackend<FixtureOperations> {
+):
+  | SqliteWorkerPreparedBackend<FixtureOperations>
+  | Promise<SqliteWorkerPreparedBackend<FixtureOperations>> {
+  if (input?.type === "prepareOpen") {
+    const waiting = waitForFile(input.gatePath);
+    writeFileSync(input.markerPath, "preparing open");
+    return waiting.then(() => createFixtureBackend(input, context.databasePath, false));
+  }
   return createFixtureBackend(input, context.databasePath, false);
 }
 

@@ -1,3 +1,4 @@
+import { isNativeError } from "node:util/types";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import {
   isSqliteNativeOpenFailure,
@@ -313,7 +314,7 @@ export function hydrateOpenClawStateWorkerError(
   value: unknown,
   options: ErrorGraphOptions = {},
 ): unknown {
-  if (!(value instanceof Error)) {
+  if (!isNativeError(value)) {
     return value;
   }
   type Node = {
@@ -372,7 +373,7 @@ export function hydrateOpenClawStateWorkerError(
       continue;
     }
     const edge = (child: unknown) => {
-      if (child instanceof Error) {
+      if (isNativeError(child)) {
         add(child).parents.add(node);
       }
     };
@@ -407,7 +408,7 @@ export function hydrateOpenClawStateWorkerError(
     }
   }
   const replace = (child: unknown): unknown => {
-    const node = child instanceof Error ? nodes.get(child) : undefined;
+    const node = isNativeError(child) ? nodes.get(child) : undefined;
     return node?.changed ? node.replacement : child;
   };
   for (const node of affected) {
@@ -435,4 +436,11 @@ export function hydrateOpenClawStateWorkerError(
     Object.defineProperties(node.replacement, descriptors);
   }
   return root.replacement;
+}
+
+/** Decode the closed read-fact error graph without changing the operation's original outcome. */
+export function decodeSqliteWorkerReadFactsError(payload: unknown): Error {
+  const error = new Error("SQLite prepared read facts are unavailable");
+  retainOpenClawStateWorkerErrorPayload(error, payload);
+  return hydrateOpenClawStateWorkerError(error, { includeOrdinary: true });
 }

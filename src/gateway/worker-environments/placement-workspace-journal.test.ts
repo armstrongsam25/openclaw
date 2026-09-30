@@ -229,16 +229,23 @@ describe("worker placement workspace journal", () => {
     await store.abortWorkspaceReconciliation(owner);
     const receive = brokerReply.receiveSqliteWorkerReply;
     let corrupted = 0;
-    vi.spyOn(brokerReply, "receiveSqliteWorkerReply").mockImplementation((slot, reply, broker) => {
-      if (slot.current?.request.type === "execute" && reply.ok && !reply.transfer && !reply.input) {
-        const value: unknown = deserialize(reply.value);
-        if (isRecord(value) && value.type === "placementJournals.begin") {
-          corrupted += 1;
-          return receive(slot, { ...reply, value: new Uint8Array([0]) }, broker);
+    vi.spyOn(brokerReply, "receiveSqliteWorkerReply").mockImplementation(
+      (slot, reply, broker, executionWorker) => {
+        if (
+          slot.current?.request.type === "execute" &&
+          reply.ok &&
+          !reply.transfer &&
+          !reply.input
+        ) {
+          const value: unknown = deserialize(reply.value);
+          if (isRecord(value) && value.type === "placementJournals.begin") {
+            corrupted += 1;
+            return receive(slot, { ...reply, value: new Uint8Array([0]) }, broker, executionWorker);
+          }
         }
-      }
-      return receive(slot, reply, broker);
-    });
+        return receive(slot, reply, broker, executionWorker);
+      },
+    );
     await store.beginWorkspaceReconciliation(owner, journal);
     expect(corrupted).toBe(1);
     expect(await store.loadWorkspaceReconciliation(owner)).toEqual(journal);

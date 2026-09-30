@@ -1,22 +1,37 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { DatabaseSync } from "node:sqlite";
-import { serialize } from "node:v8";
+import { isNativeError, isPromise } from "node:util/types";
 import {
   MessageChannel,
   receiveMessageOnPort,
   type MessagePort,
   type Transferable,
 } from "node:worker_threads";
-import { toErrorObject } from "@openclaw/normalization-core/error-coercion";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { resolveGlobalSingleton } from "../shared/global-singleton.js";
 import { resolveIdentityPathViaExistingAncestorSync } from "./boundary-path.js";
-import { deferSqlitePostCommitPublication } from "./sqlite-post-commit.js";
-import { SQLITE_WORKER_MAX_MESSAGE_BYTES, SqliteWorkerError } from "./sqlite-worker-contract.js";
-import type {
-  RetainedWorkerTransactionAdmission,
-  SqliteWorkerNativeSettlement,
-  SqliteWorkerNativeSettlementOwner,
+import { getSqliteTransactionScope, stageSqliteTransactionState } from "./sqlite-post-commit.js";
+import {
+  captureSqliteWorkerReadFacts,
+  captureSqliteWorkerSourceFacts,
+  parseSqliteWorkerReadFacts,
+  SqliteWorkerError,
+} from "./sqlite-worker-contract.js";
+import {
+  deferSqliteWorkerOwnedCommitReceipt,
+  deferSqliteWorkerOwnedReadFacts,
+  deferSqliteWorkerOwnedRollbackReceipt,
+  parseSqliteWorkerCommitAuthorities,
+  parseSqliteWorkerNativeSettlement,
+  parseSqliteWorkerSourceReceipt,
+  type RetainedWorkerTransactionAdmission,
+  type SqliteWorkerReadFacts,
+  type SqliteWorkerReadFactsCollection,
+  type SqliteWorkerCommitAuthorityReference,
+  type SqliteWorkerSourceReceipt,
+  type SqliteWorkerNativeSettlement,
+  type SqliteWorkerNativeSettlementOwner,
+  type SqliteWorkerRefusalReceipt,
 } from "./sqlite-worker-operation-settlement.js";
 
 const REQUESTED = 0;
@@ -41,14 +56,32 @@ export type SqliteWorkerAdmissionRequest = {
 };
 
 type AdmissionFailureSource = "authority" | "domain" | "protocol";
+type SqliteWorkerAdmissionFailure = SqliteWorkerRefusalReceipt &
+  Readonly<{ source: AdmissionFailureSource }>;
+
+export type SqliteWorkerReadObserver = {
+  pending(request: SqliteWorkerAdmissionRequest): void;
+  committed(facts: SqliteWorkerReadFacts): void;
+};
 
 export type SqliteWorkerOperationAdmission = SqliteWorkerNativeSettlementOwner & {
   readonly port: MessagePort;
-  readonly failure: unknown;
-  readonly failureSource: AdmissionFailureSource | undefined;
+  readonly failure: SqliteWorkerAdmissionFailure | undefined;
   readonly cleanupFailures: readonly unknown[];
+  bindReadObserver(observer: SqliteWorkerReadObserver): void;
+  deliverReadFacts(value: unknown): void;
+  bindRefusalProvenance(provenance: {
+    pending(): SqliteWorkerRefusalReceipt | undefined;
+    selected(occurrence: SqliteWorkerAdmissionFailure | undefined): void;
+  }): void;
+  retainCommitAuthority(assertCurrent: () => void): void;
+  assertCommitAuthority(authorityId: number): void;
+  bindCommitAuthority(
+    assertCurrent: (references: readonly SqliteWorkerCommitAuthorityReference[]) => void,
+  ): void;
   service(): void;
   finish(): void;
+  bindRequestAuthority(assertCurrent: () => void): void;
   bindDatabaseAuthority(authority: {
     databasePath: string;
     assertRequest?(): void;
@@ -66,6 +99,7 @@ export type SqliteWorkerAdmissionFactory = (operation: RetainedWorkerTransaction
 export function createSqliteWorkerOperationAdmission(
   admit: (request: SqliteWorkerAdmissionRequest, grant: () => boolean) => void,
   attachment?: unknown,
+  onCommitted?: (facts: unknown) => void,
 ): SqliteWorkerOperationAdmission {
   const { port1, port2 } = new MessageChannel();
   if (attachment !== undefined) {
@@ -82,66 +116,111 @@ export function createSqliteWorkerOperationAdmission(
   const decisions = new Set<Int32Array>();
   const cleanupFailures: unknown[] = [];
   let closed = false;
-  let failure: { error: unknown; source: AdmissionFailureSource } | undefined;
+  let failure: SqliteWorkerAdmissionFailure | undefined;
+  let refusalProvenance:
+    | Parameters<SqliteWorkerOperationAdmission["bindRefusalProvenance"]>[0]
+    | undefined;
+  let commitObserverFailure: { error: unknown } | undefined;
+  let admissionSealed = false;
+  let readObserver: SqliteWorkerReadObserver | undefined;
   let committed: SqliteWorkerNativeSettlementOwner["committed"];
   let settlement: SqliteWorkerNativeSettlement | undefined;
+  let requestAuthority: (() => void) | undefined;
+  let commitAuthority:
+    | ((references: readonly SqliteWorkerCommitAuthorityReference[]) => void)
+    | undefined;
+  const retainedAuthorities = new Map<number, () => unknown>();
+  let retaining: { id: number; acknowledgment: Int32Array; decision: Int32Array } | undefined;
   let databaseAuthority:
-    | {
-        databasePath: string;
-        assertRequest?(): void;
-        assertAccess(): void;
-        acquireSchema(): { assertCurrent(): void; release(): void };
+    | (Parameters<SqliteWorkerOperationAdmission["bindDatabaseAuthority"]>[0] & {
         lease?: { assertCurrent(): void; release(): void };
-      }
+      })
     | undefined;
   const waiting = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
   const recordFailure = (error: unknown, source: AdmissionFailureSource) => {
     // A handled domain refusal cannot hide a later loss of physical custody or protocol failure.
     if (!failure || (failure.source === "domain" && source !== "domain")) {
-      failure = { error, source };
+      const pending = refusalProvenance?.pending();
+      const original =
+        pending && Object.is(pending.transportError, error) ? pending.original : error;
+      failure = Object.freeze({
+        original,
+        transportError: isNativeError(error)
+          ? error
+          : new Error("SQLite worker admission refused", { cause: error }),
+        source,
+      });
     }
+    // Ignored domain failures still consume their pending boxing without replacing selection.
+    refusalProvenance?.selected(failure);
   };
   const refuse = (decision: Int32Array, error: unknown, source: AdmissionFailureSource) => {
     if (Atomics.compareExchange(decision, 0, REQUESTED, REFUSED) === REQUESTED) {
       recordFailure(error, source);
       Atomics.notify(decision, 0);
-    } else if (Atomics.load(decision, 0) === GRANTED) {
-      cleanupFailures.push(error);
+    } else {
+      if (Atomics.load(decision, 0) === GRANTED) {
+        cleanupFailures.push(error);
+      }
+      refusalProvenance?.selected(failure);
+    }
+  };
+  const assertRetainedAuthority = (authorityId: number) => {
+    const predicate = retainedAuthorities.get(authorityId);
+    if (closed || !predicate) {
+      throw new SqliteWorkerError("SQLite retained commit authority is unavailable", "closed");
+    }
+    // A provisional return can release its local transport; the original owner predicate survives.
+    const result = predicate();
+    if (isPromise(result)) {
+      void result.catch(() => undefined);
+      throw new Error("SQLite commit authority must remain synchronous");
+    }
+  };
+  const notify = (observer: () => unknown) => {
+    try {
+      const result: unknown = inOwnerContext(observer);
+      if (isPromise(result)) {
+        void result.catch(() => undefined);
+        throw new Error("SQLite committed-fact observers must remain synchronous");
+      }
+    } catch (error) {
+      if (commitObserverFailure) {
+        cleanupFailures.push(error);
+      } else {
+        commitObserverFailure = { error };
+      }
+      recordFailure(error, "authority");
     }
   };
   const receive = (message: unknown) => {
+    admissionSealed = true;
     if (isRecord(message) && message.kind === "native-commit") {
-      if (!isRecord(message.committed) || settlement) {
+      const receipt = parseSqliteWorkerSourceReceipt(message.committed);
+      if (!receipt || settlement) {
         recordFailure(
           new SqliteWorkerError("SQLite worker commit receipt is invalid", "outcome-unknown"),
           "protocol",
         );
         return;
       }
-      committed = { facts: message.committed.facts };
+      committed = receipt;
+      if (onCommitted) {
+        notify(() => onCommitted(receipt.facts));
+      }
       return;
     }
     if (isRecord(message) && message.kind === "native-settlement") {
-      const value = message.settlement;
-      if (
-        !isRecord(value) ||
-        (value.kind !== "completed" && value.kind !== "unknown") ||
-        (value.committed !== undefined && !isRecord(value.committed)) ||
-        settlement
-      ) {
+      const received = parseSqliteWorkerNativeSettlement(message.settlement, committed);
+      if (!received || settlement) {
         recordFailure(
           new SqliteWorkerError("SQLite worker native settlement is invalid", "outcome-unknown"),
           "protocol",
         );
         return;
       }
-      if (isRecord(value.committed)) {
-        committed = { facts: value.committed.facts };
-      }
-      settlement = {
-        kind: value.kind,
-        ...(committed ? { committed } : {}),
-      };
+      committed = received.committed;
+      settlement = received;
       return;
     }
     if (
@@ -160,23 +239,56 @@ export function createSqliteWorkerOperationAdmission(
       return;
     }
     const decision = new Int32Array(message.decision);
+    const parsed = parseSqliteWorkerCommitAuthorities(message);
+    if (!parsed.ok) {
+      refuse(decision, new SqliteWorkerError(parsed.error, "closed"), "protocol");
+      return;
+    }
+    const { references, guard } = parsed.value;
+    const assertCommitAuthorities = () => {
+      if (!references.length) {
+        return;
+      }
+      if (message.stage !== "commit" || !commitAuthority) {
+        throw new SqliteWorkerError("SQLite commit authority owner is unavailable", "closed");
+      }
+      commitAuthority(references);
+    };
     decisions.add(decision);
-    if (closed) {
+    if (closed || commitObserverFailure) {
       refuse(
         decision,
-        new SqliteWorkerError("SQLite worker admission is closed", "closed"),
+        commitObserverFailure
+          ? commitObserverFailure.error
+          : new SqliteWorkerError("SQLite worker admission is closed", "closed"),
         "authority",
       );
       return;
     }
     const request: SqliteWorkerAdmissionRequest = { stage: message.stage, facts: message.facts };
     const grant = () => {
+      if (commitObserverFailure) {
+        refuse(decision, commitObserverFailure.error, "authority");
+        return false;
+      }
       if (closed || Atomics.load(decision, 0) !== REQUESTED) {
         return false;
       }
       // Domain admission can reenter owner lifecycle before handing the native writer its grant.
       try {
-        inOwnerContext(() => databaseAuthority?.assertAccess());
+        inOwnerContext(() => {
+          requestAuthority?.();
+          databaseAuthority?.assertAccess();
+          const pending: unknown = readObserver?.pending(request);
+          if (isPromise(pending)) {
+            void pending.catch(() => undefined);
+            throw new Error("SQLite read observation must remain synchronous");
+          }
+          assertCommitAuthorities();
+          if (retaining?.decision === decision && Atomics.load(retaining.acknowledgment, 0) === 1) {
+            assertRetainedAuthority(retaining.id);
+          }
+        });
       } catch (error) {
         refuse(decision, error, "authority");
         return false;
@@ -187,11 +299,20 @@ export function createSqliteWorkerOperationAdmission(
       }
       return granted;
     };
+    const previousRetaining = retaining;
+    retaining =
+      isRecord(guard) &&
+      typeof guard.id === "number" &&
+      guard.acknowledgment instanceof SharedArrayBuffer
+        ? { id: guard.id, acknowledgment: new Int32Array(guard.acknowledgment), decision }
+        : undefined;
     let source: AdmissionFailureSource = "authority";
     try {
       inOwnerContext(() => {
+        requestAuthority?.();
         databaseAuthority?.assertRequest?.();
         databaseAuthority?.assertAccess();
+        assertCommitAuthorities();
       });
       if (
         request.stage === "prepare" &&
@@ -224,6 +345,10 @@ export function createSqliteWorkerOperationAdmission(
       return;
     } finally {
       // Repeated preparation requests must not retain every settled decision.
+      if (retaining && Atomics.load(decision, 0) !== GRANTED) {
+        retainedAuthorities.delete(retaining.id);
+      }
+      retaining = previousRetaining;
       decisions.delete(decision);
     }
     if (Atomics.load(decision, 0) === REQUESTED) {
@@ -243,6 +368,69 @@ export function createSqliteWorkerOperationAdmission(
   };
   return {
     port: port2,
+    bindRefusalProvenance(provenance) {
+      if (closed || refusalProvenance || admissionSealed) {
+        throw new SqliteWorkerError(
+          "SQLite refusal provenance must bind once before dispatch",
+          "closed",
+        );
+      }
+      refusalProvenance = {
+        pending: provenance.pending.bind(provenance),
+        selected: provenance.selected.bind(provenance),
+      };
+      refusalProvenance.selected(failure);
+    },
+    retainCommitAuthority(assertCurrent) {
+      if (
+        !retaining ||
+        Atomics.load(retaining.decision, 0) !== REQUESTED ||
+        retainedAuthorities.has(retaining.id)
+      ) {
+        throw new SqliteWorkerError(
+          "SQLite commit authority requires its pending native mutation request",
+          "closed",
+        );
+      }
+      const inRetainedContext = AsyncLocalStorage.snapshot();
+      retainedAuthorities.set(retaining.id, () => inRetainedContext(assertCurrent));
+      Atomics.store(retaining.acknowledgment, 0, 1);
+    },
+    assertCommitAuthority: assertRetainedAuthority,
+    bindCommitAuthority(assertCurrent) {
+      if (closed || commitAuthority) {
+        throw new SqliteWorkerError("SQLite commit authority is already bound or closed", "closed");
+      }
+      commitAuthority = assertCurrent;
+    },
+    bindReadObserver(observer) {
+      if (closed || readObserver || admissionSealed) {
+        throw new SqliteWorkerError(
+          "SQLite read observation must bind once before dispatch",
+          "closed",
+        );
+      }
+      readObserver = {
+        pending: observer.pending.bind(observer),
+        committed: observer.committed.bind(observer),
+      };
+    },
+    deliverReadFacts(value) {
+      const reader = readObserver;
+      if (reader) {
+        notify(() => reader.committed(parseSqliteWorkerReadFacts(value)));
+      }
+    },
+    bindRequestAuthority(assertCurrent) {
+      if (closed || requestAuthority) {
+        throw new SqliteWorkerError(
+          "SQLite request authority is already bound or closed",
+          "closed",
+        );
+      }
+      admissionSealed = true;
+      requestAuthority = assertCurrent;
+    },
     bindDatabaseAuthority(authority) {
       if (closed || databaseAuthority) {
         throw new SqliteWorkerError(
@@ -250,16 +438,14 @@ export function createSqliteWorkerOperationAdmission(
           "closed",
         );
       }
+      admissionSealed = true;
       databaseAuthority = {
         ...authority,
         databasePath: resolveIdentityPathViaExistingAncestorSync(authority.databasePath),
       };
     },
     get failure() {
-      return failure?.error;
-    },
-    get failureSource() {
-      return failure?.source;
+      return failure;
     },
     get cleanupFailures() {
       return cleanupFailures;
@@ -276,7 +462,7 @@ export function createSqliteWorkerOperationAdmission(
       while (true) {
         service();
         if (failure !== undefined) {
-          throw toErrorObject(failure.error, "SQLite worker admission failed");
+          throw failure.transportError;
         }
         if (settlement?.kind === "completed") {
           return settlement;
@@ -307,6 +493,7 @@ export function createSqliteWorkerOperationAdmission(
       }
       port1.close();
       port2.close();
+      retainedAuthorities.clear();
       if (databaseAuthority?.lease) {
         try {
           databaseAuthority.lease.release();
@@ -321,8 +508,13 @@ export function createSqliteWorkerOperationAdmission(
 
 export type SqliteWorkerOperationContext = {
   port: MessagePort;
+  address?: { requestId: number; actorId: number };
+  database?: DatabaseSync;
+  nextAuthorityId?: number;
   refusal?: SqliteWorkerError;
-  committed?: { facts: unknown };
+  committed?: SqliteWorkerSourceReceipt;
+  rollbackCheckpoint?: { receipt?: SqliteWorkerSourceReceipt };
+  readFacts?: SqliteWorkerReadFactsCollection;
   settled?: true;
 };
 
@@ -336,8 +528,30 @@ type WorkerAdmissionScope = {
 // one Worker. Share the carrier, while each operation still owns its private port.
 const currentAdmission = resolveGlobalSingleton(
   Symbol.for("openclaw.sqliteWorkerOperationAdmission"),
-  () => new AsyncLocalStorage<WorkerAdmissionScope>(),
+  () => new AsyncLocalStorage<WorkerAdmissionScope | undefined>(),
 );
+
+const transactionAuthorities = resolveGlobalSingleton(
+  Symbol.for("openclaw.sqliteWorkerTransactionAuthorities"),
+  () => new WeakMap<object, Set<SqliteWorkerCommitAuthorityReference>>(),
+);
+
+/** Connection facts carry no authority and preparation may intentionally have no admission. */
+export function bindSqliteWorkerOperationDatabase(database: DatabaseSync): void {
+  const scope = currentAdmission.getStore();
+  if (!scope?.active) {
+    return;
+  }
+  if (scope.owner.database && scope.owner.database !== database) {
+    throw new Error("SQLite operation changed its bound native connection");
+  }
+  scope.owner.database = database;
+}
+
+/** Preparation must not inherit an enclosing callback's native admission. */
+export function withoutSqliteWorkerOperationAdmission<T>(operation: () => T): T {
+  return currentAdmission.run(undefined, operation);
+}
 
 /** Install only the private port belonging to the broker's currently executing operation. */
 export function withSqliteWorkerOperationAdmission<T>(
@@ -352,27 +566,55 @@ export function withSqliteWorkerOperationAdmission<T>(
   }
 }
 
-/** Record facts only after the real transaction commits, before native settlement is announced. */
-export function deferSqliteWorkerCommitReceipt(database: DatabaseSync, facts: unknown): void {
+function requireSqliteReceiptOwner(): SqliteWorkerOperationContext {
   const scope = currentAdmission.getStore();
   if (!scope?.active) {
     throw new SqliteWorkerError("SQLite receipt requires its retained admission", "unavailable");
   }
-  if (serialize(facts).byteLength > SQLITE_WORKER_MAX_MESSAGE_BYTES) {
-    throw new SqliteWorkerError(
-      "SQLite worker commit receipt exceeds the transport limit",
-      "overloaded",
-    );
-  }
-  const captured = structuredClone(facts);
-  if (
-    !deferSqlitePostCommitPublication(database, () => {
-      scope.owner.committed = { facts: captured };
-      scope.owner.port.postMessage({ kind: "native-commit", committed: scope.owner.committed }, []);
-    })
-  ) {
-    throw new Error("SQLite worker receipt requires a transaction publication owner");
-  }
+  return scope.owner;
+}
+
+/** Capture now, publish only after the real transaction commits. */
+export function deferSqliteWorkerCommitReceipt(database: DatabaseSync, facts: unknown): void {
+  const owner = requireSqliteReceiptOwner();
+  const captured = captureSqliteWorkerSourceFacts(facts);
+  deferSqliteWorkerOwnedCommitReceipt(database, owner, () => captured);
+}
+
+/** Prepare source facts after native state callbacks and before reply settlement. */
+export function deferSqliteWorkerPreparedCommitReceipt(
+  database: DatabaseSync,
+  prepareFacts: () => unknown,
+): void {
+  deferSqliteWorkerOwnedCommitReceipt(database, requireSqliteReceiptOwner(), () =>
+    captureSqliteWorkerSourceFacts(prepareFacts()),
+  );
+}
+
+/** Prepare finite observations only after their actual managed transaction commits. */
+export function deferSqliteWorkerPreparedReadFacts(
+  database: DatabaseSync,
+  prepare: () => unknown,
+): void {
+  deferSqliteWorkerOwnedReadFacts(
+    database,
+    requireSqliteReceiptOwner(),
+    prepare,
+    captureSqliteWorkerReadFacts,
+  );
+}
+
+/** The domain certifies this checkpoint after rollback; a missing fact remains unknown. */
+export function deferSqliteWorkerPreparedRollbackReceipt(
+  database: DatabaseSync,
+  prepareFacts: () => SqliteWorkerSourceReceipt | undefined,
+): void {
+  deferSqliteWorkerOwnedRollbackReceipt(database, requireSqliteReceiptOwner(), () => {
+    const receipt = prepareFacts();
+    return receipt === undefined
+      ? undefined
+      : { facts: captureSqliteWorkerSourceFacts(receipt.facts) };
+  });
 }
 
 /** The executing worker calls this only after its backend's native settlement check. */
@@ -403,7 +645,30 @@ export function requestSqliteWorkerOperationAdmission(
     throw new SqliteWorkerError("SQLite operation requires its retained admission", "unavailable");
   }
   const decision = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
-  scope.port.postMessage({ ...request, decision: decision.buffer }, transferList);
+  const database = scope.owner.database;
+  const transaction = database?.isTransaction ? getSqliteTransactionScope(database) : undefined;
+  const address = scope.owner.address;
+  const authorityId = (scope.owner.nextAuthorityId ?? 0) + 1;
+  scope.owner.nextAuthorityId = authorityId;
+  const acknowledgment =
+    transaction && address
+      ? new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT))
+      : undefined;
+  const commitAuthorities =
+    request.stage === "commit" && transaction
+      ? [...(transactionAuthorities.get(transaction) ?? [])]
+      : [];
+  scope.port.postMessage(
+    {
+      ...request,
+      decision: decision.buffer,
+      ...(acknowledgment
+        ? { commitAuthority: { id: authorityId, acknowledgment: acknowledgment.buffer } }
+        : {}),
+      ...(commitAuthorities.length ? { commitAuthorities } : {}),
+    },
+    transferList,
+  );
   // Host scheduling delay does not revoke the retained owner's authority. The
   // broker keeps this port through settlement and joins worker exit on failure;
   // only the live host owner can grant or refuse the pending request.
@@ -415,6 +680,49 @@ export function requestSqliteWorkerOperationAdmission(
     scope.owner.refusal = refusal;
     throw refusal;
   }
+  if (acknowledgment && Atomics.load(acknowledgment, 0) === 1) {
+    if (
+      !database?.isTransaction ||
+      !address ||
+      !transaction ||
+      getSqliteTransactionScope(database) !== transaction
+    ) {
+      throw new Error("SQLite retained authority lost its actual transaction scope");
+    }
+    let authorities = transactionAuthorities.get(transaction);
+    if (!authorities) {
+      authorities = new Set();
+      transactionAuthorities.set(transaction, authorities);
+    }
+    const ownedAuthorities = authorities;
+    const reference = { ...address, authorityId };
+    const release = () => {
+      ownedAuthorities.delete(reference);
+      if (!ownedAuthorities.size) {
+        transactionAuthorities.delete(transaction);
+      }
+    };
+    if (
+      !stageSqliteTransactionState(database, {
+        stage() {
+          ownedAuthorities.add(reference);
+        },
+        commit: release,
+        rollback: release,
+      })
+    ) {
+      release();
+      throw new Error("SQLite retained authority requires its actual transaction owner");
+    }
+  }
+}
+
+/** Match the actual native exception, never its message, code, or cause. */
+export function isSqliteWorkerOperationRefusal(error: unknown): boolean {
+  const scope = currentAdmission.getStore();
+  return (
+    scope?.active === true && scope.owner.refusal !== undefined && scope.owner.refusal === error
+  );
 }
 
 /** Schema work borrows live host authority through the same retained job port. */

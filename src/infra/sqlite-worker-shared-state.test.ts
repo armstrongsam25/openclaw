@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { Worker } from "node:worker_threads";
+import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 import type { NativeHookRelayBridgeRecord } from "../agents/harness/native-hook-relay-bridge-record.js";
@@ -42,7 +42,11 @@ import { resolveRuntimeWorkerUrl } from "./runtime-worker-url.js";
 import { OpenClawStateOwnershipError } from "./sqlite-lifecycle-errors.js";
 import { SqliteSchemaVersionError } from "./sqlite-user-version.js";
 import { SQLITE_WORKER_MAX_MESSAGE_BYTES } from "./sqlite-worker-contract.js";
-import { registerSharedStateWorkerAdmissionTests } from "./sqlite-worker-shared-state-admission.test-support.js";
+import {
+  observeSharedStateWorkerCommands,
+  registerSharedStateWorkerAdmissionTests,
+} from "./sqlite-worker-shared-state-admission.test-support.js";
+import { NativeWorker } from "./worker-native-handle.js";
 
 const dirs = useAutoCleanupTempDirTracker((cleanup) =>
   afterEach(async () => {
@@ -304,7 +308,7 @@ describe("canonical shared-state worker admission", () => {
         path: captured.admission.databasePath,
         env: captured.environment,
       });
-      const messages = vi.spyOn(Worker.prototype, "postMessage");
+      const { messages, commands } = observeSharedStateWorkerCommands();
       await runOpenClawStateWorkerOperation(
         reopened,
         async (scope) => {
@@ -314,8 +318,13 @@ describe("canonical shared-state worker admission", () => {
               input: { selector: "installed-index", artifactPreservingReadOnly: true },
             }),
           ).toEqual({ value_json: JSON.stringify(value) });
-          const metadataWorker = messages.mock.contexts[0];
-          expect(metadataWorker).toBeInstanceOf(Worker);
+          const metadataWorker = commands.find(
+            ({ command }) =>
+              command.type === "plugins.metadata.read" &&
+              isRecord(command.input) &&
+              command.input.selector === "installed-index",
+          )?.worker;
+          expect(metadataWorker).toBeInstanceOf(NativeWorker);
           messages.mockClear();
           if (operation === "Web Push") {
             expect(
@@ -769,15 +778,17 @@ describe("canonical shared-state worker admission", () => {
 
   it("opens a fresh actor for the first new call after the previous worker exits", async () => {
     const captured = context();
-    const messages = vi.spyOn(Worker.prototype, "postMessage");
+    const { messages, commands } = observeSharedStateWorkerCommands();
     await executeOpenClawStateWorker(captured, {
       type: "plugins.conversationBindingApprovals.read",
       input: undefined,
     });
-    const worker = messages.mock.contexts[0];
+    const worker = commands.find(
+      ({ command }) => command.type === "plugins.conversationBindingApprovals.read",
+    )?.worker;
     messages.mockRestore();
-    if (!(worker instanceof Worker)) {
-      throw new Error("Expected the shared-state worker to receive its open request");
+    if (!(worker instanceof NativeWorker)) {
+      throw new Error("Expected the shared-state worker to receive its read request");
     }
     await worker.terminate();
     await expect(

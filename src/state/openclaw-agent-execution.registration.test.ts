@@ -1,12 +1,14 @@
+import { isNativeError } from "node:util/types";
 import { serialize } from "node:v8";
 import type { MessagePort } from "node:worker_threads";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { createRetainedOperation } from "../infra/retained-operation.js";
 import { SqliteCoordinatorError } from "../infra/sqlite-lifecycle-errors.js";
+import { receiveSqliteWorkerReply } from "../infra/sqlite-worker-broker-reply.js";
 import {
-  receiveSqliteWorkerReply,
   settleFailedSqliteWorkerJobs,
   settleSqliteWorkerJob,
-} from "../infra/sqlite-worker-broker-reply.js";
+} from "../infra/sqlite-worker-broker-settlement.js";
 import type { Job } from "../infra/sqlite-worker-broker.types.js";
 import {
   isSqliteWorkerError,
@@ -14,7 +16,10 @@ import {
   type SqliteWorkerReply,
   type SqliteWorkerRequest,
 } from "../infra/sqlite-worker-contract.js";
-import type { SqliteWorkerAdmissionRequest } from "../infra/sqlite-worker-operation-admission.js";
+import type {
+  SqliteWorkerAdmissionRequest,
+  SqliteWorkerOperationAdmission,
+} from "../infra/sqlite-worker-operation-admission.js";
 import { createDeferredCore, type Deferred } from "../shared/deferred.js";
 import type {
   OpenClawAgentDatabaseRegistrationCommit,
@@ -153,13 +158,47 @@ function send(request: SqliteWorkerRequest): Promise<SqliteWorkerReply> {
 function retireFailedReply(
   reply: Extract<SqliteWorkerReply, { ok: false }>,
   request: SqliteWorkerRequest,
-  admissionFailure?: unknown,
+  admissionFailure?: Readonly<{ error: unknown }>,
 ) {
-  const retired = createDeferredCore();
+  const retired = createRetainedOperation<void>(edge.forbidden);
   const completion = createDeferredCore<unknown>();
   const reject = vi.fn((error: unknown) => completion.resolve(error));
   const settleNative = vi.fn();
+  const executionWorker: Job["executionWorker"] = {
+    get threadId(): never {
+      return edge.forbidden();
+    },
+    get started(): never {
+      return edge.forbidden();
+    },
+    get executionStopped(): never {
+      return edge.forbidden();
+    },
+    postMessage: edge.forbidden,
+    ref: edge.forbidden,
+    unref: edge.forbidden,
+    terminate: edge.forbidden,
+    on: edge.forbidden,
+    once: edge.forbidden,
+    removeListener: edge.forbidden,
+    removeAllListeners: edge.forbidden,
+    cpuUsage: edge.forbidden,
+    getHeapStatistics: edge.forbidden,
+    service: edge.forbidden,
+    stop: edge.forbidden,
+  };
+  const failure: SqliteWorkerOperationAdmission["failure"] =
+    admissionFailure === undefined
+      ? undefined
+      : Object.freeze({
+          original: admissionFailure.error,
+          transportError: isNativeError(admissionFailure.error)
+            ? admissionFailure.error
+            : new Error("SQLite worker admission refused", { cause: admissionFailure.error }),
+          source: "authority",
+        });
   const job: Job = {
+    executionWorker,
     request,
     bytes: 0,
     nativeDispatched: true,
@@ -168,13 +207,19 @@ function retireFailedReply(
         get port(): MessagePort {
           return edge.forbidden();
         },
-        failure: admissionFailure,
-        failureSource: admissionFailure === undefined ? undefined : "authority",
+        failure,
         cleanupFailures: [],
         committed: undefined,
         settlement: undefined,
         waitForSettlement: edge.forbidden,
         service: edge.forbidden,
+        bindRefusalProvenance: edge.forbidden,
+        deliverReadFacts: edge.forbidden,
+        bindRequestAuthority: edge.forbidden,
+        bindReadObserver: edge.forbidden,
+        retainCommitAuthority: edge.forbidden,
+        assertCommitAuthority: edge.forbidden,
+        bindCommitAuthority: edge.forbidden,
         bindDatabaseAuthority: edge.forbidden,
         finish() {},
       },
@@ -185,25 +230,32 @@ function retireFailedReply(
     reject,
     detach() {},
   };
-  receiveSqliteWorkerReply({ current: job, worker: { postMessage: edge.forbidden } }, reply, {
-    fail(error, currentError, openOutcome) {
-      if (!(error instanceof Error)) {
-        throw error;
-      }
-      settleFailedSqliteWorkerJobs({
-        current: job,
-        queued: [],
-        queuedError: new SqliteWorkerError("retired", "unavailable"),
-        error,
-        currentError,
-        openOutcome,
-        retire: () => retired.promise,
-        finish: settleSqliteWorkerJob,
-      });
+  receiveSqliteWorkerReply(
+    { current: job },
+    reply,
+    {
+      fail(error, currentError, openOutcome) {
+        if (!(error instanceof Error)) {
+          throw error;
+        }
+        settleFailedSqliteWorkerJobs({
+          current: job,
+          queued: [],
+          queuedError: new SqliteWorkerError("retired", "unavailable"),
+          error,
+          currentError,
+          openOutcome,
+          retire: () => retired.operation,
+          finish: settleSqliteWorkerJob,
+        });
+      },
+      finish: edge.forbidden,
+      dispatch: edge.forbidden,
+      returnProvisional: edge.forbidden,
+      resumeReply: edge.forbidden,
     },
-    finish: edge.forbidden,
-    dispatch: edge.forbidden,
-  });
+    executionWorker,
+  );
   return { retired, completion, reject, settleNative };
 }
 
@@ -353,14 +405,12 @@ it.each([
       expect(reply.openOutcome).toBeUndefined();
       expect(reply.openNotEntered).toBeUndefined();
       // Even an independently retained refusal must not replace an ordinary native error.
-      const { retired, completion, reject, settleNative } = retireFailedReply(
-        reply,
-        opening,
-        refused,
-      );
+      const { retired, completion, reject, settleNative } = retireFailedReply(reply, opening, {
+        error: refused,
+      });
       expect(reject).not.toHaveBeenCalled();
       expect(settleNative).not.toHaveBeenCalled();
-      retired.resolve();
+      retired.resolve(undefined);
       const failure = await completion.promise;
       expect(settleNative).toHaveBeenCalledExactlyOnceWith({ kind: "unknown", error: failure });
       if (outcome === "direct refusal") {
@@ -447,7 +497,7 @@ describe("committed agent registration across failed native opening", () => {
       try {
         expect(reject).not.toHaveBeenCalled();
         expect(settleNative).not.toHaveBeenCalled();
-        retired.resolve();
+        retired.resolve(undefined);
         const failure = hydrateOpenClawStateWorkerError(await completion.promise);
         expect(isSqliteWorkerError(failure, "outcome-unknown")).toBe(true);
         expect(settleNative).toHaveBeenCalledExactlyOnceWith({
@@ -463,7 +513,7 @@ describe("committed agent registration across failed native opening", () => {
           },
         });
       } finally {
-        retired.resolve();
+        retired.resolve(undefined);
         await completion.promise;
       }
     },
@@ -516,14 +566,14 @@ describe("committed agent registration across failed native opening", () => {
       try {
         expect(reject).not.toHaveBeenCalled();
         expect(settleNative).not.toHaveBeenCalled();
-        retired.resolve();
+        retired.resolve(undefined);
         expect(await completion.promise).toMatchObject({ message: cleanupFailure.message });
         expect(settleNative).toHaveBeenCalledExactlyOnceWith({
           kind: "unknown",
           error: expect.objectContaining({ message: cleanupFailure.message }),
         });
       } finally {
-        retired.resolve();
+        retired.resolve(undefined);
         await completion.promise;
       }
     },
@@ -580,11 +630,11 @@ describe("committed agent registration across failed native opening", () => {
       const { retired, completion, reject, settleNative } = retireFailedReply(
         reply,
         { type: "execute", id: reply.id, actor, input: new Uint8Array() },
-        reportRefused ? reportingError : undefined,
+        reportRefused ? { error: reportingError } : undefined,
       );
       expect(reject).not.toHaveBeenCalled();
       expect(settleNative).not.toHaveBeenCalled();
-      retired.resolve();
+      retired.resolve(undefined);
       const failure = await completion.promise;
       expect(failure).toMatchObject({ code: "outcome-unknown" });
       if (!openingSucceeds) {
@@ -692,14 +742,12 @@ describe("committed agent registration across failed native opening", () => {
         [{ stage: "open", facts: input }],
       ]);
       expect(edge.open).not.toHaveBeenCalled();
-      const { retired, completion, reject, settleNative } = retireFailedReply(
-        reply,
-        opening,
-        refused,
-      );
+      const { retired, completion, reject, settleNative } = retireFailedReply(reply, opening, {
+        error: refused,
+      });
       expect(reject).not.toHaveBeenCalled();
       expect(settleNative).not.toHaveBeenCalled();
-      retired.resolve();
+      retired.resolve(undefined);
       expect(await completion.promise).toBe(refused);
       expect(settleNative).toHaveBeenCalledExactlyOnceWith({ kind: "completed" });
     } finally {

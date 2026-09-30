@@ -3,7 +3,8 @@ import { once } from "node:events";
 import { performance } from "node:perf_hooks";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { deserialize } from "node:v8";
-import { Worker, type Transferable } from "node:worker_threads";
+import type { Transferable } from "node:worker_threads";
+import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { afterEach, expect, it, vi } from "vitest";
 import { createDeferred } from "../../test/helpers/promise.js";
 import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
@@ -22,9 +23,11 @@ import {
 } from "../state/openclaw-state-worker-store.js";
 import { initializeSqliteRuntimeCapabilities } from "./bun-sqlite-library.js";
 import { requireNodeSqlite } from "./node-sqlite.js";
-import type { SqliteWorkerRequest } from "./sqlite-worker-contract.js";
+import { createRetainedOperation } from "./retained-operation.js";
+import { observeSharedStateWorkerCommands } from "./sqlite-worker-shared-state-admission.test-support.js";
 import * as sqliteWorkers from "./sqlite-worker-store.js";
 import { getSqliteWorkerActorIdentity } from "./sqlite-worker-store.js";
+import { NativeWorker } from "./worker-native-handle.js";
 
 vi.mock("node:diagnostics_channel", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:diagnostics_channel")>();
@@ -60,13 +63,55 @@ const dirs = useAutoCleanupTempDirTracker((cleanup) =>
 );
 const minute = 60_000;
 
+function findReadWorker(
+  commands: ReturnType<typeof observeSharedStateWorkerCommands>["commands"],
+  identityKey: string,
+) {
+  const worker = commands.find(
+    ({ command }) =>
+      command.type === "deviceIdentity.read" &&
+      isRecord(command.input) &&
+      command.input.identityKey === identityKey,
+  )?.worker;
+  if (!(worker instanceof NativeWorker)) {
+    throw new Error("Expected the canonical shared-state worker for its identity read");
+  }
+  return worker;
+}
+
+function holdNativeStop(stop: () => ReturnType<NativeWorker["stop"]>, release: Promise<void>) {
+  let native: ReturnType<NativeWorker["stop"]> | undefined;
+  const held = createRetainedOperation<void>(() => {
+    native?.service();
+    observe();
+  });
+  function observe() {
+    const outcome = native?.read();
+    if (outcome?.status === "fulfilled") {
+      held.resolve(undefined);
+    } else if (outcome?.status === "rejected") {
+      held.reject(outcome.error);
+    }
+  }
+  void release.then(() => {
+    try {
+      native = stop();
+      void native.result.then(observe, observe);
+      observe();
+    } catch (error) {
+      held.reject(error);
+    }
+  });
+  return held.operation;
+}
+
 async function fixture(mode: "healthy" | "local-reader" | "unsettled-inspection" = "healthy") {
   const now = performance.now.bind(performance);
   let elapsed = 0;
   vi.spyOn(performance, "now").mockImplementation(() => now() + elapsed);
   const timers = vi.spyOn(globalThis, "setTimeout");
   const open = async (context: OpenClawStateWorkerContext) => {
-    const messages = vi.spyOn(Worker.prototype, "postMessage");
+    const { messages, commands } = observeSharedStateWorkerCommands();
     try {
       // Exercise native idle ownership without preparing the unrelated task-flow runtime.
       const read = () =>
@@ -75,10 +120,7 @@ async function fixture(mode: "healthy" | "local-reader" | "unsettled-inspection"
           input: { identityKey: `idle-fixture:${mode}` },
         });
       expect(await read()).toBeNull();
-      const worker = messages.mock.contexts[0];
-      if (!(worker instanceof Worker)) {
-        throw new Error("Expected the canonical shared-state worker");
-      }
+      const worker = findReadWorker(commands, `idle-fixture:${mode}`);
       return { context, worker, read };
     } finally {
       messages.mockRestore();
@@ -238,9 +280,11 @@ it("ignores an inspection result and old expiry when real work resumes", async (
   let resume: (() => void) | undefined;
   const send = vi
     .spyOn(f.worker, "postMessage")
-    .mockImplementation((request: SqliteWorkerRequest, transfers?: readonly Transferable[]) => {
+    .mockImplementation((request: unknown, transfers?: readonly Transferable[]) => {
       if (
+        isRecord(request) &&
         request.type === "execute" &&
+        request.input instanceof Uint8Array &&
         deserialize(request.input).type === "database.inspectIdle"
       ) {
         resume = () => postMessage(request, transfers);
@@ -290,9 +334,11 @@ it("replaces a failed idle actor after an enclosing callback settles", async () 
   let resume: (() => void) | undefined;
   const send = vi
     .spyOn(f.worker, "postMessage")
-    .mockImplementation((request: SqliteWorkerRequest, transfers?: readonly Transferable[]) => {
+    .mockImplementation((request: unknown, transfers?: readonly Transferable[]) => {
       if (
+        isRecord(request) &&
         request.type === "execute" &&
+        request.input instanceof Uint8Array &&
         deserialize(request.input).type === "database.inspectIdle"
       ) {
         // Hold the admitted dispatch before the native inspection executes.
@@ -447,19 +493,16 @@ poolIt.each([undefined, "agent-resources", "shared-handles"] as const)(
     const peerContext = peerScope.run(() => captureOpenClawStateWorkerContext({ env }));
     const entered = createDeferredCore();
     const resume = createDeferredCore();
-    const messages = vi.spyOn(Worker.prototype, "postMessage");
+    const { messages, commands } = observeSharedStateWorkerCommands();
     let accepted: Promise<string> | undefined;
     let closing: Promise<unknown> | undefined;
-    let stopped: Promise<number> | undefined;
+    let stopped: Promise<void> | undefined;
     try {
       const first = await openClient(firstContext);
       const peer = await openClient(peerContext);
       expect(first.actor === peer.actor).toBe(true);
-      const worker = messages.mock.contexts.find((candidate) => candidate instanceof Worker);
+      const worker = findReadWorker(commands, "idle-fixture:idle-custody");
       messages.mockRestore();
-      if (!(worker instanceof Worker)) {
-        throw new Error("Expected the shared native worker");
-      }
       const startAccepted = async () => {
         accepted = runOpenClawStateWorkerOperation(firstContext, async () => {
           entered.resolve();
@@ -518,17 +561,14 @@ poolIt(
     const peerScope = createOpenClawDatabaseMaintenanceScope();
     const firstContext = firstScope.run(() => captureOpenClawStateWorkerContext({ env }));
     const peerContext = peerScope.run(() => captureOpenClawStateWorkerContext({ env }));
-    const messages = vi.spyOn(Worker.prototype, "postMessage");
-    let stopped: Promise<number> | undefined;
+    const { messages, commands } = observeSharedStateWorkerCommands();
+    let stopped: Promise<void> | undefined;
     try {
       const first = await openClient(firstContext);
       const peer = await openClient(peerContext);
       expect(first.actor === peer.actor).toBe(true);
-      const worker = messages.mock.contexts.find((candidate) => candidate instanceof Worker);
+      const worker = findReadWorker(commands, "idle-fixture:idle-custody");
       messages.mockRestore();
-      if (!(worker instanceof Worker)) {
-        throw new Error("Expected the shared native worker");
-      }
       stopped = worker.terminate();
       await stopped;
       await expect(peer.store.execute(read)).rejects.toMatchObject({ code: "unavailable" });
@@ -557,32 +597,31 @@ poolIt("joins adopted actor custody instead of its earlier per-client failure", 
   const terminationEntered = createDeferredCore();
   const allowNativeExit = createDeferredCore();
   const nativeExited = createDeferredCore();
-  const messages = vi.spyOn(Worker.prototype, "postMessage");
+  const { messages, commands } = observeSharedStateWorkerCommands();
   let accepted: Promise<string> | undefined;
   let firstClosing: Promise<void> | undefined;
   let canonicalClosing: Promise<boolean> | undefined;
-  let termination: Promise<number> | undefined;
-  let nativeTerminate: (() => Promise<number>) | undefined;
-  let restoreTerminate: (() => void) | undefined;
-  let worker: Worker | undefined;
+  let termination: Promise<void> | undefined;
+  let nativeStop: (() => ReturnType<NativeWorker["stop"]>) | undefined;
+  let heldStop: ReturnType<NativeWorker["stop"]> | undefined;
+  let restoreStop: (() => void) | undefined;
+  let worker: NativeWorker | undefined;
   try {
     const first = await openClient(firstContext);
     const peer = await openClient(peerContext);
     expect(first.actor === peer.actor).toBe(true);
-    const observedWorker = messages.mock.contexts.find((candidate) => candidate instanceof Worker);
+    worker = findReadWorker(commands, "idle-fixture:idle-custody");
     messages.mockRestore();
-    if (!(observedWorker instanceof Worker)) {
-      throw new Error("Expected the shared native worker");
-    }
-    worker = observedWorker;
     worker.once("exit", () => nativeExited.resolve());
-    nativeTerminate = worker.terminate.bind(worker);
-    const terminate = nativeTerminate;
-    const terminating = vi.spyOn(worker, "terminate").mockImplementation(() => {
+    nativeStop = worker.stop.bind(worker);
+    const stop = nativeStop;
+    const terminating = vi.spyOn(worker, "stop").mockImplementation(() => {
       terminationEntered.resolve();
-      return (termination ??= allowNativeExit.promise.then(terminate));
+      heldStop ??= holdNativeStop(stop, allowNativeExit.promise);
+      termination = heldStop.result;
+      return heldStop;
     });
-    restoreTerminate = () => terminating.mockRestore();
+    restoreStop = () => terminating.mockRestore();
     accepted = runOpenClawStateWorkerOperation(peerContext, async () => {
       entered.resolve();
       await resume.promise;
@@ -640,9 +679,9 @@ poolIt("joins adopted actor custody instead of its earlier per-client failure", 
     resume.resolve();
     allowNativeExit.resolve();
     await Promise.allSettled([accepted, firstClosing, canonicalClosing, termination]);
-    restoreTerminate?.();
+    restoreStop?.();
     if (worker && worker.threadId !== -1) {
-      await nativeTerminate?.();
+      await nativeStop?.().result;
       await nativeExited.promise;
     }
     await Promise.allSettled([firstScope.close(), peerScope.close()]);

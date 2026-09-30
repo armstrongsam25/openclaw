@@ -1,26 +1,45 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
-import { realpath, stat } from "node:fs/promises";
+import { realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { serialize } from "node:v8";
+import { createDeferredCore } from "../shared/deferred.js";
 import { INCOGNITO_AGENT_SQLITE_BASENAME } from "../state/openclaw-agent-db.paths.js";
 import { getOpenClawDatabaseMaintenanceScope } from "../state/openclaw-state-db-async-lifecycle.js";
-import { assertStateDatabaseAccessAllowed } from "./gateway-state-owner.js";
+import {
+  acquireStateDatabaseSchemaLease,
+  assertStateDatabaseAccessAllowed,
+  type StateDatabaseSchemaLease,
+} from "./gateway-state-owner.js";
+import { createRetainedOperation, type RetainedOperation } from "./retained-operation.js";
 import { resolveRuntimeProcessEntrypointUrl } from "./runtime-process-url.js";
+import { retainSqliteWriteAdmissionService } from "./sqlite-transaction.js";
+import { recordSqliteWorkerHostRefusal } from "./sqlite-worker-broker-settlement.js";
 import type {
   PreparedSqliteWorkerOpen,
   SqliteWorkerStoreOptions,
   Actor,
+  SqliteWorkerExecution,
   Job,
   SqliteWorkerOpenCustody,
+  SqliteWorkerPlacement,
 } from "./sqlite-worker-broker.types.js";
-import { readDatabasePathIdentity, type DatabasePathIdentity } from "./sqlite-worker-identity.js";
-import { createSqliteWorkerOperationAdmission } from "./sqlite-worker-operation-admission.js";
+import { SqliteWorkerError } from "./sqlite-worker-contract.js";
+import {
+  readDatabasePathIdentitySync,
+  type DatabasePathIdentity,
+} from "./sqlite-worker-identity.js";
+import {
+  createSqliteWorkerOperationAdmission,
+  type SqliteWorkerAdmissionFactory,
+} from "./sqlite-worker-operation-admission.js";
+import type { SqliteWorkerOperationSettlement } from "./sqlite-worker-operation-settlement.js";
 import {
   captureSqliteWorkerStateContext,
   type SqliteWorkerStateContext,
 } from "./sqlite-worker-state-context.js";
+import { captureRetainedNativeWorkerSource } from "./worker-native-lifecycle.js";
 
 export function validateSqliteWorkerDatabaseLocator(databasePath: string): void {
   const basename = path.basename(databasePath);
@@ -66,6 +85,9 @@ export function captureSqliteWorkerOpen(
     maintenanceScope: custody.maintenanceScope ?? getOpenClawDatabaseMaintenanceScope(),
     ...(preparation !== undefined ? { preparation: serialize(preparation) } : {}),
     runtimeGeneration: options.runtimeGeneration,
+    nativeWorkerSource: captureRetainedNativeWorkerSource({
+      runtimeGeneration: options.runtimeGeneration,
+    }),
     carrierUrl,
     createAdmission:
       createAdmission && inCaller ? (operation) => inCaller(createAdmission, operation) : undefined,
@@ -105,16 +127,26 @@ function validateSqliteWorkerModuleUrl(moduleUrl: URL): void {
   }
 }
 
-export async function prepareSqliteWorkerDatabaseAdmission(options: PreparedSqliteWorkerOpen) {
+/** Resolve one captured locator before the broker's retained native open. */
+export function prepareSqliteWorkerDatabaseAdmissionSync(options: PreparedSqliteWorkerOpen) {
   validateSqliteWorkerModuleUrl(options.moduleUrl);
+  const identity = readDatabasePathIdentitySync(path.resolve(options.databasePath));
   const databasePath = path.resolve(options.databasePath);
   const inputHash = createHash("sha256").update(options.input).digest("hex");
-  const identity = await readDatabasePathIdentity(databasePath);
   options.assertCurrent?.();
   if (options.expectedIdentity && identity.key !== options.expectedIdentity) {
     throw new Error("SQLite Worker path no longer matches its borrowed native owner");
   }
-  return { databasePath, inputHash, identity };
+  const placement: SqliteWorkerPlacement | undefined =
+    options.stateContext && options.stateDatabasePath === undefined
+      ? {
+          kind: "file",
+          requestedPath: databasePath,
+          canonicalPath: identity.canonicalPath,
+          identity: { ...identity },
+        }
+      : undefined;
+  return { databasePath, inputHash, identity, placement };
 }
 
 export function captureSqliteWorkerAdmissionPaths(
@@ -140,13 +172,22 @@ export function captureSqliteWorkerAdmissionPaths(
 export function retainSqliteWorkerAdmissionCleanup(
   actor: Actor,
   retain: PreparedSqliteWorkerOpen["retainCleanup"],
-  close: () => Promise<void>,
+  close: () => RetainedOperation<void>,
 ): void {
+  const closeRetained = () => {
+    if (actor.references === 0) {
+      return close();
+    }
+    const completion = createRetainedOperation<void>(() => {});
+    completion.resolve(undefined);
+    return completion.operation;
+  };
   retain?.({
     get pending() {
       return actor.references === 0 && actor.cleanupState === "pending";
     },
-    close: () => (actor.references === 0 ? close() : Promise.resolve()),
+    closeRetained,
+    close: () => closeRetained().result,
   });
 }
 
@@ -166,12 +207,23 @@ export function retainSqliteWorkerAdmissionPathReferences(actor: Actor, paths: S
   };
 }
 
-export async function resolveOpenedSqliteWorkerIdentity(
+export function resolveOpenedSqliteWorkerIdentitySync(
   databasePath: string,
   previous: DatabasePathIdentity,
   isOwnedElsewhere: (key: string) => boolean,
-): Promise<string> {
-  const openedIdentity = await readDatabasePathIdentity(databasePath);
+): DatabasePathIdentity {
+  return validateOpenedIdentity(
+    readDatabasePathIdentitySync(databasePath),
+    previous,
+    isOwnedElsewhere,
+  );
+}
+
+function validateOpenedIdentity(
+  openedIdentity: DatabasePathIdentity,
+  previous: DatabasePathIdentity,
+  isOwnedElsewhere: (key: string) => boolean,
+): DatabasePathIdentity {
   const physical = openedIdentity.key;
   if (openedIdentity.canonicalPath !== previous.canonicalPath) {
     throw new Error("SQLite database canonical pathname changed during open");
@@ -185,7 +237,7 @@ export async function resolveOpenedSqliteWorkerIdentity(
   if (previous.key.startsWith("file:") && physical !== previous.key) {
     throw new Error("SQLite database file identity changed during open");
   }
-  return physical;
+  return openedIdentity;
 }
 
 export function findUnclaimedSharedStateActors(
@@ -202,26 +254,49 @@ export function findUnclaimedSharedStateActors(
   );
 }
 
-export async function closeUnclaimedSharedStateActors(
+export function closeUnclaimedSharedStateActors(
   actors: Iterable<Actor>,
   databasePath: string,
-  close: (actor: Actor) => Promise<void>,
-): Promise<void> {
-  const results = await Promise.allSettled(
-    findUnclaimedSharedStateActors(actors, databasePath).map(close),
-  );
-  const errors = results.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
-  if (errors.length) {
-    throw new AggregateError(errors, "SQLite worker unclaimed cleanup failed", {
-      cause: errors[0],
-    });
+  close: (actor: Actor) => RetainedOperation<void>,
+): RetainedOperation<void> {
+  const pending = findUnclaimedSharedStateActors(actors, databasePath).map(close);
+  const completion = createRetainedOperation<void>(() => {
+    for (const operation of pending) {
+      operation.service();
+    }
+    advance();
+  });
+  function advance() {
+    if (completion.operation.read().status !== "pending") {
+      return;
+    }
+    const results = pending.map((operation) => operation.read());
+    if (results.some((result) => result.status === "pending")) {
+      return;
+    }
+    const errors = results.flatMap((result) =>
+      result.status === "rejected" ? [result.error] : [],
+    );
+    if (errors.length) {
+      completion.reject(
+        new AggregateError(errors, "SQLite worker unclaimed cleanup failed", { cause: errors[0] }),
+      );
+    } else {
+      completion.resolve(undefined);
+    }
   }
+  for (const operation of pending) {
+    void operation.result.then(advance, advance);
+  }
+  advance();
+  return completion.operation;
 }
 
-export async function resolveSqliteWorkerModuleUrl(sourceUrl: URL) {
-  const modulePath = await realpath(fileURLToPath(sourceUrl));
+export function resolveSqliteWorkerModuleUrlSync(sourceUrl: URL) {
+  const modulePath = realpathSync(fileURLToPath(sourceUrl));
+  const isFile = statSync(modulePath).isFile();
   const moduleUrl = pathToFileURL(modulePath).href;
-  if (!/\.[cm]?[jt]s$/.test(modulePath) || !(await stat(modulePath)).isFile()) {
+  if (!/\.[cm]?[jt]s$/.test(modulePath) || !isFile) {
     throw new Error("SQLite worker backend must identify a JavaScript or TypeScript file");
   }
   return { modulePath, moduleUrl };
@@ -236,15 +311,27 @@ function assertSqliteWorkerActorStateContext(
   }
 }
 
+export function assertSqliteWorkerActorExecution(actor: Actor): SqliteWorkerExecution {
+  const execution = [...actor.slot.executions].find(
+    (entry) => entry.worker === actor.executionWorker,
+  );
+  const failure = actor.slot.failed ?? execution?.failed;
+  if (failure) {
+    throw failure;
+  }
+  if (!execution || execution.exited || execution.retiringRetained || actor.backendClosed) {
+    throw new SqliteWorkerError("SQLite actor execution is no longer available", "closed");
+  }
+  return execution;
+}
+
 export function assertSqliteWorkerActorReusable(
   actor: Actor,
   moduleUrl: string,
   inputHash: string,
   stateContext: SqliteWorkerStateContext | undefined,
 ): void {
-  if (actor.slot.failed) {
-    throw actor.slot.failed;
-  }
+  assertSqliteWorkerActorExecution(actor);
   if (actor.moduleUrl !== moduleUrl || actor.inputHash !== inputHash) {
     throw new Error("SQLite database already belongs to another worker backend");
   }
@@ -265,4 +352,185 @@ export function prepareSqliteWorkerActorContext(actor: Actor | undefined, job: J
     request.stateDatabasePath = actor.stateDatabasePath ?? actor.databasePath;
     request.stateContext = stateContext;
   }
+}
+
+export function prepareSqliteWorkerOperationAdmission(
+  job: Job,
+  actor: Actor | undefined,
+  assertDispatchable: () => void,
+  assertCurrentJob: () => void,
+) {
+  const databasePath = job.request.stateDatabasePath ?? actor?.databasePath;
+  if (!job.createAdmission && !databasePath) {
+    return undefined;
+  }
+  const settlement = createDeferredCore<SqliteWorkerOperationSettlement>();
+  job.settleNative = settlement.resolve;
+  job.nativeSettlement = settlement.promise;
+  let registeringConsumerCompletion = true;
+  let retained: ReturnType<SqliteWorkerAdmissionFactory>;
+  try {
+    retained = job.createAdmission
+      ? job.createAdmission({
+          settled: settlement.promise,
+          readFinalReceipt: () => job.finalReceipt,
+          retainConsumerCompletion(completion) {
+            if (!registeringConsumerCompletion || job.nativeDispatched || job.completed) {
+              throw new SqliteWorkerError(
+                "SQLite consumer completion registration is closed",
+                "closed",
+              );
+            }
+            if (job.consumerCompletion) {
+              if (job.consumerCompletion !== completion) {
+                throw new SqliteWorkerError(
+                  "SQLite consumer completion is already registered",
+                  "closed",
+                );
+              }
+              return;
+            }
+            job.consumerCompletion = completion;
+            job.consumerSettlement = settlement.promise.then<SqliteWorkerOperationSettlement>(
+              (native) => {
+                if (native.kind === "unknown") {
+                  return native;
+                }
+                return completion.then(
+                  () => native,
+                  () => native,
+                );
+              },
+            );
+          },
+          runCallback: job.runCallback,
+          runRetainedCallback: job.runRetainedCallback,
+          readCallbackDeliveryFailure: () => job.readCallbackDeliveryFailure?.(),
+          refuseCallback(error) {
+            if (job.completed || !job.nativeDispatched) {
+              throw new SqliteWorkerError(
+                "SQLite callback refusal lost its accepted operation",
+                "closed",
+              );
+            }
+            throw recordSqliteWorkerHostRefusal(job, error);
+          },
+          retainCommitAuthority: (assertCurrent) => {
+            if (!job.operationAdmission) {
+              throw new Error("SQLite operation admission is not installed");
+            }
+            job.operationAdmission.admission.retainCommitAuthority(assertCurrent);
+          },
+        })
+      : {
+          admission: createSqliteWorkerOperationAdmission(() => {
+            throw new SqliteWorkerError(
+              "SQLite domain operation requires its own admission",
+              "closed",
+            );
+          }),
+          nativeLocations: databasePath ? [databasePath] : [],
+        };
+  } finally {
+    registeringConsumerCompletion = false;
+  }
+  try {
+    retained.admission.bindRefusalProvenance({
+      pending: () => job.refusal?.pending,
+      selected(occurrence) {
+        const previous = job.refusal;
+        // A child with no local failure can still carry its ancestor's confirmed refusal.
+        const selected = occurrence ?? previous?.admissionFailure;
+        if (!selected) {
+          job.refusal = undefined;
+          return;
+        }
+        job.refusal =
+          previous?.admissionFailure === selected && previous.nativeConfirmed
+            ? Object.freeze({ admissionFailure: selected, nativeConfirmed: true })
+            : Object.freeze({ admissionFailure: selected });
+      },
+    });
+    retained.admission.bindCommitAuthority((references) => {
+      const candidates = new Map<number, Job>();
+      const collect = (candidate: Job) => {
+        if (candidates.has(candidate.request.id)) {
+          return;
+        }
+        candidates.set(candidate.request.id, candidate);
+        for (const child of candidate.provisionalChildren?.values() ?? []) {
+          collect(child);
+        }
+      };
+      for (let ancestor: Job | undefined = job; ancestor; ancestor = ancestor.parent) {
+        collect(ancestor);
+      }
+      for (const reference of references) {
+        const candidate = candidates.get(reference.requestId);
+        if (
+          !candidate ||
+          candidate.completed ||
+          candidate.request.actor !== reference.actorId ||
+          candidate.executionWorker !== job.executionWorker ||
+          !candidate.operationAdmission
+        ) {
+          throw new SqliteWorkerError(
+            "SQLite commit authority lost its accepted native lineage",
+            "closed",
+          );
+        }
+        try {
+          candidate.operationAdmission.admission.assertCommitAuthority(reference.authorityId);
+        } catch (error) {
+          throw recordSqliteWorkerHostRefusal(job, error);
+        }
+      }
+    });
+    if (databasePath) {
+      let schemaLease: StateDatabaseSchemaLease | undefined;
+      const assertAccess = () => {
+        assertCurrentJob();
+        job.maintenanceScope?.assertAdmission();
+        assertStateDatabaseAccessAllowed(databasePath, {
+          maintenanceScope: job.maintenanceScope,
+          schemaLease,
+        });
+      };
+      retained.admission.bindDatabaseAuthority({
+        databasePath,
+        assertRequest: assertDispatchable,
+        assertAccess,
+        acquireSchema() {
+          assertAccess();
+          const acquire = () => acquireStateDatabaseSchemaLease(databasePath);
+          const lease = job.maintenanceScope ? job.maintenanceScope.run(acquire) : acquire();
+          schemaLease = lease;
+          job.maintenanceScope?.own(lease, "shared-resources", () => lease.release());
+          return {
+            assertCurrent() {
+              assertAccess();
+              lease.assertCurrent();
+            },
+            release: () => lease.release(),
+          };
+        },
+      });
+    }
+  } catch (error) {
+    retained.admission.finish();
+    throw error;
+  }
+  job.operationAdmission = {
+    admission: retained.admission,
+    // Native BEGIN services the live job's grants at the actual admitted database paths.
+    releaseService: retainSqliteWriteAdmissionService(
+      [
+        ...retained.nativeLocations,
+        ...(databasePath ? [databasePath] : []),
+        ...(actor?.pathReferences.keys() ?? []),
+      ],
+      () => retained.admission.service(),
+    ),
+  };
+  return retained.admission.port;
 }

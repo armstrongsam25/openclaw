@@ -116,22 +116,24 @@ it("checks live admission at commit and keeps a refused operation replayable", a
 function corruptReply(matches: (value: Record<string, unknown>) => boolean) {
   const receive = brokerReply.receiveSqliteWorkerReply;
   let corrupted = false;
-  vi.spyOn(brokerReply, "receiveSqliteWorkerReply").mockImplementation((slot, reply, owner) => {
-    if (
-      !corrupted &&
-      slot.current?.request.type === "execute" &&
-      reply.ok &&
-      !reply.transfer &&
-      !reply.input
-    ) {
-      const value: unknown = deserialize(reply.value);
-      if (isRecord(value) && matches(value)) {
-        corrupted = true;
-        return receive(slot, { ...reply, value: new Uint8Array([0]) }, owner);
+  vi.spyOn(brokerReply, "receiveSqliteWorkerReply").mockImplementation(
+    (slot, reply, owner, executionWorker) => {
+      if (
+        !corrupted &&
+        slot.current?.request.type === "execute" &&
+        reply.ok &&
+        !reply.transfer &&
+        !reply.input
+      ) {
+        const value: unknown = deserialize(reply.value);
+        if (isRecord(value) && matches(value)) {
+          corrupted = true;
+          return receive(slot, { ...reply, value: new Uint8Array([0]) }, owner, executionWorker);
+        }
       }
-    }
-    return receive(slot, reply, owner);
-  });
+      return receive(slot, reply, owner, executionWorker);
+    },
+  );
   return () => expect(corrupted).toBe(true);
 }
 

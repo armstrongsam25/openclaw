@@ -1,8 +1,17 @@
-import { isNativeError, isProxy } from "node:util/types";
+import { isNativeError, isPromise, isProxy } from "node:util/types";
+import { serialize } from "node:v8";
 import type { MessagePort } from "node:worker_threads";
-import type { OpenClawStateWorkerErrorPayload } from "../state/openclaw-state-worker-error.js";
+import { isRecord } from "@openclaw/normalization-core/record-coerce";
+import {
+  encodeOpenClawStateWorkerError,
+  type OpenClawStateWorkerErrorPayload,
+} from "../state/openclaw-state-worker-error.js";
 import type { SqliteWalCheckpointSnapshot } from "./sqlite-wal-checkpoint.js";
 import type { DatabasePathIdentity } from "./sqlite-worker-identity.js";
+import type {
+  SqliteWorkerReadFacts,
+  SqliteWorkerSourceReceipt,
+} from "./sqlite-worker-operation-settlement.js";
 import type { SqliteWorkerStateContext } from "./sqlite-worker-state-context.js";
 import type { SqliteWorkerTransferHandle } from "./sqlite-worker-transfer.js";
 
@@ -79,6 +88,12 @@ export type SqliteWorkerRequest = {
 export type SqliteWorkerReply = {
   id: number;
   cleanupFailure?: OpenClawStateWorkerErrorPayload;
+  rollbackSource?: SqliteWorkerSourceReceipt;
+  readFacts?: SqliteWorkerReadFacts;
+  provisional?: { parentActor: number; parentId: number };
+  provisionalFinal?: true;
+  provisionalRollback?: true;
+  rollbackId?: number;
 } & (
   | {
       ok: true;
@@ -212,4 +227,71 @@ export function hasSqliteWorkerOutcomeUnknown(error: unknown): boolean {
     }
   }
   return false;
+}
+
+export function captureSqliteWorkerSourceFacts(facts: unknown): unknown {
+  if (serialize(facts).byteLength > SQLITE_WORKER_MAX_MESSAGE_BYTES) {
+    throw new SqliteWorkerError("SQLite worker receipt exceeds the transport limit", "overloaded");
+  }
+  return structuredClone(facts);
+}
+
+function encodeSqliteWorkerReadFactsFailure(error: unknown): SqliteWorkerReadFacts {
+  try {
+    const failure = isNativeError(error) ? error : new Error("SQLite read fact preparation failed");
+    const payload = encodeOpenClawStateWorkerError(failure, { includeOrdinary: true });
+    if (payload && serialize(payload).byteLength <= SQLITE_WORKER_MAX_MESSAGE_BYTES) {
+      return { ok: false, error: structuredClone(payload) };
+    }
+  } catch {
+    // Read enrichment failure cannot replace a committed source publication's outcome.
+  }
+  return {
+    ok: false,
+    error: encodeOpenClawStateWorkerError(
+      new SqliteWorkerError("SQLite prepared read facts are unavailable", "outcome-unknown"),
+      { includeOrdinary: true },
+    ),
+  };
+}
+
+/** Bound the accumulated committed facts, not just the latest transaction's contribution. */
+export function captureSqliteWorkerReadFacts(
+  preparations: readonly (() => unknown)[],
+  previous: SqliteWorkerReadFacts | undefined,
+): SqliteWorkerReadFacts {
+  let current: SqliteWorkerReadFacts;
+  try {
+    const contribution = preparations.map((prepare) => {
+      const facts = prepare();
+      if (isPromise(facts)) {
+        void facts.catch(() => undefined);
+        throw new Error("SQLite read fact preparation must remain synchronous");
+      }
+      return facts;
+    });
+    const value = previous?.ok ? [...previous.value, ...contribution] : contribution;
+    if (serialize(value).byteLength > SQLITE_WORKER_MAX_MESSAGE_BYTES) {
+      throw new SqliteWorkerError(
+        "SQLite prepared read facts exceed the transport limit",
+        "overloaded",
+      );
+    }
+    current = { ok: true, value: structuredClone(value) };
+  } catch (error) {
+    current = encodeSqliteWorkerReadFactsFailure(error);
+  }
+  return previous?.ok === false ? previous : current;
+}
+
+export function parseSqliteWorkerReadFacts(value: unknown): SqliteWorkerReadFacts {
+  if (isRecord(value) && value.ok === true && Array.isArray(value.value)) {
+    return { ok: true, value: value.value };
+  }
+  if (isRecord(value) && value.ok === false && Object.hasOwn(value, "error")) {
+    return { ok: false, error: value.error };
+  }
+  return encodeSqliteWorkerReadFactsFailure(
+    new SqliteWorkerError("SQLite prepared read facts are invalid", "outcome-unknown"),
+  );
 }

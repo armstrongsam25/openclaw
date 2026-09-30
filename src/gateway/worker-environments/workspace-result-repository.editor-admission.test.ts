@@ -164,7 +164,7 @@ describe("repository workspace editor admission", () => {
       });
     const replies = vi
       .spyOn(brokerReply, "receiveSqliteWorkerReply")
-      .mockImplementation((slot, reply, owner) => {
+      .mockImplementation((slot, reply, owner, executionWorker) => {
         if (
           holding &&
           !heldSlot &&
@@ -184,7 +184,7 @@ describe("repository workspace editor admission", () => {
             if (!heldSlot) {
               throw new Error("Repository predecessor has no observed native dispatch");
             }
-            deliver = () => receive(slot, reply, owner);
+            deliver = () => receive(slot, reply, owner, executionWorker);
             predecessorHeld.resolve();
             if (signal.aborted) {
               release();
@@ -192,7 +192,7 @@ describe("repository workspace editor admission", () => {
             return;
           }
         }
-        receive(slot, reply, owner);
+        receive(slot, reply, owner, executionWorker);
       });
     const operations = vi
       .spyOn(stateWorker, "runOpenClawStateWorkerOperation")

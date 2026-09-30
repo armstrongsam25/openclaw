@@ -5,7 +5,7 @@ import type { Result } from "@openclaw/normalization-core/result";
 import { cloneEnvWithPlatformSemantics } from "../../config/config-env-vars.js";
 import { resolveStateDir } from "../../config/paths.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
-import { withSqliteWorkerCleanupFailure } from "../../infra/sqlite-worker-broker-reply.js";
+import { withSqliteWorkerCleanupFailure } from "../../infra/sqlite-worker-broker-settlement.js";
 import { getOpenClawDatabaseMaintenanceScope } from "../../state/openclaw-state-db-async-lifecycle.js";
 import {
   getActiveOpenClawStateDatabaseReadSnapshot,
@@ -652,7 +652,7 @@ export function createAuthProfileStoreRuntimeReader({
           ? error
           : withSqliteWorkerCleanupFailure(
               toErrorObject(result.error, "Auth profile runtime read failed"),
-              error,
+              { error },
             );
       }
       if (!result.ok) {

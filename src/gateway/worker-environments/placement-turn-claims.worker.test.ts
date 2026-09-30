@@ -190,21 +190,28 @@ it.each(["claim", "staged result", "workspace manifest"] as const)(
     }
     const receive = brokerReply.receiveSqliteWorkerReply;
     let corrupted = 0;
-    vi.spyOn(brokerReply, "receiveSqliteWorkerReply").mockImplementation((slot, reply, owner) => {
-      if (slot.current?.request.type === "execute" && reply.ok && !reply.transfer && !reply.input) {
-        const value: unknown = deserialize(reply.value);
-        const matches =
-          isRecord(value) &&
-          (operation === "claim"
-            ? isRecord(value.claim) && value.claim.claimId === requested.claimId
-            : isRecord(value.placement) && value.placement.sessionId === requested.sessionId);
-        if (matches) {
-          corrupted += 1;
-          return receive(slot, { ...reply, value: new Uint8Array([0]) }, owner);
+    vi.spyOn(brokerReply, "receiveSqliteWorkerReply").mockImplementation(
+      (slot, reply, owner, executionWorker) => {
+        if (
+          slot.current?.request.type === "execute" &&
+          reply.ok &&
+          !reply.transfer &&
+          !reply.input
+        ) {
+          const value: unknown = deserialize(reply.value);
+          const matches =
+            isRecord(value) &&
+            (operation === "claim"
+              ? isRecord(value.claim) && value.claim.claimId === requested.claimId
+              : isRecord(value.placement) && value.placement.sessionId === requested.sessionId);
+          if (matches) {
+            corrupted += 1;
+            return receive(slot, { ...reply, value: new Uint8Array([0]) }, owner, executionWorker);
+          }
         }
-      }
-      return receive(slot, reply, owner);
-    });
+        return receive(slot, reply, owner, executionWorker);
+      },
+    );
     if (stagedClaim) {
       if (operation === "workspace manifest") {
         const manifestRef = `sha256:${"a".repeat(64)}`;
@@ -243,27 +250,29 @@ it("keeps a later same-byte native claim authoritative when the old release repl
   const replyArrived = createDeferredCore<() => void>();
   const receive = brokerReply.receiveSqliteWorkerReply;
   let delayed = false;
-  vi.spyOn(brokerReply, "receiveSqliteWorkerReply").mockImplementation((slot, reply, owner) => {
-    if (
-      !delayed &&
-      slot.current?.request.type === "execute" &&
-      reply.ok &&
-      !reply.transfer &&
-      !reply.input
-    ) {
-      const value: unknown = deserialize(reply.value);
+  vi.spyOn(brokerReply, "receiveSqliteWorkerReply").mockImplementation(
+    (slot, reply, owner, executionWorker) => {
       if (
-        isRecord(value) &&
-        isRecord(value.placement) &&
-        value.placement.sessionId === claim.sessionId
+        !delayed &&
+        slot.current?.request.type === "execute" &&
+        reply.ok &&
+        !reply.transfer &&
+        !reply.input
       ) {
-        delayed = true;
-        replyArrived.resolve(() => receive(slot, reply, owner));
-        return;
+        const value: unknown = deserialize(reply.value);
+        if (
+          isRecord(value) &&
+          isRecord(value.placement) &&
+          value.placement.sessionId === claim.sessionId
+        ) {
+          delayed = true;
+          replyArrived.resolve(() => receive(slot, reply, owner, executionWorker));
+          return;
+        }
       }
-    }
-    return receive(slot, reply, owner);
-  });
+      return receive(slot, reply, owner, executionWorker);
+    },
+  );
   const releasing = placements.releaseTurn(claim);
   const deliver = await replyArrived.promise;
   let delivered = false;

@@ -1,10 +1,10 @@
 import { deserialize } from "node:v8";
-import { Worker } from "node:worker_threads";
 import { expectDefined } from "@openclaw/normalization-core";
+import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { describe, expect, it, vi } from "vitest";
 import * as workerReplies from "../../infra/sqlite-worker-broker-reply.js";
-import type { SqliteWorkerRequest } from "../../infra/sqlite-worker-contract.js";
 import * as workerAdmission from "../../infra/sqlite-worker-operation-admission.js";
+import { NativeWorker } from "../../infra/worker-native-handle.js";
 import { createTestIngressQueue, withTempState } from "./ingress-drain.test-helpers.js";
 import { createChannelIngressQueue } from "./ingress-queue.js";
 
@@ -132,18 +132,22 @@ describe("channel ingress claim ownership", () => {
     await withTempState(async (stateDir) => {
       const queue = createTestIngressQueue(stateDir);
       let policyChanged = false;
-      let stopped: Promise<number> | undefined;
-      let stopClaimWorker: (() => Promise<number>) | undefined;
+      let stopped: ReturnType<NativeWorker["terminate"]> | undefined;
+      let stopClaimWorker: (() => ReturnType<NativeWorker["terminate"]>) | undefined;
       let claimRequest: number | undefined;
       let attempts = 0;
       // oxlint-disable-next-line typescript/unbound-method -- The intercepted worker remains the receiver below.
-      const originalPost = Worker.prototype.postMessage;
-      const post = vi.spyOn(Worker.prototype, "postMessage").mockImplementation(function (
-        this: Worker,
-        request: SqliteWorkerRequest,
+      const originalPost = NativeWorker.prototype.postMessage;
+      const post = vi.spyOn(NativeWorker.prototype, "postMessage").mockImplementation(function (
+        this: NativeWorker,
+        request: unknown,
         transferList,
       ) {
-        if (request.type === "execute") {
+        if (
+          isRecord(request) &&
+          request.type === "execute" &&
+          request.input instanceof Uint8Array
+        ) {
           const command: unknown = deserialize(request.input);
           if (
             command &&
@@ -151,6 +155,9 @@ describe("channel ingress claim ownership", () => {
             "type" in command &&
             command.type === "channelIngress.claimNext"
           ) {
+            if (typeof request.id !== "number") {
+              throw new Error("Native claim request omitted its operation identity");
+            }
             stopClaimWorker = () => this.terminate();
             claimRequest = request.id;
             attempts++;
@@ -161,12 +168,12 @@ describe("channel ingress claim ownership", () => {
       const receiveReply = workerReplies.receiveSqliteWorkerReply;
       const replies = vi
         .spyOn(workerReplies, "receiveSqliteWorkerReply")
-        .mockImplementation((slot, reply, owner) => {
+        .mockImplementation((slot, reply, owner, executionWorker) => {
           if (reply.id === claimRequest && !reply.ok && stopClaimWorker && !stopped) {
             stopped = stopClaimWorker();
             return;
           }
-          receiveReply(slot, reply, owner);
+          receiveReply(slot, reply, owner, executionWorker);
         });
       const createAdmission = workerAdmission.createSqliteWorkerOperationAdmission;
       const admission = vi

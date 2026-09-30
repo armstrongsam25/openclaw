@@ -33,6 +33,22 @@ or `withOpenClawAgentDatabaseReadOnly` alone, does not move execution off thread
 `readWithCanonicalSessionAdmission` validates session reads on the executing
 thread; invoke it inside the worker's admitted reader.
 
+SQLite broker jobs retain their original execution handle through native
+settlement and cleanup. A returned value or callback result alone does not prove
+that cleanup finished. Retained operations expose native completion without
+requiring a Promise continuation. Public store close also joins accepted command
+Promises and caller scopes, including when a settlement observer calls close.
+Draining a rejected command does not by itself turn that rejection into a close
+failure; close preserves its own native cleanup outcome.
+
+Native source shutdown joins every admitted domain owner before invoking their
+returned native finalizers. Successful settlement keeps the updater generation's
+existing bounded termination and runtime-retention policy. Failed settlement
+still joins recorded sibling cleanup and the original source before reporting
+the failure; it does not become only a termination timeout. Sources outside an
+updater generation use the same domain drainage. Schemas, stored bytes,
+permissions, and domain authority checks are unchanged.
+
 Reply initialization and audited admission validators can reserve their exact
 session keys in the shared store queue. Unrelated sessions proceed while a holder
 awaits another queue; overlapping keys retain FIFO order. Creation hooks, parent

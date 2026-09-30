@@ -7,7 +7,6 @@ import { mock } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { isMainThread, Worker } from "node:worker_threads";
 import { createDeferredCore } from "../shared/deferred.js";
-import { drainGlobalSingletonLifecycleState } from "../shared/global-singleton.js";
 import {
   captureRuntimeWorkerSource,
   withRuntimeWorkerGeneration,
@@ -20,7 +19,9 @@ import {
 } from "./worker-native-lifecycle.js";
 import {
   assertNativeWorkerDiagnosticMatches,
+  assertNativeGenerationFailure,
   runNativeResourceLifecycle,
+  runExplicitUnboundLifecycle,
 } from "./worker-native-lifecycle.runtime.test-support.js";
 
 const sqliteChild = `
@@ -409,208 +410,252 @@ async function runBlockedLifecycle(ending: "terminate" | "natural-exit", databas
   }
 }
 
-async function runGenerationLifecycle(directory: string, databasePath: string) {
-  // Source-loader startup can register its worker after the entry module begins.
+async function runGenerationLifecycle(
+  directory: string,
+  databasePath: string,
+  ending:
+    | "generation"
+    | "generation-settlement-error"
+    | "generation-settlement-undefined"
+    | "generation-direct-error",
+) {
   await nextTurn();
   const initialWorkers = getTrackedWorkerLifecycleSnapshot().workerCount;
   const order: string[] = [];
   const marker = new URL("./native-generation-marker.js", import.meta.url);
   const retainedMarker = new URL("./retained-native-generation-marker.js", import.meta.url);
+  const directFailure =
+    ending === "generation-direct-error"
+      ? new Error("original direct generation owner failed")
+      : undefined;
+  const failure =
+    ending === "generation" || directFailure
+      ? undefined
+      : {
+          error:
+            ending === "generation-settlement-error"
+              ? new Error("original owner settlement failed")
+              : undefined,
+        };
+  const expectedFailure = directFailure ? { error: directFailure } : failure;
+  const workers: ReturnType<typeof createRetainedNativeWorker>[] = [];
+  let supervisor: Worker | undefined;
+  let supervisorJoined = false;
   let nativeJoined = false;
   let siblingJoined = false;
+  let siblingSettled = false;
   let terminalSamplesRejected = false;
   let directoryReleased = false;
-  process.stderr.write(`native lifecycle fixture pid=${process.pid}: generation close ordering\n`);
-  await withRuntimeWorkerGeneration(
-    async (bind) => {
-      bind((url) => (url.href === marker.href ? retainedMarker : url));
-      const binding = captureRuntimeWorkerSource(marker);
-      assert.equal(binding.moduleUrl.href, retainedMarker.href);
-      const generation = binding.runtimeGeneration;
-      assert.ok(generation);
-      const source = captureRetainedNativeWorkerSource({ runtimeGeneration: generation });
-      assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers);
-      const queuedOwner = { source };
-      const siblingOwner = { source };
-      const firstOwnerFinished = createDeferredCore();
-      // Domain owners share the captured source through the existing generation contract.
-      source.retain(queuedOwner, async () => {
-        try {
-          order.push("owner-close-start");
-          await nextTurn();
-          assert.throws(() => generation.resolve(marker), /closing/);
-          assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers);
-          const worker = createRetainedNativeWorker(
-            workerSource,
-            {
-              eval: true,
-              execArgv: [],
-              workerData: { childSource: sqliteChild, databasePath },
-            },
-            queuedOwner.source,
-          );
-          let reply = createDeferredCore<unknown>();
-          worker.on("message", (value) => reply.resolve(value));
-          worker.on("error", (error) => reply.reject(error));
-          worker.on("messageerror", (error) => reply.reject(error));
-          worker.postMessage(21, []);
-          assert.deepEqual(await reply.promise, { value: 42 });
-          assert.ok(worker.threadId > 0);
-          assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 2);
-          order.push("queued-worker-started");
-          reply = createDeferredCore<unknown>();
-          worker.postMessage(9, []);
-          assert.deepEqual(await reply.promise, { value: 18 });
-          order.push("worker-usable-during-close");
-          const stopped = worker.stop();
-          await stopped.result;
-          assert.deepEqual(stopped.read(), { status: "fulfilled", value: undefined });
-          assert.equal(worker.threadId, -1);
-          assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 1);
-          nativeJoined = true;
-          order.push("native-joined");
-          await assert.rejects(worker.cpuUsage());
-          await assert.rejects(worker.getHeapStatistics());
-          terminalSamplesRejected = true;
-          const database = new DatabaseSync(databasePath);
-          try {
-            database.exec("PRAGMA busy_timeout=0; BEGIN IMMEDIATE");
-            assert.equal(database.prepare("SELECT COUNT(*) AS count FROM proof").get()?.count, 1);
-            database.exec("ROLLBACK");
-          } finally {
-            database.close();
-          }
-        } finally {
-          firstOwnerFinished.resolve();
-        }
-      });
-      source.retain(siblingOwner, async () => {
-        await firstOwnerFinished.promise;
-        await nextTurn();
-        assert.equal(nativeJoined, true);
-        assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 1);
-        order.push("sibling-owner-close");
-        const sibling = createRetainedNativeWorker(
-          echoWorkerSource,
-          { eval: true, execArgv: [] },
-          siblingOwner.source,
-        );
-        const reply = createDeferredCore<unknown>();
-        sibling.on("message", reply.resolve);
-        sibling.on("error", reply.reject);
-        sibling.on("messageerror", reply.reject);
-        sibling.postMessage(41, []);
-        assert.equal(await reply.promise, 42);
-        assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 2);
-        const stopped = sibling.stop();
-        await stopped.result;
-        assert.deepEqual(stopped.read(), { status: "fulfilled", value: undefined });
-        assert.equal(sibling.threadId, -1);
-        assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 1);
-        siblingJoined = true;
-        order.push("sibling-native-joined");
-      });
-      order.push("operation");
-    },
-    async () => {
-      assert.equal(nativeJoined, true);
-      assert.equal(siblingJoined, true);
-      assert.equal(terminalSamplesRejected, true);
-      assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers);
-      assert.equal(existsSync(databasePath), true);
-      order.push("release");
-      rmSync(directory, { recursive: true, force: true });
-      directoryReleased = true;
-    },
-  );
-  assert.equal(existsSync(directory), false);
-  console.log(
-    JSON.stringify({
-      ending: "generation",
-      order,
-      nativeJoined,
-      siblingJoined,
-      supervisorJoined: true,
-      directoryReleased,
-      terminalSamplesRejected,
-    }),
-  );
-}
-
-async function runExplicitUnboundLifecycle() {
-  await nextTurn();
-  const initialWorkers = getTrackedWorkerLifecycleSnapshot().workerCount;
-  let ambientReleased = false;
-  const source = await withRuntimeWorkerGeneration(
-    async (bind) => {
-      bind((url) => {
-        const mapped = new URL(url);
-        mapped.searchParams.set("native-lifecycle-test-generation", "ambient");
-        return mapped;
-      });
-      const marker = new URL("./native-generation-marker.js", import.meta.url);
-      assert.notEqual(captureRuntimeWorkerSource(marker).moduleUrl.href, marker.href);
-      const unbound = captureRetainedNativeWorkerSource({ runtimeGeneration: undefined });
-      assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers);
-      return unbound;
-    },
-    async () => {
-      ambientReleased = true;
-      assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers);
-    },
-  );
-  assert.equal(ambientReleased, true);
-  process.stderr.write(`native lifecycle fixture pid=${process.pid}: explicit unbound source\n`);
-  const worker = createRetainedNativeWorker(echoWorkerSource, { eval: true, execArgv: [] }, source);
-  const reply = createDeferredCore<unknown>();
-  worker.on("message", reply.resolve);
-  worker.on("error", reply.reject);
-  worker.on("messageerror", reply.reject);
+  let originalSource: ReturnType<typeof captureRetainedNativeWorkerSource> | undefined;
+  let caught: { error: unknown } | undefined;
+  process.stderr.write(`native lifecycle fixture pid=${process.pid}: ${ending} two-phase close\n`);
   try {
-    worker.postMessage(41, []);
-    assert.equal(await reply.promise, 42);
-    assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 2);
-  } finally {
-    await worker.terminate();
-  }
-  assert.equal(worker.threadId, -1);
-  assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 1);
-  const idleSource = captureRetainedNativeWorkerSource({ runtimeGeneration: undefined });
-  assert.equal(idleSource, source);
-  let ownerClosed = false;
-  source.retain({}, async () => {
-    // Already admitted owners may finish queued work while shutdown drains them.
-    const queued = createRetainedNativeWorker(
-      echoWorkerSource,
-      { eval: true, execArgv: [] },
-      idleSource,
+    try {
+      await withRuntimeWorkerGeneration(
+        async (bind) => {
+          bind((url) => (url.href === marker.href ? retainedMarker : url));
+          const binding = captureRuntimeWorkerSource(marker);
+          assert.equal(binding.moduleUrl.href, retainedMarker.href);
+          const generation = binding.runtimeGeneration;
+          assert.ok(generation);
+          const source = captureRetainedNativeWorkerSource({ runtimeGeneration: generation });
+          originalSource = source;
+          assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers);
+          const firstOwnerSettled = createDeferredCore();
+          const firstNativeFinished = createDeferredCore();
+          const sourceSettled = createDeferredCore();
+          source.retain({}, async () => {
+            try {
+              order.push("owner-settle-start");
+              await nextTurn();
+              assert.throws(() => generation.resolve(marker), /closing/);
+              const registrations = mock.method(Worker.prototype, "on");
+              const worker = (() => {
+                try {
+                  const retained = createRetainedNativeWorker(
+                    workerSource,
+                    {
+                      eval: true,
+                      execArgv: [],
+                      workerData: { childSource: sqliteChild, databasePath },
+                    },
+                    source,
+                  );
+                  workers.push(retained);
+                  const actual = registrations.mock.calls
+                    .map((call) => call.this)
+                    .find((value) => value instanceof Worker);
+                  assert.ok(actual instanceof Worker);
+                  supervisor = actual;
+                  actual.once("exit", () => {
+                    supervisorJoined = true;
+                  });
+                  return retained;
+                } finally {
+                  registrations.mock.restore();
+                }
+              })();
+              let reply = createDeferredCore<unknown>();
+              worker.on("message", (value) => reply.resolve(value));
+              worker.on("error", (error) => reply.reject(error));
+              worker.on("messageerror", (error) => reply.reject(error));
+              worker.postMessage(21, []);
+              assert.deepEqual(await reply.promise, { value: 42 });
+              assert.ok(worker.threadId > 0);
+              assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 2);
+              order.push("queued-worker-started");
+              reply = createDeferredCore<unknown>();
+              worker.postMessage(9, []);
+              assert.deepEqual(await reply.promise, { value: 18 });
+              order.push("worker-usable-during-settlement");
+              const nativeFinal = async () => {
+                try {
+                  if (!failure) {
+                    assert.equal(siblingSettled, true);
+                  }
+                  order.push(failure ? "failed-owner-close" : "owner-native-final");
+                  const stopped = worker.stop();
+                  await stopped.result;
+                  assert.deepEqual(stopped.read(), { status: "fulfilled", value: undefined });
+                  assert.equal(worker.threadId, -1);
+                  nativeJoined = true;
+                  order.push("native-joined");
+                  await assert.rejects(worker.cpuUsage());
+                  await assert.rejects(worker.getHeapStatistics());
+                  terminalSamplesRejected = true;
+                  const database = new DatabaseSync(databasePath);
+                  try {
+                    database.exec("PRAGMA busy_timeout=0; BEGIN IMMEDIATE");
+                    assert.equal(
+                      database.prepare("SELECT COUNT(*) AS count FROM proof").get()?.count,
+                      1,
+                    );
+                    database.exec("ROLLBACK");
+                  } finally {
+                    database.close();
+                  }
+                } finally {
+                  firstNativeFinished.resolve();
+                }
+              };
+              if (failure) {
+                await nativeFinal();
+                order.push("owner-settlement-failed");
+                // oxlint-disable-next-line typescript/only-throw-error -- Preserve the original undefined owner failure without normalization.
+                throw failure.error;
+              }
+              order.push("owner-settled");
+              return nativeFinal;
+            } catch (error) {
+              firstNativeFinished.resolve();
+              throw error;
+            } finally {
+              firstOwnerSettled.resolve();
+            }
+          });
+          source.retain({}, async () => {
+            try {
+              await firstOwnerSettled.promise;
+              assert.equal(nativeJoined, failure !== undefined);
+              assert.equal(supervisorJoined, false);
+              order.push("sibling-owner-settle");
+              const sibling = createRetainedNativeWorker(
+                echoWorkerSource,
+                { eval: true, execArgv: [] },
+                source,
+              );
+              workers.push(sibling);
+              const reply = createDeferredCore<unknown>();
+              sibling.on("message", reply.resolve);
+              sibling.on("error", reply.reject);
+              sibling.on("messageerror", reply.reject);
+              sibling.postMessage(41, []);
+              assert.equal(await reply.promise, 42);
+              assert.equal(
+                getTrackedWorkerLifecycleSnapshot().workerCount,
+                initialWorkers + (failure ? 2 : 3),
+              );
+              siblingSettled = true;
+              order.push("sibling-settled");
+              return async () => {
+                await firstNativeFinished.promise;
+                assert.equal(nativeJoined, true);
+                assert.equal(supervisorJoined, false);
+                order.push("sibling-native-final");
+                const stopped = sibling.stop();
+                await stopped.result;
+                assert.deepEqual(stopped.read(), { status: "fulfilled", value: undefined });
+                assert.equal(sibling.threadId, -1);
+                assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 1);
+                siblingJoined = true;
+                order.push("sibling-native-joined");
+              };
+            } finally {
+              sourceSettled.resolve();
+            }
+          });
+          if (directFailure) {
+            generation.retain({}, async () => {
+              await sourceSettled.promise;
+              order.push("direct-owner-settlement-failed");
+              throw directFailure;
+            });
+          }
+          order.push("operation");
+        },
+        async () => {
+          assert.equal(expectedFailure, undefined);
+          assert.equal(nativeJoined, true);
+          assert.equal(siblingJoined, true);
+          assert.equal(terminalSamplesRejected, true);
+          assert.equal(supervisorJoined, true);
+          assert.equal(supervisor?.threadId, -1);
+          assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers);
+          order.push("release");
+          rmSync(directory, { recursive: true, force: true });
+          directoryReleased = true;
+        },
+      );
+    } catch (error) {
+      caught = { error };
+    }
+    const { originalFailureOccurrences, sourceFailureOccurrences } = assertNativeGenerationFailure(
+      caught,
+      expectedFailure,
+      directFailure !== undefined,
     );
-    const queuedReply = createDeferredCore<unknown>();
-    queued.on("message", queuedReply.resolve);
-    queued.on("error", queuedReply.reject);
-    queued.postMessage(41, []);
-    assert.equal(await queuedReply.promise, 42);
-    await queued.terminate();
-    assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 1);
-    ownerClosed = true;
-  });
-  await drainGlobalSingletonLifecycleState();
-  assert.equal(ownerClosed, true);
-  assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers);
-  assert.throws(() => source.create(echoWorkerSource, { eval: true }), /closing/);
-  const renewed = captureRetainedNativeWorkerSource({ runtimeGeneration: undefined });
-  assert.notEqual(renewed, source);
-  await drainGlobalSingletonLifecycleState();
-  console.log(
-    JSON.stringify({
-      ending: "explicit-unbound",
-      ambientReleased,
-      value: 42,
-      nativeJoined: true,
-      idleReused: true,
-      shutdownJoined: true,
-    }),
-  );
+    assert.equal(nativeJoined, true, "original native final must join before return");
+    assert.equal(siblingJoined, true, "sibling native final must join before return");
+    assert.equal(supervisorJoined, true);
+    assert.equal(supervisor?.threadId, -1);
+    assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers);
+    const source = originalSource;
+    assert.ok(source);
+    assert.throws(
+      () => source.create(echoWorkerSource, { eval: true }),
+      /closing|no retained execution owner/,
+    );
+    assert.equal(directoryReleased, expectedFailure === undefined);
+    assert.equal(existsSync(directory), expectedFailure !== undefined);
+    console.log(
+      JSON.stringify({
+        ending,
+        order,
+        nativeJoined,
+        siblingJoined,
+        supervisorJoined,
+        directoryReleased,
+        terminalSamplesRejected,
+        ...(expectedFailure ? { originalFailureOccurrences, sourceFailureOccurrences } : {}),
+      }),
+    );
+  } finally {
+    await Promise.allSettled(workers.map((worker) => worker.terminate()));
+    if (supervisor && supervisor.threadId !== -1) {
+      await supervisor.terminate();
+    }
+    await nextTurn();
+  }
 }
 
 assert.equal(isMainThread, true, "the fixture must block the process main thread");
@@ -619,6 +664,9 @@ assert.ok(
   ending === "terminate" ||
     ending === "natural-exit" ||
     ending === "generation" ||
+    ending === "generation-settlement-error" ||
+    ending === "generation-settlement-undefined" ||
+    ending === "generation-direct-error" ||
     ending === "explicit-unbound" ||
     ending === "supervisor-loss" ||
     ending === "native-resource" ||
@@ -632,10 +680,15 @@ assert.ok(
 const directory = process.argv[3];
 assert.ok(directory);
 const databasePath = path.join(directory, "nested.sqlite");
-if (ending === "generation") {
-  await runGenerationLifecycle(directory, databasePath);
+if (
+  ending === "generation" ||
+  ending === "generation-settlement-error" ||
+  ending === "generation-settlement-undefined" ||
+  ending === "generation-direct-error"
+) {
+  await runGenerationLifecycle(directory, databasePath, ending);
 } else if (ending === "explicit-unbound") {
-  await runExplicitUnboundLifecycle();
+  await runExplicitUnboundLifecycle(echoWorkerSource);
 } else if (ending === "supervisor-loss") {
   await runSupervisorLoss();
 } else if (ending === "native-resource") {

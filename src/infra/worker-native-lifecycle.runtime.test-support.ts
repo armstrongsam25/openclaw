@@ -588,3 +588,113 @@ export async function runNativeResourceLifecycle(
     channel.port2.close();
   }
 }
+
+export async function runExplicitUnboundLifecycle(echoWorkerSource: string) {
+  const { createDeferredCore } = await import("../shared/deferred.js");
+  const { drainGlobalSingletonLifecycleState } = await import("../shared/global-singleton.js");
+  const { captureRuntimeWorkerSource, withRuntimeWorkerGeneration } =
+    await import("./runtime-worker-generation.js");
+  const { getTrackedWorkerLifecycleSnapshot } = await import("./worker-cpu.js");
+  const { captureRetainedNativeWorkerSource, createRetainedNativeWorker } =
+    await import("./worker-native-lifecycle.js");
+  await nextTurn();
+  const initialWorkers = getTrackedWorkerLifecycleSnapshot().workerCount;
+  let ambientReleased = false;
+  const source = await withRuntimeWorkerGeneration(
+    async (bind) => {
+      bind((url) => {
+        const mapped = new URL(url);
+        mapped.searchParams.set("native-lifecycle-test-generation", "ambient");
+        return mapped;
+      });
+      const marker = new URL("./native-generation-marker.js", import.meta.url);
+      assert.notEqual(captureRuntimeWorkerSource(marker).moduleUrl.href, marker.href);
+      const unbound = captureRetainedNativeWorkerSource({ runtimeGeneration: undefined });
+      assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers);
+      return unbound;
+    },
+    async () => {
+      ambientReleased = true;
+      assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers);
+    },
+  );
+  assert.equal(ambientReleased, true);
+  process.stderr.write(`native lifecycle fixture pid=${process.pid}: explicit unbound source\n`);
+  const worker = createRetainedNativeWorker(echoWorkerSource, { eval: true, execArgv: [] }, source);
+  const reply = createDeferredCore<unknown>();
+  worker.on("message", reply.resolve);
+  worker.on("error", reply.reject);
+  worker.on("messageerror", reply.reject);
+  try {
+    worker.postMessage(41, []);
+    assert.equal(await reply.promise, 42);
+    assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 2);
+  } finally {
+    await worker.terminate();
+  }
+  assert.equal(worker.threadId, -1);
+  assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 1);
+  const idleSource = captureRetainedNativeWorkerSource({ runtimeGeneration: undefined });
+  assert.equal(idleSource, source);
+  let ownerClosed = false;
+  source.retain({}, async () => {
+    // Already admitted owners may finish queued work while shutdown drains them.
+    const queued = createRetainedNativeWorker(
+      echoWorkerSource,
+      { eval: true, execArgv: [] },
+      idleSource,
+    );
+    const queuedReply = createDeferredCore<unknown>();
+    queued.on("message", queuedReply.resolve);
+    queued.on("error", queuedReply.reject);
+    queued.postMessage(41, []);
+    assert.equal(await queuedReply.promise, 42);
+    await queued.terminate();
+    assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers + 1);
+    ownerClosed = true;
+  });
+  await drainGlobalSingletonLifecycleState();
+  assert.equal(ownerClosed, true);
+  assert.equal(getTrackedWorkerLifecycleSnapshot().workerCount, initialWorkers);
+  assert.throws(() => source.create(echoWorkerSource, { eval: true }), /closing/);
+  const renewed = captureRetainedNativeWorkerSource({ runtimeGeneration: undefined });
+  assert.notEqual(renewed, source);
+  await drainGlobalSingletonLifecycleState();
+  console.log(
+    JSON.stringify({
+      ending: "explicit-unbound",
+      ambientReleased,
+      value: 42,
+      nativeJoined: true,
+      idleReused: true,
+      shutdownJoined: true,
+    }),
+  );
+}
+
+export function assertNativeGenerationFailure(
+  caught: { error: unknown } | undefined,
+  failure: { error: unknown } | undefined,
+  direct: boolean,
+) {
+  if (!failure) {
+    assert.equal(caught, undefined);
+    return { originalFailureOccurrences: 0, sourceFailureOccurrences: 0 };
+  }
+  assert.ok(caught?.error instanceof AggregateError);
+  let members: readonly unknown[] = caught.error.errors;
+  assert.equal(members.length, 1, "one failed generation owner, not one per domain owner");
+  const sourceFailureOccurrences = direct ? 0 : members.length;
+  if (!direct) {
+    const sourceFailure = members[0];
+    assert.ok(sourceFailure instanceof AggregateError);
+    members = sourceFailure.errors;
+  }
+  assert.equal(members.length, 1, "retain the original failure occurrence once");
+  assert.equal(members[0], failure.error);
+  const originalFailureOccurrences = members.filter((member) =>
+    Object.is(member, failure.error),
+  ).length;
+  assert.equal(originalFailureOccurrences, 1);
+  return { originalFailureOccurrences, sourceFailureOccurrences };
+}

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { deserialize } from "node:v8";
-import { MessagePort, Worker } from "node:worker_threads";
+import { MessagePort } from "node:worker_threads";
 import { stableStringify } from "@openclaw/normalization-core";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,6 +18,7 @@ import { trackSqliteStatementExecutions } from "../../../test/helpers/sqlite-sta
 import { collectErrorGraphCandidates } from "../../infra/errors.js";
 import * as brokerReply from "../../infra/sqlite-worker-broker-reply.js";
 import { hasSqliteWorkerOutcomeUnknown } from "../../infra/sqlite-worker-contract.js";
+import { NativeWorker } from "../../infra/worker-native-handle.js";
 import {
   closeOpenClawStateDatabaseAsync,
   closeOpenClawStateDatabaseForTest,
@@ -256,22 +257,22 @@ describe("worker inference SQLite store", async () => {
         storePath: path.join(root, "sessions.sqlite"),
       };
       let invalid = false;
-      let target: { worker: Worker; id: number; actor: number } | undefined;
+      let target: { worker: NativeWorker; id: number; actor: number } | undefined;
       let refusalReplies = 0;
       let drain: AcceptedWorkerInferenceSessionDrain | undefined;
       const restores: Array<() => void> = [];
       try {
         await manager.ready();
         const originalPost: unknown = Object.getOwnPropertyDescriptor(
-          Worker.prototype,
+          NativeWorker.prototype,
           "postMessage",
         )?.value;
         if (typeof originalPost !== "function") {
-          throw new Error("native Worker.postMessage is not an own callable property");
+          throw new Error("NativeWorker.postMessage is not an own callable property");
         }
-        const posts = vi.spyOn(Worker.prototype, "postMessage").mockImplementation(function (
-          this: Worker,
-          ...args: Parameters<Worker["postMessage"]>
+        const posts = vi.spyOn(NativeWorker.prototype, "postMessage").mockImplementation(function (
+          this: NativeWorker,
+          ...args: Parameters<NativeWorker["postMessage"]>
         ) {
           const request: unknown = args[0];
           if (
@@ -302,12 +303,12 @@ describe("worker inference SQLite store", async () => {
         const originalReceive = brokerReply.receiveSqliteWorkerReply;
         const replies = vi
           .spyOn(brokerReply, "receiveSqliteWorkerReply")
-          .mockImplementation((slot, reply, owner) => {
+          .mockImplementation((slot, reply, owner, executionWorker) => {
             const job = slot.current;
-            const refusal = job?.operationAdmission?.admission.failure;
+            const refusal = job?.operationAdmission?.admission.failure?.transportError;
             if (
               target &&
-              slot.worker === target.worker &&
+              executionWorker === target.worker &&
               job?.request.id === target.id &&
               job.request.actor === target.actor &&
               reply.id === target.id &&
@@ -318,10 +319,15 @@ describe("worker inference SQLite store", async () => {
             ) {
               refusalReplies += 1;
               if (mode === "lost-refusal-reply" && refusalReplies === 1) {
-                return originalReceive(slot, { ...reply, id: reply.id + 1 }, owner);
+                return originalReceive(
+                  slot,
+                  { ...reply, id: reply.id + 1 },
+                  owner,
+                  executionWorker,
+                );
               }
             }
-            return originalReceive(slot, reply, owner);
+            return originalReceive(slot, reply, owner, executionWorker);
           });
         restores.push(() => replies.mockRestore());
         const started = manager.start({
@@ -486,7 +492,7 @@ describe("worker inference SQLite store", async () => {
         const originalReceive = brokerReply.receiveSqliteWorkerReply;
         const receiver = vi
           .spyOn(brokerReply, "receiveSqliteWorkerReply")
-          .mockImplementation((slot, reply, owner) => {
+          .mockImplementation((slot, reply, owner, executionWorker) => {
             if (
               slot.current?.request.type === "execute" &&
               slot.current.nativeDispatched &&
@@ -504,11 +510,16 @@ describe("worker inference SQLite store", async () => {
                 if (terminalReplies === 1) {
                   // The Worker reply reaches this receiver after COMMIT.
                   committedOutcome = value;
-                  return originalReceive(slot, { ...reply, value: new Uint8Array([0]) }, owner);
+                  return originalReceive(
+                    slot,
+                    { ...reply, value: new Uint8Array([0]) },
+                    owner,
+                    executionWorker,
+                  );
                 }
               }
             }
-            return originalReceive(slot, reply, owner);
+            return originalReceive(slot, reply, owner, executionWorker);
           });
         restoreReceiver = () => receiver.mockRestore();
         const cancellation = manager.captureSessionCancellation(REQUEST.sessionId).cancel();
