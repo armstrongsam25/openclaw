@@ -12,7 +12,8 @@ import {
 } from "./loader.test-fixtures.js";
 import { getPluginInstance } from "./plugin-instance-scope.js";
 import type { PluginRegistry } from "./registry-types.js";
-import { clearActivePluginRegistry, disposePluginRegistryInstances } from "./runtime.js";
+import { disposePluginRegistryInstances } from "./runtime.js";
+import { clearActivePluginRegistry } from "./runtime.test-support.js";
 import { bindPluginToolCallbacks } from "./tool-factory-runtime.js";
 
 const lenderId = "borrow-lender";

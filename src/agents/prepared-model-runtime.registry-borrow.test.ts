@@ -16,7 +16,8 @@ import {
   bindPluginRegistryGatewayOwner,
   isPluginRegistryRetired,
 } from "../plugins/registry-lifecycle.js";
-import { clearActivePluginRegistry, setActivePluginRegistry } from "../plugins/runtime.js";
+import { setActivePluginRegistry } from "../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../plugins/runtime.test-support.js";
 import { withPluginRuntimeRegistryScope } from "../plugins/runtime/gateway-request-scope.js";
 import { setPluginRuntimeLoadContext } from "../plugins/runtime/load-context.js";
 import { createPluginRecord } from "../plugins/status.test-helpers.js";

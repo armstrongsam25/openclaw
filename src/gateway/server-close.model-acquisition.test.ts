@@ -10,9 +10,9 @@ import {
   acquireAgentRunPreparedModelRuntime,
   loadPublishedGatewayReplyDispatchRuntime,
   refreshPreparedModelRuntimeSnapshots,
-  registerPreparedModelRuntimePublicationListener,
 } from "../agents/prepared-model-runtime.js";
 import { registerPreparedModelRuntimeClose } from "../agents/prepared-model-runtime.lifecycle.js";
+import { registerPreparedModelRuntimePublicationListener } from "../agents/prepared-model-runtime.publication-events.js";
 import { getPreparedModelRuntimeStartupStatus } from "../agents/prepared-model-runtime.startup-status.js";
 import { readConfigFileSnapshot } from "../config/io.js";
 import { GATEWAY_SHUTDOWN_TIMEOUT_MS } from "../infra/gateway-shutdown-budget.js";
@@ -104,6 +104,8 @@ it.each(["final Gateway", "live sibling", "closing sibling"] as const)(
       const port = await fixture.reservePort();
       const server = await fixture.start(port);
       const kernel = fixture.kernels.get(port)!;
+      // Settle unrelated delivery imports before simulating a rotated model chunk.
+      await kernel.runtimeState.stopDeliveryRecovery();
       const reloader = kernel.runtimeState.configReloader;
       const stopReloader = reloader.stop.bind(reloader);
       const observedStop = vi.spyOn(reloader, "stop").mockImplementation(() => {

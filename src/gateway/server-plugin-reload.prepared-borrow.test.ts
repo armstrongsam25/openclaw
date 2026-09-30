@@ -24,11 +24,8 @@ import {
   retainGatewayPluginMetadata,
 } from "../plugins/plugin-metadata-lifecycle.js";
 import type { PluginRegistry } from "../plugins/registry-types.js";
-import {
-  clearActivePluginRegistry,
-  createPluginRegistryOwner,
-  resetPluginRuntimeStateForTest,
-} from "../plugins/runtime.js";
+import { createPluginRegistryOwner, resetPluginRuntimeStateForTest } from "../plugins/runtime.js";
+import { clearActivePluginRegistry } from "../plugins/runtime.test-support.js";
 import { withPluginRuntimeRegistryScope } from "../plugins/runtime/gateway-request-scope.js";
 import { resetGatewayWorkAdmission } from "../process/gateway-work-admission.js";
 import { createDeferredCore } from "../shared/deferred.js";
