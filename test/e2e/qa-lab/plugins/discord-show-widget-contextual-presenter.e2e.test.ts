@@ -392,6 +392,9 @@ describe("Discord show_widget contextual presenter process proof", () => {
         },
         tools: {
           ...cfg.tools,
+          // The inventory assertion exercises the widget's direct model schema.
+          toolSearch: false,
+          codeMode: false,
           alsoAllow: [...(cfg.tools?.alsoAllow ?? []), "message", "show_widget"],
         },
       }),
