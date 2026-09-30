@@ -211,6 +211,11 @@ changing the installed package. Linux OverlayFS installations use private copies
 so hard-link copy-up cannot invalidate the retained files’ identity checks.
 Other supported filesystems keep the hard-link fast path and copy fallback.
 
+SQLite read-only workers use that retained generation through post-install
+verification, even after the package manager removes the previous package path.
+Already-installed older updaters, including 2026.9.6, still run their original
+worker-launch code; installing a corrected candidate cannot repair that first hop.
+
 Source updates retain a retired workspace dependency link when only its ignored `node_modules` directory remains.
 An older installed updater that fails at `updater-runtime-retention` needs this correction in its running code before retrying; a newer candidate cannot repair that earlier step.
 
@@ -338,6 +343,12 @@ require storing a task password.
 
 This target-CLI protection does not cover every Doctor or plugin child or the
 in-process service preparation before package mutation.
+
+After Scheduled Task autostart has been suspended, cancelling before installation
+mutation restores it before exit, while retaining checks on the original update
+owner and task identity. This protection belongs to the installed updater;
+installing a release with the fix enables it for the next update that release
+performs.
 
 ## Options
 
