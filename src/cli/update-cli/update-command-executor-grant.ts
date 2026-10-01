@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { resolveServiceManagerEnv } from "../../daemon/service-process-env.js";
+import { formatErrorMessage } from "../../infra/errors.js";
 import { resolveUpdateInstallRoot } from "../../infra/update-install-root.js";
 import { captureManagedUpdateLeaseDatabaseIdentity } from "../../infra/update-managed-service-handoff-database.js";
 import { createManagedHandoffLeaseStore } from "../../infra/update-managed-service-handoff-lease.js";
@@ -62,7 +63,7 @@ export function resolveUpdateCommandChildBinding(
     !grant.databaseIdentity &&
     grant.childKey === `${grant.parent.key}/.openclaw-update-child-${childName}` &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(childName);
-  const databaseIdentity = legacyGrant
+  let databaseIdentity = legacyGrant
     ? captureManagedUpdateLeaseDatabaseIdentity(grant.databasePath)
     : grant.databaseIdentity;
   const databasePath = databaseIdentity?.databasePath ?? grant.databasePath;
@@ -88,6 +89,20 @@ export function resolveUpdateCommandChildBinding(
       "Candidate executor lineage is missing or invalid.",
     );
   }
+  // Lineage authenticates the original bytes before legacy pins are normalized.
+  // Cancellation-aware originals and descendants of an admitted candidate use
+  // exact pins. Only the initial hop from an older original can need rounding.
+  databaseIdentity = captureManagedUpdateLeaseDatabaseIdentity(
+    databasePath,
+    databaseIdentity,
+    (spawner.key === original.key ||
+      (spawner.key.startsWith(childPrefix) &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+          spawner.key.slice(childPrefix.length),
+        ))) &&
+      original.action.kind === "update" &&
+      (original.version === 1 || original.action.mutationProtocol === undefined),
+  );
   const store = createManagedHandoffLeaseStore({
     databasePath,
     serviceManagerEnv: resolveServiceManagerEnv(),
@@ -106,6 +121,14 @@ export function resolveUpdateCommandChildBinding(
   const slotChild = slot ? store.read(slot.childKey) : undefined;
   const retained = retainedFields ? store.read(grant.retainedParent!.key) : undefined;
   const retainedChild = retainedFields ? store.read(grant.retainedChildKey!) : undefined;
+  for (const read of [parent, originalChild, child, slotChild, retained, retainedChild]) {
+    if (read?.kind === "unreadable") {
+      throw new UpdateCommandRecoveryPendingError(
+        `Candidate executor lease is unreadable: ${formatErrorMessage(read.error)}`,
+        { cause: read.error },
+      );
+    }
+  }
   if (
     (slot &&
       (slot.parent.key === original.key ||

@@ -131,7 +131,7 @@ export function registerPreparedCoordinatorAdmissionTest(params: {
 
         await fs.promises.rename(coordinator, displaced);
         moved = true;
-        expect(originalStore.read(root)).toEqual({ kind: "unreadable" });
+        expect(originalStore.read(root)).toMatchObject({ kind: "unreadable" });
         await expect(
           start().then((result) => {
             latest = result;

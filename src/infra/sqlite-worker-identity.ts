@@ -9,6 +9,10 @@ export type DatabaseFileIdentity = Readonly<{
 }>;
 export type DatabasePathIdentity = DatabaseFileIdentity & Readonly<{ canonicalPath: string }>;
 
+export function databaseFileIdentityKey(file: Pick<BigIntStats, "dev" | "ino">): string {
+  return `${file.dev}:${file.ino}`;
+}
+
 export function readDatabaseFileIdentity(value: unknown): DatabaseFileIdentity {
   if (
     !value ||
@@ -37,7 +41,7 @@ export function assertDatabaseFileIdentity(
 ): void {
   if (
     !file.isFile() ||
-    `file:${file.dev}:${file.ino}` !== expected.key ||
+    `file:${databaseFileIdentityKey(file)}` !== expected.key ||
     (expected.birthtime !== undefined && file.birthtimeNs.toString() !== expected.birthtime)
   ) {
     throw new Error("SQLite database file identity changed before existing-only open");
@@ -60,7 +64,7 @@ function existingIdentity(
     throw new Error("SQLite database pathname changed during admission");
   }
   return {
-    key: `file:${file.dev}:${file.ino}`,
+    key: `file:${databaseFileIdentityKey(file)}`,
     canonicalPath,
     birthtime: file.birthtimeNs.toString(),
   };
