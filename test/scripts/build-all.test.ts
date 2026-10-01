@@ -710,6 +710,7 @@ describe("resolveBuildAllSteps", () => {
 
   it("uses a runtime artifact plus plugin SDK export profile for ci artifacts", () => {
     expect(resolveBuildAllSteps("ciArtifacts").map((step) => step.label)).toEqual([
+      "native-protocol",
       "plugins:assets:build",
       "tsdown",
       "external-plugins:local-dist",
