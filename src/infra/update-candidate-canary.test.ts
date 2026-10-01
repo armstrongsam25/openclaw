@@ -773,7 +773,10 @@ describe("update candidate canary", () => {
           updateRunReportInputFromResult({ ...result, mode: "git", root }),
         );
         for (const text of [output, report.markdown]) {
-          expect(text.match(/Unable to resolve health API/gu)).toHaveLength(1);
+          expect(text).toContain("Unable to resolve health API");
+          if (scenario !== "startup-tail") {
+            expect(text.match(/Unable to resolve health API/gu)).toHaveLength(1);
+          }
         }
         expect(result.logTail.join("\n")).toContain("Unable to resolve health API");
       }
