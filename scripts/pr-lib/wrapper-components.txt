@@ -1001,10 +1001,12 @@ src/plugins/discovery-required-plugins.ts
 src/plugins/discovery.ts
 src/plugins/doctor-compatibility-migration.ts
 src/plugins/doctor-contract-artifact.ts
+src/plugins/doctor-contract-legacy-setup.ts
 src/plugins/doctor-contract-module.ts
 src/plugins/doctor-contract-registry-loader-state.ts
 src/plugins/doctor-contract-registry.ts
 src/plugins/doctor-contract-relevance.ts
+src/plugins/loader-channel-setup.ts
 src/plugins/doctor-session-route-state-owner-types.ts
 src/plugins/enable.ts
 src/plugins/hardlink-policy.ts
