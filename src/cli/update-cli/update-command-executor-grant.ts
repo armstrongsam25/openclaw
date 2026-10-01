@@ -101,7 +101,8 @@ export function resolveUpdateCommandChildBinding(
           spawner.key.slice(childPrefix.length),
         ))) &&
       original.action.kind === "update" &&
-      (original.version === 1 || original.action.mutationProtocol === undefined),
+      (original.version === 1 ||
+        (original.version === 2 && original.action.mutationProtocol === undefined)),
   );
   const store = createManagedHandoffLeaseStore({
     databasePath,
