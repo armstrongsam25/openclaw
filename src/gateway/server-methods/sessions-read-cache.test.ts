@@ -900,13 +900,13 @@ describe("resident sessions.list", () => {
         const client = identifiedClient("viewer@example.com");
         await initializeSessionReadContext(context);
         const projection = getSessionRowProjection(context)!;
-        const ensure = projection.ensureMaterialized.bind(projection);
+        const ensure = projection.prepareSelection.bind(projection);
         let releaseRows!: () => void;
         const gate = new Promise<void>((resolve) => {
           releaseRows = resolve;
         });
         const readiness = vi
-          .spyOn(projection, "ensureMaterialized")
+          .spyOn(projection, "prepareSelection")
           .mockImplementationOnce(async () => {
             await gate;
             await ensure();
@@ -954,7 +954,7 @@ describe("resident sessions.list", () => {
       const request = { archived: "all" as const, limit: 100 };
       await initializeSessionReadContext(context);
       const projection = getSessionRowProjection(context)!;
-      vi.spyOn(projection, "ensureMaterialized").mockRejectedValueOnce(
+      vi.spyOn(projection, "prepareSelection").mockRejectedValueOnce(
         new Error("synthetic materialization failure"),
       );
 

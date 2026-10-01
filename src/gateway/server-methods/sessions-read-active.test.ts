@@ -52,8 +52,8 @@ async function changeDuringReadiness(
 ) {
   await initializeSessionReadContext(context);
   const projection = getSessionRowProjection(context)!;
-  const ensure = projection.ensureMaterialized;
-  vi.spyOn(projection, "ensureMaterialized").mockImplementationOnce(async () => {
+  const ensure = projection.prepareSelection;
+  vi.spyOn(projection, "prepareSelection").mockImplementationOnce(async () => {
     await change();
     await ensure();
   });

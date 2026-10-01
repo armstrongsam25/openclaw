@@ -106,8 +106,8 @@ it.each([
         { key: scope.sessionKey, sessionId: selected.sessionId },
       ]);
       const projection = expectDefined(getSessionRowProjection(context), "resident projection");
-      const ready = projection.ensureMaterialized.bind(projection);
-      vi.spyOn(projection, "ensureMaterialized").mockImplementationOnce(async () => {
+      const ready = projection.prepareSelection.bind(projection);
+      vi.spyOn(projection, "prepareSelection").mockImplementationOnce(async () => {
         await ready();
         // Resume the real request only after its current authority has changed.
         if (change === "config") {

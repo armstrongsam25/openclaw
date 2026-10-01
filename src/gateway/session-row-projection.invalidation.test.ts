@@ -505,6 +505,7 @@ it.each([
       let lists: Array<ReturnType<typeof listProjectedSessions>> = [];
       let stopWorkerReadGuard = () => {};
       try {
+        await projection.ensureMaterialized();
         await listProjectedSessions({ projection, opts });
         const catalogReads = vi.spyOn(catalogLookup, "findModelCatalogEntry");
         await listProjectedSessions({ projection, opts });
