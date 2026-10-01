@@ -1,8 +1,7 @@
 import "../subagents/registry/subagent-registry.mocks.shared.js";
 import assert from "node:assert/strict";
 import os from "node:os";
-import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import { createDeferred } from "../../../test/helpers/promise.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTempDirTracker } from "../../../test/helpers/temp-dir.js";
 import { cleanupBrowserSessionsForLifecycleEnd } from "../../browser-lifecycle-cleanup.js";
 import { getRuntimeConfig } from "../../config/config.js";
@@ -22,9 +21,7 @@ import {
   runSubagentAnnounceFlow,
 } from "../subagents/announce/subagent-announce.js";
 import { maybeWakeRequesterAfterAllChildrenSettled } from "../subagents/announce/subagent-announce.requester-settle-wake.js";
-import { subagentRuns } from "../subagents/registry/subagent-registry-memory.js";
 import {
-  onSubagentRegistryPersisted,
   persistSubagentRunsToDisk,
   persistSubagentRunsToDiskOrThrow,
   restoreSubagentRunsFromDisk,
@@ -109,7 +106,6 @@ describe("swarm tools integration", () => {
     const modelStructuredCalls: number[] = [];
     const childGuidance: string[] = [];
     const acceptedNotes: string[] = [];
-    const collectorsWaiting = createDeferred();
     let launchCount = 0;
     const launchGateway = vi.fn(async (request: unknown) => {
       const method =
@@ -176,9 +172,6 @@ describe("swarm tools integration", () => {
         assert(typeof runId === "string", "collector wait must identify its run");
         await new Promise<void>((resolve) => {
           completionResolvers.set(runId, resolve);
-          if (completionResolvers.size === 3) {
-            collectorsWaiting.resolve();
-          }
         });
         return { status: "ok", startedAt: 1, endedAt: Date.now() } as T;
       },
@@ -250,7 +243,7 @@ describe("swarm tools integration", () => {
       expect(details.runId).toBeTruthy();
       runIds.push(details.runId ?? "");
     }
-    await collectorsWaiting.promise;
+    await vi.waitFor(() => expect(completionResolvers.size).toBe(3));
     expect(modelStructuredCalls).toEqual([1, 3]);
 
     const pending = new Set(runIds);
@@ -258,21 +251,10 @@ describe("swarm tools integration", () => {
     for (const publicRunId of [runIds[1] ?? "", runIds[2] ?? "", runIds[0] ?? ""]) {
       const gatewayRunId = publicToGateway.get(publicRunId);
       expect(gatewayRunId).toBeTruthy();
-      const published = createDeferred();
-      const unsubscribe = onSubagentRegistryPersisted(() => {
-        if (subagentRuns.get(gatewayRunId ?? "")?.collectorCompletion) {
-          published.resolve();
-        }
-      });
-      onTestFinished(unsubscribe);
       completionResolvers.get(gatewayRunId ?? "")?.();
-      // agent.wait returning starts asynchronous completion capture. Drain only
-      // after the registry publishes the collector result, not a wall-clock deadline.
-      await published.promise;
-      unsubscribe();
       const result = await wait.execute("wait", {
         ids: [...pending],
-        timeoutSeconds: 0,
+        timeoutSeconds: 1,
       });
       const details = result.details as {
         completed: Array<{ runId: string; result: string; structured?: unknown }>;
