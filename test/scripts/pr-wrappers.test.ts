@@ -1734,6 +1734,7 @@ exit 99
 
   it("initializes stamped review artifacts through the materialized anchor", () => {
     const fixture = makeMismatchedWrapperRepo();
+    const dependencyTarget = realpathSync(join(fixture.canonical, "node_modules/tsx"));
     writeFileSync(
       join(fixture.bin, "gh"),
       `#!/bin/sh
@@ -1776,6 +1777,11 @@ exit 99
       headSha: fixture.localRevision,
     });
     expect(existsSync(join(reviewRoot, ".local", "review.md"))).toBe(false);
+    expect(
+      readdirSync(fixture.root).filter((name) => name.startsWith("openclaw-pr-anchor.")),
+    ).toEqual([]);
+    expect(realpathSync(join(fixture.canonical, "node_modules/tsx"))).toBe(dependencyTarget);
+    expect(existsSync(join(dependencyTarget, "package.json"))).toBe(true);
   });
 
   it.each([
