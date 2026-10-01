@@ -9,15 +9,20 @@ import {
   createManagedHandoffLeaseDatabase,
 } from "../../infra/update-managed-service-handoff-database.js";
 import { createManagedHandoffLeaseStore } from "../../infra/update-managed-service-handoff-lease.js";
-import { childLineageDigest } from "./update-command-executor-children.js";
+import {
+  childLineageDigest,
+  type UpdateCommandChildGrant,
+} from "./update-command-executor-children.js";
 import { resolveUpdateCommandChildBinding } from "./update-command-executor-grant.js";
 
 const dirs = useAutoCleanupTempDirTracker(afterEach);
 afterEach(() => vi.restoreAllMocks());
 
-it.each(["9.6 numeric", "9.6 bridge", "9.7 exact"] as const)(
+it.each(["9.4 identity-less", "9.6 numeric", "9.6 bridge", "9.7 exact"] as const)(
   "admits a %s grant and fences parent replacement",
   (version) => {
+    const identityLess = version === "9.4 identity-less";
+    const numeric = version === "9.6 numeric" || version === "9.6 bridge";
     const root = fs.realpathSync(dirs.make("numeric-lease-parent-"));
     const directory = path.join(root, "leases");
     fs.mkdirSync(directory, { mode: 0o700 });
@@ -61,7 +66,8 @@ it.each(["9.6 numeric", "9.6 bridge", "9.7 exact"] as const)(
 
     // Model NTFS metadata only; the grant, live rows and candidate admission are real.
     const lstat = fs.lstatSync;
-    let parentInode = 168040561096346671n;
+    const initialInode = identityLess ? 9007199254740992n : 168040561096346671n;
+    let parentInode = initialInode;
     let readError: Error | undefined;
     vi.spyOn(fs, "lstatSync").mockImplementation((...args) => {
       if (String(args[0]) === directory && readError) {
@@ -80,82 +86,118 @@ it.each(["9.6 numeric", "9.6 bridge", "9.7 exact"] as const)(
       const stat = fs.lstatSync(pathname);
       return `${stat.dev}:${stat.ino}`;
     };
-    const databaseIdentity =
-      version !== "9.7 exact"
-        ? {
-            databasePath,
-            databaseIdentity: numericIdentity(databasePath),
-            parentIdentity: numericIdentity(directory),
-          }
-        : captureManagedUpdateLeaseDatabaseIdentity(databasePath);
+    const databaseIdentity = numeric
+      ? {
+          databasePath,
+          databaseIdentity: numericIdentity(databasePath),
+          parentIdentity: numericIdentity(directory),
+        }
+      : captureManagedUpdateLeaseDatabaseIdentity(databasePath);
     expect(databaseIdentity.parentIdentity).toMatch(
-      version !== "9.7 exact" ? /:168040561096346660$/ : /:168040561096346671$/,
+      numeric ? /:168040561096346660$/ : new RegExp(`:${initialInode}$`),
     );
-    const childKey = `${spawnerKey}/.openclaw-update-child-${randomUUID()}-lineage-${childLineageDigest(parent.lease, spawner.lease, parent.lease, databaseIdentity)}`;
+    const childKey = `${spawnerKey}/.openclaw-update-child-${randomUUID()}${identityLess ? "" : `-lineage-${childLineageDigest(parent.lease, spawner.lease, parent.lease, databaseIdentity)}`}`;
+    const childPayload = identityLess
+      ? JSON.stringify({
+          version: 2,
+          helper: executor,
+          executor: store.processIdentity(process.pid),
+          action: { kind: "update" },
+        })
+      : payload;
     const db = new DatabaseSync(databasePath);
     try {
       db.prepare("INSERT INTO managed_update_handoffs VALUES (?, ?, ?, ?)").run(
         childKey,
         runId,
-        payload,
+        childPayload,
         2,
       );
     } finally {
       db.close();
     }
-    const grant = {
+    const grant: UpdateCommandChildGrant = {
       runId,
       root,
       databasePath,
-      databaseIdentity,
       parent: parent.lease,
-      originalParent: parent.lease,
-      spawner: spawner.lease,
       childKey,
-      originalChildKey: childKey,
+      ...(identityLess
+        ? {}
+        : {
+            databaseIdentity,
+            originalParent: parent.lease,
+            spawner: spawner.lease,
+            originalChildKey: childKey,
+          }),
     };
     const admitted = resolveUpdateCommandChildBinding(grant, runId, root);
     assert(admitted.databaseIdentity);
-    expect(admitted.databaseIdentity.parentIdentity).toMatch(/^\d+:168040561096346671$/);
+    expect(admitted.databaseIdentity.parentIdentity).toMatch(new RegExp(`^\\d+:${initialInode}$`));
     expect(admitted.store.read(root)).toMatchObject({ kind: "current" });
     const descendantKey = `${childKey}/.openclaw-update-child-${randomUUID()}-lineage-${childLineageDigest(parent.lease, admitted.child, parent.lease, admitted.databaseIdentity)}`;
     const descendants = new DatabaseSync(databasePath);
     try {
-      descendants
-        .prepare("INSERT INTO managed_update_handoffs VALUES (?, ?, ?, ?)")
-        .run(descendantKey, runId, payload, 3);
+      descendants.prepare("INSERT INTO managed_update_handoffs VALUES (?, ?, ?, ?)").run(
+        descendantKey,
+        runId,
+        JSON.stringify({
+          version: 2,
+          helper: admitted.child.executor,
+          executor: admitted.child.executor,
+          action: admitted.child.action,
+        }),
+        3,
+      );
     } finally {
       descendants.close();
     }
     const descendantGrant = {
       ...grant,
+      originalParent: parent.lease,
       spawner: admitted.child,
       databaseIdentity: admitted.databaseIdentity,
       originalChildKey: descendantKey,
       childKey: descendantKey,
     };
-    expect(resolveUpdateCommandChildBinding(descendantGrant, runId, root).child.key).toBe(
-      descendantKey,
+    const resolveDescendant = () => {
+      // Model the next receiver's parent PID without booting another source runtime.
+      const descriptor = Object.getOwnPropertyDescriptor(process, "ppid");
+      assert(descriptor);
+      Object.defineProperty(process, "ppid", {
+        configurable: true,
+        value: admitted.child.executor.pid,
+      });
+      try {
+        return resolveUpdateCommandChildBinding(descendantGrant, runId, root);
+      } finally {
+        Object.defineProperty(process, "ppid", descriptor);
+      }
+    };
+    expect(resolveDescendant().child.key).toBe(descendantKey);
+    parentInode += identityLess ? 1n : -1n;
+    expect(numericIdentity(directory)).toMatch(
+      identityLess ? /:9007199254740992$/ : /:168040561096346660$/,
     );
-    parentInode -= 1n;
-    expect(numericIdentity(directory)).toMatch(/:168040561096346660$/);
     expect(() => admitted.store.acquire(root, "replacement", { kind: "update" })).toThrow(
       "identity changed",
     );
-    expect(() => resolveUpdateCommandChildBinding(descendantGrant, runId, root)).toThrow(
-      "identity changed",
-    );
+    expect(resolveDescendant).toThrow("identity changed");
     if (version === "9.7 exact") {
       expect(() => resolveUpdateCommandChildBinding(grant, runId, root)).toThrow(
         "identity changed",
       );
     }
     parentInode += 4096n;
-    expect(() => resolveUpdateCommandChildBinding(grant, runId, root)).toThrow("identity changed");
+    if (!identityLess) {
+      expect(() => resolveUpdateCommandChildBinding(grant, runId, root)).toThrow(
+        "identity changed",
+      );
+    }
     readError = new Error("lease parent metadata unavailable");
     expect(() => resolveUpdateCommandChildBinding(grant, runId, root)).toThrow(readError.message);
     readError = undefined;
-    parentInode = 168040561096346671n;
+    parentInode = initialInode;
     const damaged = new DatabaseSync(databasePath);
     try {
       damaged.exec("DROP TABLE managed_update_handoffs");

@@ -90,13 +90,14 @@ export function resolveUpdateCommandChildBinding(
     );
   }
   // Lineage authenticates the original bytes before legacy pins are normalized.
-  // Cancellation-aware originals and descendants of an admitted candidate use
-  // exact pins. Only the initial hop from an older original can need rounding.
+  // Bound descendants differ from self-owned, bare-UUID legacy bridges; only
+  // the initial hop from an older original or its bridge can need rounding.
   databaseIdentity = captureManagedUpdateLeaseDatabaseIdentity(
     databasePath,
     databaseIdentity,
     (spawner.key === original.key ||
       (spawner.key.startsWith(childPrefix) &&
+        isDeepStrictEqual(spawner.helper, spawner.executor) &&
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
           spawner.key.slice(childPrefix.length),
         ))) &&
