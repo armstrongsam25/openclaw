@@ -1,10 +1,20 @@
 // Plugin config runtime helpers load and normalize plugin-owned configuration at execution time.
 import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 import type { OpenClawConfig } from "../config/types.js";
-import { normalizePluginsConfig, resolveEffectiveEnableState } from "../plugins/config-state.js";
+import { normalizePluginsConfigWithResolverCore } from "../plugins/config-normalization-shared.js";
+import {
+  normalizePluginId,
+  normalizePluginsConfig as readNormalizedPluginsConfig,
+  resolveEffectiveEnableState,
+} from "../plugins/config-state.js";
 
-export { normalizePluginsConfig, resolveEffectiveEnableState };
+export { resolveEffectiveEnableState };
 export { mergeDeep } from "../infra/deep-merge.js";
+
+/** Public normalization returns caller-owned policy; plugins cannot mutate the host's facts. */
+export function normalizePluginsConfig(config?: OpenClawConfig["plugins"]) {
+  return normalizePluginsConfigWithResolverCore(config, normalizePluginId);
+}
 
 /** Requires an already-resolved runtime config at plugin runtime boundaries. */
 export function requireRuntimeConfig(config: OpenClawConfig, context: string): OpenClawConfig {
@@ -21,7 +31,7 @@ export function resolvePluginConfigObject(
   config: OpenClawConfig | undefined,
   pluginId: string,
 ): Record<string, unknown> | undefined {
-  const pluginConfig = normalizePluginsConfig(config?.plugins).entries[pluginId]?.config;
+  const pluginConfig = readNormalizedPluginsConfig(config?.plugins).entries[pluginId]?.config;
   return asOptionalRecord(pluginConfig);
 }
 
