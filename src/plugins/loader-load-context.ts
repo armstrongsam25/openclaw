@@ -32,6 +32,7 @@ import { normalizePluginIdScope } from "./plugin-scope.js";
 import { getPluginLoaderCacheState } from "./registry-lifecycle.js";
 import { getPluginRegistryRuntime } from "./registry-runtime-binding.js";
 import { getActivePluginRegistry, getPluginRegistryForContext } from "./runtime.js";
+import { activationConfigFingerprint } from "./runtime/load-context.js";
 import type { PluginSdkResolutionPreference } from "./sdk-alias.js";
 
 const runtimeBindingCacheIds = new WeakMap<object, number>();
@@ -115,6 +116,7 @@ function buildCacheKeys(params: {
   allowProcessHomeSessionCatalogs?: boolean;
   activate?: boolean;
   runtimeSideEffects: boolean;
+  registrationSnapshots?: readonly string[];
   mode: NonNullable<PluginLoadOptions["mode"]>;
   expectedSourceDigests?: Readonly<Record<string, string>>;
 }) {
@@ -179,11 +181,18 @@ function buildCacheKeys(params: {
       ? Object.entries(params.expectedSourceDigests).toSorted(([a], [b]) => a.localeCompare(b))
       : undefined,
   };
-  // Capture request facts once; discovered manifests may replace only the source projection.
   const requestIdentity = JSON.stringify(cacheIdentity);
+  // Prepared, non-activating loads consume exact manifest sources, not workspace discovery.
+  const preparedIdentity = params.registrationSnapshots
+    ? JSON.stringify({
+        ...cacheIdentity,
+        roots: { ...roots, workspace: undefined },
+        registrationSnapshots: params.registrationSnapshots,
+      })
+    : requestIdentity;
   const resolveManifestCacheKey = (manifestRegistry: PluginLoadOptions["manifestRegistry"]) =>
     createHash("sha256")
-      .update(requestIdentity)
+      .update(manifestRegistry ? preparedIdentity : requestIdentity)
       .update(
         JSON.stringify(
           manifestRegistry?.plugins.map((plugin) => [
@@ -277,15 +286,11 @@ export function resolvePluginLoadCacheContext(options: PluginLoadOptions = {}) {
         onMissing: () => undefined,
       }) as OpenClawConfig)
     : rawActivationSourceConfig;
-  // Registration callbacks retain these exact snapshots for their instance lifetime.
-  const cfg = captureRuntimeConfig(runtimeConfig);
-  const activationSourceConfig =
-    activationConfig === runtimeConfig ? cfg : captureRuntimeConfig(activationConfig);
-  const normalized = normalizePluginsConfig(cfg.plugins);
+  const normalized = normalizePluginsConfig(runtimeConfig.plugins);
   // Identical plugin inputs may share facts; source channel policy keeps its own root config.
   const activationSource = createPluginActivationSource({
-    config: activationSourceConfig,
-    plugins: cfg.plugins === activationSourceConfig.plugins ? normalized : undefined,
+    config: activationConfig,
+    plugins: runtimeConfig.plugins === activationConfig.plugins ? normalized : undefined,
   });
   const trustNormalized = mergeTrustPluginConfigFromActivationSource({
     normalized,
@@ -341,7 +346,7 @@ export function resolvePluginLoadCacheContext(options: PluginLoadOptions = {}) {
     ...(options.installRecords ??
       preparedInstallRecords ??
       loadInstalledPluginIndexInstallRecordsSync({ env })),
-    ...cfg.plugins?.installs,
+    ...runtimeConfig.plugins?.installs,
   };
   const discoveryContext = resolvePluginDiscoveryContext({
     workspaceDir: options.workspaceDir,
@@ -355,6 +360,9 @@ export function resolvePluginLoadCacheContext(options: PluginLoadOptions = {}) {
   const shouldActivate = options.mode !== "cli-metadata" && options.activate !== false;
   // Staged runtime registration is independent of publishing the process registry.
   const runtimeSideEffects = options.runtimeSideEffects ?? shouldActivate;
+  const manifestRegistry =
+    options.manifestRegistry ??
+    (options.discovery === undefined ? currentMetadataSnapshot?.manifestRegistry : undefined);
   const { cacheKey, resolveManifestCacheKey } = buildCacheKeys({
     discoveryContext,
     plugins: trustNormalized,
@@ -364,9 +372,7 @@ export function resolvePluginLoadCacheContext(options: PluginLoadOptions = {}) {
       autoEnabledReasons: options.autoEnabledReasons ?? {},
     }),
     installs: installRecords,
-    manifestRegistry:
-      options.manifestRegistry ??
-      (options.discovery === undefined ? currentMetadataSnapshot?.manifestRegistry : undefined),
+    manifestRegistry,
     discovery: options.manifestRegistry ? undefined : options.discovery,
     env,
     onlyPluginIds,
@@ -402,18 +408,57 @@ export function resolvePluginLoadCacheContext(options: PluginLoadOptions = {}) {
     allowProcessHomeSessionCatalogs: options.allowProcessHomeSessionCatalogs,
     activate: shouldActivate,
     runtimeSideEffects,
+    registrationSnapshots: !shouldActivate
+      ? [activationConfigFingerprint(runtimeConfig), activationConfigFingerprint(activationConfig)]
+      : undefined,
     expectedSourceDigests: options.expectedSourceDigests,
     mode: options.mode ?? "full",
   });
+  // Cache probes need selection facts only. Capture callbacks' immutable inputs on a miss.
+  let captured:
+    | {
+        cfg: OpenClawConfig;
+        activationSourceConfig: OpenClawConfig;
+        activationSource: PluginActivationConfigSource;
+        normalized: NormalizedPluginsConfig;
+      }
+    | undefined;
+  const capture = () => {
+    if (!captured) {
+      const cfg = captureRuntimeConfig(runtimeConfig);
+      const activationSourceConfig =
+        activationConfig === runtimeConfig ? cfg : captureRuntimeConfig(activationConfig);
+      const normalized = normalizePluginsConfig(cfg.plugins);
+      const activationSource = createPluginActivationSource({
+        config: activationSourceConfig,
+        plugins: cfg.plugins === activationSourceConfig.plugins ? normalized : undefined,
+      });
+      captured = {
+        cfg,
+        activationSourceConfig,
+        activationSource,
+        normalized: mergeTrustPluginConfigFromActivationSource({ normalized, activationSource }),
+      };
+    }
+    return captured;
+  };
   return {
     cacheState,
     env,
-    cfg,
+    get cfg() {
+      return capture().cfg;
+    },
     registrationConfigKey,
     metadataSnapshot: currentMetadataSnapshot,
-    normalized: trustNormalized,
-    activationSourceConfig,
-    activationSource,
+    get normalized() {
+      return capture().normalized;
+    },
+    get activationSourceConfig() {
+      return capture().activationSourceConfig;
+    },
+    get activationSource() {
+      return capture().activationSource;
+    },
     autoEnabledReasons: options.autoEnabledReasons ?? {},
     onlyPluginIds,
     includeSetupOnlyChannelPlugins,
