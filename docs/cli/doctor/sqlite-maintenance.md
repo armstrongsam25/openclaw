@@ -85,6 +85,10 @@ registry. Configured session stores and retained legacy databases are also check
 If a configured database still needs a schema migration after `--fix`, Doctor reports
 its path and exits non-zero instead of printing `Doctor complete`.
 
+Canonical session-key repair follows complete transcript-owner alias chains, including
+long chains in large databases. It preserves the terminal owner's session key and
+retained transcript history; shortening history is not required to bound the repair's stack.
+
 `openclaw doctor --session-sqlite <mode>` provides targeted inspection,
 import, validation, and SQLite maintenance. Legacy `sessions.json` files are
 migration sources. Hot transcript JSONL files are imported and archived after
