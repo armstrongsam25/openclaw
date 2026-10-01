@@ -1,4 +1,3 @@
-import { isDeepStrictEqual } from "node:util";
 import {
   withArtifactPreservingStateReads,
   withSynchronousArtifactPreservingStateSnapshot,
