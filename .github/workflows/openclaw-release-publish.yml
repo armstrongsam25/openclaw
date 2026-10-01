@@ -1238,6 +1238,7 @@ jobs:
           PARENT_WORKFLOW_SHA: ${{ github.workflow_sha }}
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+          SIGNED_RELEASE_TAG_OBJECT_SHA: ${{ needs.resolve_release_target.outputs.signed_tag_object_sha }}
           TARGET_SHA: ${{ needs.resolve_release_target.outputs.sha }}
         working-directory: .release-harness
         run: |
@@ -1257,6 +1258,7 @@ jobs:
     needs: [resolve_release_target]
     outputs:
       source_sha: ${{ needs.resolve_release_target.outputs.sha }}
+      signed_tag_object_sha: ${{ needs.resolve_release_target.outputs.signed_tag_object_sha }}
       clawhub_run_id: ${{ steps.children.outputs.plugin_clawhub_run_id }}
       clawhub_bootstrap_run_id: ${{ steps.children.outputs.plugin_clawhub_bootstrap_run_id }}
     if: ${{ !inputs.publish_docker_only }}
@@ -2300,9 +2302,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
           SOURCE_SHA: ${{ needs.publish.outputs.source_sha }}
+          SIGNED_RELEASE_TAG_OBJECT_SHA: ${{ needs.publish.outputs.signed_tag_object_sha }}
+          TARGET_SHA: ${{ needs.publish.outputs.source_sha }}
           RELEASE_NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
         run: |
           set -euo pipefail
+          source scripts/lib/release-publish-children.sh
+          verify_release_tag_target
           expected_prerelease=false
           if [[ "${RELEASE_TAG}" == *"-beta."* ]]; then
             expected_prerelease=true
@@ -2318,11 +2324,6 @@ jobs:
               --output "$RUNNER_TEMP/linux-updater-carry"; then
               echo "::warning::Linux updater continuity needs recovery; the independent Linux publication remains pending."
             fi
-          fi
-          actual_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
-          if [[ "$actual_sha" != "$SOURCE_SHA" ]]; then
-            echo "Release tag moved before activation; refusing publication." >&2
-            exit 1
           fi
           release_json="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease)"
           latest_tag=""
@@ -2423,6 +2424,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PARENT_WORKFLOW_SHA: ${{ github.workflow_sha }}
           RELEASE_TAG: ${{ inputs.tag }}
+          SIGNED_RELEASE_TAG_OBJECT_SHA: ${{ needs.resolve_release_target.outputs.signed_tag_object_sha }}
           TARGET_SHA: ${{ needs.resolve_release_target.outputs.sha }}
         run: |
           set -euo pipefail
@@ -2472,6 +2474,7 @@ jobs:
           PARENT_WORKFLOW_SHA: ${{ github.workflow_sha }}
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+          SIGNED_RELEASE_TAG_OBJECT_SHA: ${{ needs.resolve_release_target.outputs.signed_tag_object_sha }}
           TARGET_SHA: ${{ needs.resolve_release_target.outputs.sha }}
         run: |
           source scripts/lib/release-publish-children.sh
@@ -2518,6 +2521,7 @@ jobs:
           PARENT_WORKFLOW_SHA: ${{ github.workflow_sha }}
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+          SIGNED_RELEASE_TAG_OBJECT_SHA: ${{ needs.resolve_release_target.outputs.signed_tag_object_sha }}
           TARGET_SHA: ${{ needs.resolve_release_target.outputs.sha }}
           WINDOWS_NODE_TAG: ${{ inputs.windows_node_tag }}
           WINDOWS_NODE_INSTALLER_DIGESTS: ${{ inputs.windows_node_installer_digests }}
