@@ -449,6 +449,9 @@ async function ensureFinalTag(ctx: ReleaseContext): Promise<void> {
   );
   if (tagged.exitCode !== 0) {
     const local = await ctx.run("git", ["rev-parse", `${state.tag}^{}`], { allowFailure: true });
+    const tagType = await ctx.run("git", ["cat-file", "-t", state.tag], {
+      allowFailure: true,
+    });
     const tagObject = await ctx.run("git", ["cat-file", "-p", state.tag], {
       allowFailure: true,
     });
@@ -459,6 +462,8 @@ async function ensureFinalTag(ctx: ReleaseContext): Promise<void> {
     if (
       local.exitCode !== 0 ||
       local.stdout.trim() !== sha ||
+      tagType.exitCode !== 0 ||
+      tagType.stdout.trim() !== "tag" ||
       tagObject.exitCode !== 0 ||
       !hasSignature
     ) {
