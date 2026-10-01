@@ -299,7 +299,7 @@ it("reports rejected artifacts without another confirmation", async () => {
   expect(request.mock.calls.some(([method]) => method === "plugins.inspect")).toBe(false);
 });
 
-it("acknowledges the fresh inspection token after compact consent errors", async () => {
+it("requires fresh inspection and acknowledgement when a reviewed capability surface changes", async () => {
   const plugin = createPlugin({ origin: "global" });
   const updated = createPlugin({ ...plugin, enabled: true, state: "enabled" });
   const inspection = createInspectResult({
@@ -319,12 +319,23 @@ it("acknowledges the fresh inspection token after compact consent errors", async
     widened: { tools: ["workboard_review"] },
     acceptedAt: "2026-08-20T14:03:00Z",
   });
+  const changedInspection = createInspectResult({
+    ...inspection,
+    reviewToken: "changed-inspected-token",
+    declared: { ...inspection.declared, tools: ["workboard_review", "workboard_manage"] },
+  });
   const enableAttempt = deferred<never>();
+  const reinspection = deferred<ReturnType<typeof createInspectResult>>();
+  let inspections = 0;
+  let acknowledgements = 0;
   const { client, request } = scriptedClient({
-    "plugins.inspect": () => inspection,
+    "plugins.inspect": () => (++inspections === 1 ? inspection : reinspection.promise),
     "plugins.setEnabled": (params) => {
       if (typeof params !== "object" || !params || !("acknowledgeCapabilities" in params)) {
         return enableAttempt.promise;
+      }
+      if (++acknowledgements === 1) {
+        throw consentError("changed-compact-token");
       }
       return { ok: true, plugin: updated, restartRequired: true };
     },
@@ -361,6 +372,35 @@ it("acknowledges the fresh inspection token after compact consent errors", async
       acknowledgeCapabilities: { reviewToken: inspection.reviewToken },
     }),
   );
+  await waitForFast(() => expect(inspections).toBe(2));
+  await page.updateComplete;
+  expect(consentAction(page)?.disabled).toBe(true);
+  expect(page.result?.plugins[0]?.enabled).toBe(false);
+  expect(methodCalls(request, "plugins.setEnabled")).toHaveLength(2);
+
+  reinspection.resolve(changedInspection);
+  await waitForFast(() => {
+    const dialog = page.querySelector('[data-plugin-consent="enable"]');
+    expect(dialog?.textContent).toContain("workboard_manage");
+    expect(consentAction(page)?.disabled).toBe(false);
+  });
+  expect(page.result?.plugins[0]?.enabled).toBe(false);
+  expect(methodCalls(request, "plugins.setEnabled")).toHaveLength(2);
+
+  consentAction(page)?.click();
+
+  await waitForFast(() => expect(page.result?.plugins[0]?.enabled).toBe(true));
+  expect(methodCalls(request, "plugins.setEnabled").map(([, params]) => params)).toEqual([
+    enableRequest,
+    {
+      ...enableRequest,
+      acknowledgeCapabilities: { reviewToken: inspection.reviewToken },
+    },
+    {
+      ...enableRequest,
+      acknowledgeCapabilities: { reviewToken: changedInspection.reviewToken },
+    },
+  ]);
   await page.updateComplete;
   expect(page.querySelector('[data-plugin-consent="enable"]')).toBeNull();
 });

@@ -312,8 +312,13 @@ describe("resolvePluginCapabilityProviders", () => {
     }
   });
 
-  it("never prepares or executes an explicitly disabled bundled capability provider", () => {
-    const plugins = { entries: { blocked: { enabled: false } } };
+  it.each([
+    {
+      name: "explicitly disabled",
+      plugins: { entries: { blocked: { enabled: false } } },
+    },
+    { name: "outside the restrictive allowlist", plugins: { allow: ["allowed"] } },
+  ])("never prepares or executes a $name bundled capability provider", ({ plugins }) => {
     const generateImage = vi.fn();
     const registry = createEmptyPluginRegistry();
     addCapabilityProvider(registry, "imageGenerationProviders", {
@@ -341,6 +346,31 @@ describe("resolvePluginCapabilityProviders", () => {
 
     expect(generateImage).not.toHaveBeenCalled();
     expect(prepared.imageGenerationProviders).toEqual([]);
+  });
+
+  it.each([
+    {
+      name: "explicitly disabled",
+      plugins: { entries: { blocked: { enabled: false } } },
+    },
+    { name: "denylisted", plugins: { deny: ["blocked"] } },
+    { name: "outside the restrictive allowlist", plugins: { allow: ["allowed"] } },
+  ])("never imports a $name bundled provider through cold compatibility capture", ({ plugins }) => {
+    const captured = createEmptyPluginRegistry();
+    addCapabilityProvider(captured, "imageGenerationProviders", { id: "blocked" });
+    mocks.resolveRuntimePluginRegistry.mockReturnValue(createEmptyPluginRegistry());
+    mocks.loadBundledCapabilityRuntimeRegistry.mockReturnValue(captured);
+    setCapabilityManifestPlugins([
+      { id: "blocked", contracts: { imageGenerationProviders: ["blocked"] } },
+    ]);
+
+    expect(
+      resolvePluginCapabilityProviders({
+        key: "imageGenerationProviders",
+        cfg: { plugins },
+      }),
+    ).toEqual([]);
+    expect(mocks.loadBundledCapabilityRuntimeRegistry).not.toHaveBeenCalled();
   });
 
   it("preserves restrictive-allowlist compatibility only for known bundled active owners", () => {

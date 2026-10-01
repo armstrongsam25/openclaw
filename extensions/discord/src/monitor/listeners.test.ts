@@ -419,6 +419,22 @@ describe("Discord monitor dispatch", () => {
     },
   );
 
+  it("keeps membership claims independent for two account clients", async () => {
+    const first = createHarness({ accountId: "account-a" });
+    const second = createHarness({ accountId: "account-b" });
+    try {
+      await first.update();
+      await second.update();
+      await first.client.dispatchGatewayEvent("READY", {});
+      await first.update();
+      await second.update();
+      expect(first.fetch).toHaveBeenCalledTimes(2);
+      expect(second.fetch).toHaveBeenCalledOnce();
+    } finally {
+      await Promise.all([first.cleanup(), second.cleanup()]);
+    }
+  });
+
   it("unbinds the account's deleted thread and reports a session-close failure without farewell", async () => {
     const { client, fetch, logger } = createHarness();
     lifecycle.closeDiscordThreadSessions.mockRejectedValueOnce(new Error("session close failed"));
@@ -482,6 +498,19 @@ describe("Discord guild join introductions", () => {
       expect(dispose).toHaveBeenCalledOnce();
     },
   );
+
+  it("ignores stale guild-create startup snapshots", async () => {
+    const { client, cleanup } = createHarness();
+    try {
+      await client.dispatchGatewayEvent("GUILD_CREATE", {
+        ...guildCreateEvent(),
+        joined_at: new Date(Date.now() - 10 * 60_000).toISOString(),
+      });
+      expect(reportChannelRoomJoin).not.toHaveBeenCalled();
+    } finally {
+      await cleanup();
+    }
+  });
 
   it("introduces the bot in the permitted system channel using readable room context", async () => {
     mocks.readMessagesDiscord.mockResolvedValue([

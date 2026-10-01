@@ -172,23 +172,33 @@ describe("GatewayChatClient connections", () => {
     });
   });
 
-  it("requires explicit auth and drops the configured TLS pin for a mismatched resume target", async () => {
-    setGateway({
-      mode: "remote",
-      remote: {
-        url: "wss://remote.example/gateway",
-        token: "configured-remote-token",
-        tlsFingerprint: `sha256:${TLS_FINGERPRINT}`,
-      },
-    });
-    const opts = { url: "wss://other.example/gateway", allowConfiguredAuthForExactTarget: true };
-    await expect(resolveGatewayConnection(opts)).rejects.toThrow(
-      /pass --token or --password once to request pairing/i,
-    );
-    const explicit = await resolveGatewayConnection({ ...opts, token: "explicit-token" });
-    expect(explicit.token).toBe("explicit-token");
-    expect(explicit.tlsFingerprint).toBeUndefined();
-  });
+  it.each([
+    "ws://127.0.0.1/gateway",
+    "wss://other.example/gateway",
+    "wss://127.0.0.1:19876/gateway",
+    "wss://127.0.0.1/other",
+    "wss://127.0.0.1/gateway?target=other",
+    "wss://127.0.0.1/gateway#other",
+  ])(
+    "requires explicit auth and drops the configured TLS pin for mismatched target %s",
+    async (url) => {
+      setGateway({
+        mode: "remote",
+        remote: {
+          url: "wss://127.0.0.1/gateway",
+          token: "configured-remote-token",
+          tlsFingerprint: `sha256:${TLS_FINGERPRINT}`,
+        },
+      });
+      const opts = { url, allowConfiguredAuthForExactTarget: true };
+      await expect(resolveGatewayConnection(opts)).rejects.toThrow(
+        /pass --token or --password once to request pairing/i,
+      );
+      const explicit = await resolveGatewayConnection({ ...opts, token: "explicit-token" });
+      expect(explicit.token).toBe("explicit-token");
+      expect(explicit.tlsFingerprint).toBeUndefined();
+    },
+  );
 
   it("keeps the TLS pin on an auth-free local Gateway", async () => {
     setGateway({ mode: "local", tls: { enabled: true }, auth: { mode: "none" } });
