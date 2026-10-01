@@ -813,12 +813,24 @@ final class OpenClawSnapshotUITests: XCTestCase {
 
     func testSavedPromptReactionsAndQuickPalette() throws {
         try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .phone, "Phone message reaction proof only")
+        let prompt = "Check the release status and prepare the next steps."
+        self.launchApp(
+            for: Self.chatScreenshotTarget,
+            additionalArguments: ["--openclaw-no-reactions-fixture"])
+        self.sendFixtureChatMessage(prompt)
+        let before = try XCTUnwrap(self.app)
+        XCTAssertFalse(before.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier BEGINSWITH %@", "chat-message-reactions-")).firstMatch.exists)
+        self.attachScreenshot(named: "ios-reactions-prompt-before")
+        before.staticTexts[prompt].press(forDuration: 0.8)
+        XCTAssertTrue(before.buttons["Copy Message"].waitForExistence(timeout: 3))
+        XCTAssertFalse(before.buttons["chat-add-reaction"].exists)
+
         self.launchApp(for: ScreenshotTarget(
             initialTab: "chat",
             initialDestination: "chat",
             name: "chat-message-reactions"))
         let app = try XCTUnwrap(self.app)
-        let prompt = "Check the release status and prepare the next steps."
         self.sendFixtureChatMessage(prompt)
 
         let thumbsUp = app.buttons["chat-reaction-👍"]

@@ -249,7 +249,7 @@ struct IOSGatewayChatTransportTests {
         let frame = try JSONDecoder().decode(EventFrame.self, from: Data(#"""
         {"type":"event","event":"session.reaction","payload":{
           "sessionKey":"global","agentId":"research","sessionId":"transcript-1","messageId":"saved-1",
-          "emoji":"👍","action":"added","actor":{"type":"user","id":"profile-viewer"},
+          "emoji":"👍","action":"added","actor":{"type":"human","id":"profile-viewer"},
           "reactions":[{"emoji":"👍","count":2,"identities":[
             {"id":"profile-viewer","label":"Alex"},{"id":"profile-other"}]}]
         }}

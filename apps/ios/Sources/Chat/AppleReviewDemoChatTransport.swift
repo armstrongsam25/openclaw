@@ -18,6 +18,9 @@ enum ScreenshotFixtureMode {
     static let gatewayName = "OpenClaw Gateway"
     static let gatewayAddress = "Gateway on local network"
     static let gatewayID = "screenshot-fixture-gateway"
+    static var reactionsEnabled: Bool {
+        !ProcessInfo.processInfo.arguments.contains("--openclaw-no-reactions-fixture")
+    }
 }
 
 struct LocalChatFixture {
@@ -231,6 +234,7 @@ struct LocalFixtureChatTransport: OpenClawChatTransport {
     }
 
     func acquireReactionsRouteLease() async -> OpenClawChatReactionsRouteLease? {
+        guard ScreenshotFixtureMode.reactionsEnabled else { return nil }
         let store = self.store
         return OpenClawChatReactionsRouteLease(
             routeID: self.reactionsRouteID,
@@ -725,7 +729,7 @@ private actor LocalFixtureChatStore {
     }
 
     private func publishReactions(for message: OpenClawChatMessage, sessionKey: String, agentID: String? = nil) {
-        guard let messageID = message.transcriptMessageID else { return }
+        guard ScreenshotFixtureMode.reactionsEnabled, let messageID = message.transcriptMessageID else { return }
         let key = Self.normalizedSessionKey(sessionKey, fallback: self.fixture.sessionKey)
         self.eventContinuation?.yield(.sessionReaction(OpenClawChatReactionEvent(
             sessionKey: key,
