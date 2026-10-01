@@ -2,11 +2,8 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { build as esbuild } from "esbuild";
 import { afterEach, describe, expect, it } from "vitest";
-import packageJson from "../../package.json" with { type: "json" };
 import { resolveSessionStorePathCore } from "../config/sessions/paths.js";
 import { resolveSqliteTargetFromSessionStorePath } from "../config/sessions/session-sqlite-target.js";
 import {
@@ -17,7 +14,7 @@ import {
   createOpenClawTestState,
   type OpenClawTestState,
 } from "../test-utils/openclaw-test-state.js";
-import { canonicalMemoryTestSupportModuleUrl } from "./doctor-session-canonical-keys.memory.test-support.js";
+import { buildCanonicalSessionRepairChild } from "./doctor-session-canonical-keys.bundle.test-support.js";
 import { insertLegacySession } from "./doctor-session-canonical-keys.test-support.js";
 
 const execFileAsync = promisify(execFile);
@@ -71,33 +68,7 @@ describe("canonical SQLite session repair memory", () => {
     });
     fs.mkdirSync(path.join(process.cwd(), "node_modules/.cache"), { recursive: true });
     bundleDir = fs.mkdtempSync(path.join(process.cwd(), "node_modules/.cache/canonical-memory-"));
-    const childPath = path.join(bundleDir, "child.mjs");
-    fs.copyFileSync(
-      path.join(process.cwd(), "src/state/openclaw-agent-schema.sql"),
-      path.join(bundleDir, "openclaw-agent-schema.sql"),
-    );
-    fs.copyFileSync(
-      path.join(process.cwd(), "src/state/openclaw-state-schema.sql"),
-      path.join(bundleDir, "openclaw-state-schema.sql"),
-    );
-    await esbuild({
-      bundle: true,
-      entryPoints: { child: fileURLToPath(canonicalMemoryTestSupportModuleUrl) },
-      format: "esm",
-      // Keep generated source overhead out of the entry-data heap budget;
-      // preserve function/class names used by runtime dispatch and diagnostics.
-      minify: true,
-      keepNames: true,
-      outdir: bundleDir,
-      outExtension: { ".js": ".mjs" },
-      // Preserve lazy runtime imports so unused provider SDKs do not consume the child heap.
-      splitting: true,
-      external: Object.entries(packageJson.dependencies)
-        .filter(([, version]) => !version.startsWith("workspace:"))
-        .map(([name]) => name),
-      platform: "node",
-      target: "node22",
-    });
+    const childPath = await buildCanonicalSessionRepairChild(bundleDir);
     const runChild = async () => {
       const { stdout } = await execFileAsync(
         process.execPath,

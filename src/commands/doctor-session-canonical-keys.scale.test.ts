@@ -1,5 +1,9 @@
+import { execFile } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
+import { promisify } from "node:util";
 import { afterEach, expect, it } from "vitest";
+import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 import { resolveSessionStorePathCore } from "../config/sessions/paths.js";
 import { resolveSqliteTargetFromSessionStorePath } from "../config/sessions/session-sqlite-target.js";
 import {
@@ -7,24 +11,23 @@ import {
   openOpenClawAgentDatabase,
 } from "../state/openclaw-agent-db.js";
 import { withStateDirEnv } from "../test-helpers/state-dir-env.js";
-import { repairCanonicalSessionKeys } from "./doctor-session-canonical-keys.js";
+import { buildCanonicalSessionRepairChild } from "./doctor-session-canonical-keys.bundle.test-support.js";
 
 afterEach(() => closeOpenClawAgentDatabasesForTest());
+const tempDirs = useAutoCleanupTempDirTracker(afterEach);
+const execFileAsync = promisify(execFile);
 
 it("repairs deep owner aliases without losing a large healthy transcript", async () => {
   await withStateDirEnv("openclaw-doctor-canonical-scale-", async ({ stateDir }) => {
     const env = { ...process.env, OPENCLAW_STATE_DIR: stateDir };
     const storeTemplate = path.join(stateDir, "agents", "{agentId}", "sessions.json");
     const storePath = resolveSessionStorePathCore(storeTemplate, { agentId: "main", env });
-    const cfg = {
-      agents: { list: [{ id: "main", default: true }] },
-      session: { store: storeTemplate },
-    };
-    const { db } = openOpenClawAgentDatabase({
+    const databaseOptions = {
       agentId: "main",
       env,
       path: resolveSqliteTargetFromSessionStorePath(storePath, { agentId: "main", env }).path,
-    });
+    };
+    const { db } = openOpenClawAgentDatabase(databaseOptions);
     const aliasCount = 12_000;
     const eventCount = 200_000;
     const key = (index: number) => `agent:main:dashboard:scale-${String(index).padStart(5, "0")}`;
@@ -75,23 +78,36 @@ it("repairs deep owner aliases without losing a large healthy transcript", async
     }
     expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
-    await expect(repairCanonicalSessionKeys({ apply: false, cfg, env })).resolves.toMatchObject({
+    closeOpenClawAgentDatabasesForTest();
+    const cacheDir = path.join(process.cwd(), "node_modules/.cache");
+    fs.mkdirSync(cacheDir, { recursive: true });
+    const childPath = await buildCanonicalSessionRepairChild(
+      tempDirs.make("canonical-scale-", cacheDir),
+    );
+    // Doctor runs on Node's main thread; Vitest's worker-thread stack masks this overflow.
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [childPath, stateDir, storeTemplate, "apply"],
+      { cwd: process.cwd(), env, encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 60_000 },
+    );
+    expect(JSON.parse(stdout)).toMatchObject({
       foundGroups: 1,
-      removedRows: aliasCount,
-      scannedStores: 1,
-    });
-    await expect(repairCanonicalSessionKeys({ apply: true, cfg, env })).resolves.toMatchObject({
       repairedGroups: 1,
       removedRows: aliasCount,
     });
-    expect(db.prepare("SELECT count(*) AS count FROM transcript_events").get()).toEqual({
+    const { db: verified } = openOpenClawAgentDatabase(databaseOptions);
+    expect(verified.prepare("SELECT count(*) AS count FROM transcript_events").get()).toEqual({
       count: eventCount,
     });
-    expect(db.prepare("SELECT count(*) AS count FROM session_nodes").get()).toEqual({ count: 1 });
-    expect(db.prepare("SELECT session_key, current_session_id FROM session_nodes").get()).toEqual({
+    expect(verified.prepare("SELECT count(*) AS count FROM session_nodes").get()).toEqual({
+      count: 1,
+    });
+    expect(
+      verified.prepare("SELECT session_key, current_session_id FROM session_nodes").get(),
+    ).toEqual({
       session_key: key(aliasCount),
       current_session_id: sessionId,
     });
-    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    expect(verified.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   });
 });
