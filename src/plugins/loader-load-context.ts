@@ -428,16 +428,19 @@ export function resolvePluginLoadCacheContext(options: PluginLoadOptions = {}) {
       const cfg = captureRuntimeConfig(runtimeConfig);
       const activationSourceConfig =
         activationConfig === runtimeConfig ? cfg : captureRuntimeConfig(activationConfig);
-      const normalized = normalizePluginsConfig(cfg.plugins);
-      const activationSource = createPluginActivationSource({
+      const capturedNormalized = normalizePluginsConfig(cfg.plugins);
+      const capturedActivationSource = createPluginActivationSource({
         config: activationSourceConfig,
-        plugins: cfg.plugins === activationSourceConfig.plugins ? normalized : undefined,
+        plugins: cfg.plugins === activationSourceConfig.plugins ? capturedNormalized : undefined,
       });
       captured = {
         cfg,
         activationSourceConfig,
-        activationSource,
-        normalized: mergeTrustPluginConfigFromActivationSource({ normalized, activationSource }),
+        activationSource: capturedActivationSource,
+        normalized: mergeTrustPluginConfigFromActivationSource({
+          normalized: capturedNormalized,
+          activationSource: capturedActivationSource,
+        }),
       };
     }
     return captured;
