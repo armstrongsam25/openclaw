@@ -1,5 +1,5 @@
 {
-  "startupJsGzipBytes": 367848,
-  "reason": "Shrink after merging main 97e5ea7be95f: same-host Node 26.10.0 main startup is 368157 B; merged startup is 367848 B (309 B less), below the 371771 B main baseline.",
-  "updatedAt": "2026-09-30"
+  "startupJsGzipBytes": 371771,
+  "reason": "Approved by @steipete for PR #158567 on 2026-09-27: measured startup bundle 371,771 B after main reconciliation and canonical boot-module regeneration, +1,015 B (0.27%) over the previous baseline. Paired baseline and cap retain the 512 B growth and 64 B build-variance allowances, yielding a 372,347 B enforcement limit.",
+  "updatedAt": "2026-09-27"
 }

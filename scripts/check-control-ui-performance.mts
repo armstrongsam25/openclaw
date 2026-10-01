@@ -56,8 +56,9 @@ const CONTROL_UI_LOCALE_GZIP_BYTES = 300 * KIB;
 // accompany an intentional loading or chunking decision.
 const controlUiPerformanceBudgets = {
   startupJsRequests: 18,
-  // Chat and New Session each measured 29 boot JS requests; allow 3 requests of headroom.
-  routeBootJsRequests: 32,
+  // Main 098173f9f5d4 with facade optimization measured chat/new at 31/32 requests.
+  // Allow 3 above the maximum while catching the roughly 19-request facade regression.
+  routeBootJsRequests: 35,
   startupCssRequests: 1,
   // Approved measured upload-control baseline; retain the fixed growth and variance allowances.
   startupJsGzipBytes: 371_771,
