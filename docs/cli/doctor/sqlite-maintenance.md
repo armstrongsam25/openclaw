@@ -66,6 +66,10 @@ compatible backup or upgrade OpenClaw for a newer schema.
 
 ## Session SQLite migration
 
+Canonical session-key repair follows complete transcript-owner alias chains, including
+long chains in large databases. It preserves the terminal owner's session key and
+retained transcript history; shortening history is not required to bound the repair's stack.
+
 Runtime session rows and transcripts live in SQLite, by default at
 `~/.openclaw/agents/<agentId>/agent/openclaw-agent.sqlite`. Gateway startup uses
 Doctor's exclusive maintenance owner to migrate legacy session JSON/JSONL files
@@ -84,10 +88,6 @@ including custom paths outside the default agent tree and databases absent from 
 registry. Configured session stores and retained legacy databases are also checked.
 If a configured database still needs a schema migration after `--fix`, Doctor reports
 its path and exits non-zero instead of printing `Doctor complete`.
-
-Canonical session-key repair follows complete transcript-owner alias chains, including
-long chains in large databases. It preserves the terminal owner's session key and
-retained transcript history; shortening history is not required to bound the repair's stack.
 
 `openclaw doctor --session-sqlite <mode>` provides targeted inspection,
 import, validation, and SQLite maintenance. Legacy `sessions.json` files are
