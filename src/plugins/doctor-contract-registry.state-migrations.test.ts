@@ -303,10 +303,7 @@ describe("doctor-contract-registry state migrations", () => {
         onInspectedStatelessPlugin: stateless,
       });
       expect(entries).toHaveLength(kind === "detector" ? 1 : 0);
-      expect(stateless).toHaveBeenCalledTimes(kind === "stateless" ? 1 : 0);
-      if (kind === "stateless") {
-        expect(stateless).toHaveBeenCalledWith("legacy-channel");
-      }
+      expect(stateless).not.toHaveBeenCalled();
       expect(doctorContractWarnMock).toHaveBeenCalledTimes(kind === "invalid-detector" ? 1 : 0);
     },
   );

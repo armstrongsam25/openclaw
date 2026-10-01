@@ -29,9 +29,11 @@ unconfigured. See
 [Setup and Config](/plugins/sdk-setup#setup-entry) for when this matters.
 
 Doctor also inspects this public setup entry when finishing a deferred plugin
-upgrade. It uses `plugin.lifecycle.detectLegacyStateMigrations` when provided;
-an inspected plugin without that detector can finish its installation-only
-upgrade obligation. Missing or broken setup entries keep the obligation pending.
+upgrade. It uses `plugin.lifecycle.detectLegacyStateMigrations` when provided.
+Keep the detector on this lightweight entry while a released version may still
+need a legacy migration; omitting it does not prove that the full entry has no
+migration, so Doctor keeps the upgrade obligation pending. Missing or broken
+setup entries also keep the obligation pending.
 
 Pair `defineSetupPluginEntry(...)` with the narrow setup helper families:
 

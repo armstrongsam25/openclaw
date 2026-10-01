@@ -40,7 +40,6 @@ export function loadLegacyChannelStateMigrationDetector(
         }
         const detector = plugin.lifecycle?.detectLegacyStateMigrations;
         if (detector === undefined) {
-          onInspectedStatelessPlugin?.(record.id);
           return null;
         }
         if (typeof detector !== "function") {
