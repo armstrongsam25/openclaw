@@ -1,5 +1,5 @@
-import { createLazyRuntimeModule } from "../shared/lazy-runtime.js";
 import { resolveRuntimeWorkerThreadExecArgv } from "./runtime-worker-url.js";
+import { removeTemporaryArtifacts } from "./temp-artifact-removal.js";
 import { createCpuTrackedWorker, receiveWorkerMemoryPort } from "./worker-cpu.js";
 import {
   createRetainedNativeWorker,
@@ -11,10 +11,6 @@ import type {
 } from "./worker-native-lifecycle.types.js";
 import { releaseWorkerNativeSectionsOnExit } from "./worker-task-native-sections.js";
 import type { Slot, WorkerTaskPoolOptions } from "./worker-task-pool.types.js";
-
-export const prepareWorkerTaskResources = createLazyRuntimeModule(
-  () => import("./temp-artifact-removal.js"),
-);
 
 /** Physical construction and listeners share the pool's detached creation scope. */
 export function createWorkerTaskPoolWorker<Input, Output>(params: {
@@ -36,11 +32,10 @@ export function createWorkerTaskPoolWorker<Input, Output>(params: {
     slot.releaseResources = prepared?.releaseResources;
     const temporaryDirectory = prepared?.temporaryDirectory;
     if (temporaryDirectory) {
-      const cleanup = prepareWorkerTaskResources();
       const releaseResources = slot.releaseResources;
       slot.releaseResources = async () => {
         try {
-          const { removeTemporaryArtifacts } = await cleanup;
+          // Loaded with the pool so an in-place update cannot strand retirement.
           await removeTemporaryArtifacts(temporaryDirectory, "Worker task");
         } finally {
           await releaseResources?.();

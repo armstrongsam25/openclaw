@@ -21,7 +21,6 @@ import type { PluginManifestRecord } from "../plugins/manifest-registry.js";
 import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.types.js";
 import { getPluginModuleLoaderStats } from "../plugins/plugin-module-loader-cache.js";
 import type { PluginRegistry } from "../plugins/registry.js";
-import { disposePluginRegistryInstances } from "../plugins/runtime.js";
 import {
   getGatewayContextLifetime,
   withPluginRuntimeRegistryScope,
