@@ -210,6 +210,9 @@ export function createSessionCapability(
         publish({ ...state, error }, "session-observer");
       } else if (error === null && observerOwnsVisibleError) {
         publish({ ...state, error: null });
+      } else if (previousError !== error) {
+        // Query and operation errors must not hide observer transitions from other views.
+        notifySubscribers();
       }
       if (previousError !== null && error === null) {
         // Observer outages do not replay events; every held query must close the gap.
@@ -455,6 +458,7 @@ export function createSessionCapability(
         deletions.clear();
       }
       const hadPullRequestSummaries = pullRequestSummaries.size > 0;
+      const hadSubscriptionError = sessionEventSubscriptionError !== null;
       thinkingClaims.reset();
       permissions.clear();
       roster.reset();
@@ -467,7 +471,7 @@ export function createSessionCapability(
       pullRequestSummaries.clear();
       pullRequestEpochs.clear();
       // Client replacement needs a publish; disconnect publishes cleared state below.
-      if (hadPullRequestSummaries && connected && next.client) {
+      if ((hadPullRequestSummaries || hadSubscriptionError) && connected && next.client) {
         publish({ ...state });
       }
     }
@@ -621,6 +625,9 @@ export function createSessionCapability(
     },
     get state() {
       return state;
+    },
+    get eventSubscriptionError() {
+      return sessionEventSubscriptionError;
     },
     get presentation() {
       return presentation.result
