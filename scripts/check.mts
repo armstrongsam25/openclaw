@@ -11,6 +11,7 @@ export const PREFLIGHT_CHECKS: CheckCommand[] = [
   { name: "conflict markers", args: ["check:no-conflict-markers"] },
   { name: "script TypeScript erasability", args: ["check:script-erasability"] },
   { name: "line-cap growth ratchet", args: ["check:line-cap-ratchet"], usesBase: true },
+  { name: "SQLite worker ratchet", args: ["check:database-worker-ratchet"], usesBase: true },
   { name: "max-lines suppression ratchet", args: ["check:max-lines-ratchet"], usesBase: true },
   { name: "assertion SAFETY comment ratchet", args: ["check:assertion-safety"], usesBase: true },
   { name: "changelog attributions", args: ["check:changelog-attributions"] },
