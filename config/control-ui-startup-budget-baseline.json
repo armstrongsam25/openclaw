@@ -1,5 +1,5 @@
 {
-  "startupJsGzipBytes": 364757,
-  "reason": "Isolate optional desktop top-level await to restore boot facade optimization",
+  "startupJsGzipBytes": 367848,
+  "reason": "Shrink after merging main 97e5ea7be95f: same-host Node 26.10.0 main startup is 368157 B; merged startup is 367848 B (309 B less), below the 371771 B main baseline.",
   "updatedAt": "2026-09-30"
 }
