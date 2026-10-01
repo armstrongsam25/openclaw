@@ -2,12 +2,20 @@ import { realpathSync, statSync, type BigIntStats } from "node:fs";
 import { realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { hasErrnoCode } from "./errno.js";
+import { normalizeWindowsPathPreservingCase } from "./path-guards.js";
 
 export type DatabaseFileIdentity = Readonly<{
   key: string;
   birthtime?: string;
 }>;
 export type DatabasePathIdentity = DatabaseFileIdentity & Readonly<{ canonicalPath: string }>;
+
+/** Native SQLite namespaces are filesystem locators, not distinct database owners. */
+export function normalizeDatabasePath(location: string): string {
+  const normalized =
+    process.platform === "win32" ? normalizeWindowsPathPreservingCase(location) : location;
+  return process.platform === "win32" && !path.win32.isAbsolute(normalized) ? location : normalized;
+}
 
 export function readDatabaseFileIdentity(value: unknown): DatabaseFileIdentity {
   if (
@@ -61,7 +69,7 @@ function existingIdentity(
   }
   return {
     key: `file:${file.dev}:${file.ino}`,
-    canonicalPath,
+    canonicalPath: normalizeDatabasePath(canonicalPath),
     birthtime: file.birthtimeNs.toString(),
   };
 }
@@ -90,7 +98,9 @@ export function inspectDatabasePathIdentitySync(
   let ancestor = resolvedPath;
   while (true) {
     try {
-      const canonicalPath = path.join(realpathSync.native(ancestor), ...missing);
+      const canonicalPath = normalizeDatabasePath(
+        path.join(realpathSync.native(ancestor), ...missing),
+      );
       return { key: `path:${canonicalPath}`, canonicalPath };
     } catch (error) {
       if (!hasErrnoCode(error, "ENOENT")) {
@@ -151,7 +161,7 @@ export async function readDatabasePathIdentity(
   let ancestor = databasePath;
   while (true) {
     try {
-      const canonicalPath = path.join(await realpath(ancestor), ...missing);
+      const canonicalPath = normalizeDatabasePath(path.join(await realpath(ancestor), ...missing));
       return { key: `path:${canonicalPath}`, canonicalPath };
     } catch (error) {
       if (!hasErrnoCode(error, "ENOENT")) {
