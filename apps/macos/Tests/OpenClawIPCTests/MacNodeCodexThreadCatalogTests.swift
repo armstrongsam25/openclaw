@@ -5,7 +5,7 @@ import OpenClawKit
 import Testing
 @testable import OpenClaw
 
-@Suite(.serialized)
+@Suite(.serialized, .testWaitLimit)
 struct MacNodeCodexThreadCatalogTests {
     private static let fixtureSourceHomeId = "fe94896e07f486e0c81c8eb582386bf8c881819fc553a097d922707e48677414"
     private static let fixtureInitializeResult =
@@ -1325,7 +1325,7 @@ extension MacNodeCodexThreadCatalogTests {
             in: URL(fileURLWithPath: fake.executable.path + ".pid"))
         try outputGate.write(contentsOf: Data("emit\n".utf8))
         try outputGate.close()
-        #expect(await TestProcessSupport.waitUntilGone(pid))
+        #expect(try await TestProcessSupport.waitUntilGone(pid))
         _ = try await self.requestEmptyList(
             client: client,
             executable: fake.executable,
