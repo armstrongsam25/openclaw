@@ -354,9 +354,9 @@ async function runDoctorHealthFlowWithResult(
       await noteStalePluginRuntimeSymlinks(root);
       noteStartupOptimizationHints();
 
-      if (schemas.agentDatabaseMigrationDiscovery && preparedArchiveDiscovery) {
-        schemas.agentDatabaseMigrationDiscovery.preparedTranscriptArchives =
-          preparedArchiveDiscovery.preparedTranscriptArchives;
+      const discovery = schemas.agentDatabaseMigrationDiscovery;
+      if (discovery && discovery.stateDir === preparedArchiveDiscovery?.stateDir) {
+        discovery.preparedTranscriptArchives = preparedArchiveDiscovery?.preparedTranscriptArchives;
       }
       const { loadAndMaybeMigrateDoctorConfig } = await import("../commands/doctor-config-flow.js");
       const configResult = await loadAndMaybeMigrateDoctorConfig({
