@@ -1,5 +1,7 @@
 /** Private stderr contract between the candidate Gateway and its updater. */
 export const UPDATE_CANARY_PROGRESS_PREFIX = "openclaw-update-canary-progress: ";
+// Older updaters use the first stderr line as the failure reason.
+export const UPDATE_CANARY_PROGRESS_ENV = "OPENCLAW_UPDATE_CANARY_PROGRESS";
 
 // Only completed events from the CLI dispatcher and Gateway startup trace renew the wait.
 const startupMilestones = [

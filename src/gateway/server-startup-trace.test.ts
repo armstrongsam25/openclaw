@@ -43,10 +43,17 @@ describe("gateway startup trace", () => {
     vi.restoreAllMocks();
   });
 
-  it.each([false, true])(
-    "reports only completed startup milestones to an update canary (%s)",
-    async (updateCanary) => {
+  it.each([
+    { updateCanary: false, support: undefined },
+    { updateCanary: true, support: undefined },
+    { updateCanary: false, support: "1" },
+    { updateCanary: true, support: "1" },
+    { updateCanary: true, support: "0" },
+  ])(
+    "reports completed Gateway milestones only to a supporting updater ($updateCanary, $support)",
+    async ({ updateCanary, support }) => {
       vi.stubEnv("OPENCLAW_GATEWAY_STARTUP_TRACE", "0");
+      vi.stubEnv("OPENCLAW_UPDATE_CANARY_PROGRESS", support);
       const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
       const trace = createGatewayStartupTrace({ info: vi.fn() } as never, 0, updateCanary);
       trace.detail("state.schema-preflight", [["agents", 2]]);
@@ -66,7 +73,7 @@ describe("gateway startup trace", () => {
         .map(([line]) => String(line))
         .filter((line) => line.startsWith("openclaw-update-canary-progress: "));
       expect(progress).toEqual(
-        updateCanary
+        updateCanary && support === "1"
           ? [
               "openclaw-update-canary-progress: config.snapshot\n",
               "openclaw-update-canary-progress: http.bound\n",
