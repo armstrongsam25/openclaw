@@ -14,6 +14,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { isPathInside } from "@openclaw/fs-safe/path";
+import { ensureKyselyTypes } from "./generate-kysely-types.mts";
 import { BUNDLED_PLUGIN_BUILD_ENV_NAMES } from "./lib/bundled-plugin-build-entries.mjs";
 import { BUNDLED_PLUGIN_PATH_PREFIX } from "./lib/bundled-plugin-paths.mjs";
 import { isDirectRunUrl } from "./lib/direct-run.mjs";
@@ -1475,6 +1476,7 @@ export async function runTsdownBuild(
     console.error(fence.message);
     return 1;
   }
+  await ensureKyselyTypes(options.cwd ?? process.cwd());
   let code: number;
   if (options.executeBuild) {
     code = await options.executeBuild(args.forwardedArgs);
