@@ -1,0 +1,172 @@
+# Temporary proof workflow for the remaining macOS test-wait migration. Lives only on
+# the proof branch; never merged. Baseline = the tests this branch builds on.
+name: Proof macOS test wait remaining suites
+
+on:
+  push:
+    branches: [proof/macos-test-wait-remaining-suites]
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    name: remaining waits under load (${{ matrix.shard }})
+    runs-on: xcode-27
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    env:
+      BASE_SHA: 0ace0f28fbd93fe1950cb712e8603476957780b6
+      FULL_ITERATIONS: "4"
+      FOCUSED: "BoundedCommandTests|BoundedProcessTests|CanvasFileWatcherTests|CoalescingFSEventsWatcherTests|ConnectSnapshotStoreGenerationTests|ConnectionModeCoordinatorTests|CuaDriverHostCoordinatorTests|DashboardGatewaySelectionTests|DashboardHTTPFixtureTests|ExecApprovalQueueStoreTests|ExecApprovalsSocketPathGuardTests|GatewayBrowserSessionTests|GatewayChannelConnectTests|GatewayChannelRequestTests|GatewayConnectionBrowserSessionTests|GatewayConnectionControlTests|GatewayConnectionControlUIAuthTests|GatewayConnectionDashboardIdentityTests|GatewayConnectionMediaAuthorityTests|GatewayDiscoverySelectionFlowTests|GatewayEndpointStoreTests|GatewayHealthOwnershipTests|GatewayMenuStatusStoreTests|MacGatewayBrowserSessionStoreTests|MacNodeCodexThreadCatalogTests|MacNodeHostWorkerTests|MacNodeModeCoordinatorDeviceAuthTests|MacNodeModeCoordinatorTests|MacNodeRuntimeTests|MacRealtimeTalkAudioCaptureTests|ManagedProcessTests|OnboardingAISetupTests|QuickChatPowerFeaturesTests|QuickChatPresentationTests|SkillBinsGatewayOwnershipTests|StatusMenuSummariesTests|TalkMLXSpeechSynthesizerTests|TalkModeRuntimeSpeechTests|WebChatSwiftUISmokeTests|WebChatWindowLifetimeTests|WorkActivityStoreTests"
+      TOUCHED: "(AppKitWindowTransitionTestSupport|BoundedCommandTests|BoundedProcessTests|CanvasFileWatcherTests|CoalescingFSEventsWatcherTests|ConnectionModeCoordinatorTests|ControlChannelHeartbeatTests|CuaDriverHostCoordinatorTests|DashboardGatewaySelectionTests|DashboardHTTPFixture|DashboardHTTPFixtureTests|ExecApprovalQueueStoreTests|ExecApprovalsSocketPathGuardTests|GatewayBrowserSessionTests|GatewayChannelConnectTests|GatewayChannelRequestTests|GatewayConnectionControlTests|GatewayConnectionControlUIAuthTests|GatewayConnectionDashboardIdentityTests|GatewayConnectionMediaAuthorityTests|GatewayConnectionPushOwnershipTests|GatewayDiscoverySelectionFlowTests|GatewayEndpointStoreTests|GatewayHealthOwnershipTests|GatewayMenuStatusStoreTests|MacNodeCodexThreadCatalogTests|MacNodeHostWorkerTests|MacNodeModeCoordinatorTests|MacNodeRuntimeTests|MacRealtimeTalkAudioCaptureTests|ManagedProcessTests|OnboardingAISetupTests|QuickChatHistoryRecoveryPresentationTests|QuickChatPowerFeaturesTests|QuickChatPresentationTests|SkillBinsGatewayOwnershipTests|StatusMenuSummariesTests|TalkMLXSpeechSynthesizerTests|TalkModeRuntimeSpeechTests|TestProcessSupport|TestWait|WebChatSwiftUISmokeTests|WebChatWindowLifetimeTests|WorkActivityStoreTests)\\.swift"
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout baseline
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BASE_SHA }}
+          path: baseline
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          source scripts/lib/swift-toolchain.sh
+          select_xcode_toolchain
+          sw_vers
+          sysctl -n hw.logicalcpu hw.memsize
+          git log --oneline -1
+          git -C baseline log --oneline -1
+          git diff --stat "$BASE_SHA" HEAD -- apps | tail -3 || true
+
+      - name: Setup Node environment for Apple assets
+        uses: ./.github/actions/setup-node-env
+        with:
+          node-version: "24.21.0"
+          cache-mode: "off"
+          install-bun: "false"
+          install-deps: "false"
+
+      - name: Install Mermaid renderer dependencies
+        env:
+          CI: "true"
+        run: >-
+          pnpm install --frozen-lockfile --prefer-offline --optional
+          --filter '@openclaw/mermaid-renderer...'
+          --config.ignore-scripts=false
+          --config.engine-strict=false
+          --config.enable-pre-post-scripts=true
+          --config.side-effects-cache=true
+
+      - name: Prepare Apple Mermaid assets
+        run: |
+          set -euo pipefail
+          node scripts/prepare-apple-mermaid.mjs
+          resources=apps/shared/OpenClawKit/Sources/OpenClawChatUI/Resources
+          mkdir -p "baseline/$resources"
+          rm -rf "baseline/$resources/Mermaid"
+          cp -R "$resources/Mermaid" "baseline/$resources/Mermaid"
+
+      - name: Build candidate and baseline tests
+        run: |
+          set -euo pipefail
+          for dir in . baseline; do
+            start=$(date +%s)
+            swift build --package-path "$dir/apps/macos" --build-system native --enable-code-coverage \
+              --disable-index-store -Xswiftc -gline-tables-only --build-tests
+            echo "build $dir seconds=$(( $(date +%s) - start ))"
+          done
+
+      - name: Alternate baseline and candidate under CPU saturation
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set +e
+          set -u
+          cpu="$(sysctl -n hw.logicalcpu)"
+          width=8
+          logdir="$RUNNER_TEMP/remaining-waits"
+          mkdir -p "$logdir"
+          echo "| variant | run | exit | seconds | issues | touched-file issues | time limit | still waiting |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|---|---|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          report() {
+            local variant="$1" label="$2" log="$3" rc="$4" seconds="$5"
+            local issues touched limits waiting
+            issues=$(grep -c "recorded an issue" "$log")
+            touched=$(grep "recorded an issue" "$log" | grep -cE " at ($TOUCHED):")
+            limits=$(grep -c "Time limit was exceeded" "$log")
+            waiting=$(grep -c "Still waiting for" "$log")
+            echo "::group::$variant $label rc=$rc seconds=$seconds issues=$issues touched=$touched limits=$limits waiting=$waiting"
+            grep -E "recorded an issue|Time limit|Still waiting" "$log" | cut -c1-400 | head -80
+            grep -E "Test run with .* (passed|failed)" "$log" | tail -1
+            echo "::endgroup::"
+            echo "| $variant | $label | $rc | $seconds | $issues | $touched | $limits | $waiting |" >> "$GITHUB_STEP_SUMMARY"
+            echo "$variant $label rc=$rc seconds=$seconds issues=$issues touched=$touched limits=$limits waiting=$waiting" >> "$logdir/summary.txt"
+          }
+          run() {
+            local variant="$1" label="$2" mode="$3"; shift 3
+            local dir="." log="$logdir/$variant-$label.log"
+            [ "$variant" = baseline ] && dir=baseline
+            local start rc
+            start=$(date +%s)
+            (cd "$dir" && node scripts/test-macos-native.mts "$mode" --package-path apps/macos --build-system native \
+              --enable-code-coverage --disable-index-store -Xswiftc -gline-tables-only --skip-build \
+              --experimental-maximum-parallelization-width "$width" "$@") > "$log" 2>&1
+            rc=$?
+            report "$variant" "$label" "$log" "$rc" "$(( $(date +%s) - start ))"
+          }
+
+          # Unloaded focused runs record each touched suite's normal cost (shard 1 only).
+          if [ "$SHARD" = 1 ]; then
+            for variant in baseline candidate; do
+              run "$variant" unloaded-focused default --filter "$FOCUSED"
+              grep -E "Suite [A-Za-z]+ (passed|failed) after" "$logdir/$variant-unloaded-focused.log" \
+                | sed -E 's/.*Suite ([A-Za-z]+) (passed|failed) after ([0-9.]+) seconds.*/\1 \2 \3/' \
+                | sort > "$logdir/$variant-unloaded-suite-times.txt"
+            done
+            join -a1 -a2 -e - -o 0,1.3,2.3 "$logdir/baseline-unloaded-suite-times.txt" \
+              "$logdir/candidate-unloaded-suite-times.txt" 2>/dev/null \
+              | awk '{print $1" baseline="$2"s candidate="$3"s"}' | tee "$logdir/unloaded-suite-cost.txt"
+          fi
+
+          echo "cpu=$cpu width=$width"
+          pids=()
+          for _ in $(seq 1 "$cpu"); do sudo -n nice -n -20 yes > /dev/null & pids+=("$!"); done
+          for _ in $(seq 1 $(( cpu * 3 ))); do yes > /dev/null & pids+=("$!"); done
+          sleep 5
+          # Quick Chat history recovery extends the rendered partition's suite.
+          for variant in baseline candidate; do
+            run "$variant" "loaded-rendered-$SHARD" default --filter "QuickChatCatalogPresentationTests"
+          done
+          for i in $(seq 1 "$FULL_ITERATIONS"); do
+            for variant in baseline candidate; do
+              run "$variant" "loaded-full-$SHARD-$i" default \
+                --skip "AppStateIsolationTests|ProfileChatPreferencesTests|QuickChatCatalogPresentationTests"
+            done
+          done
+          sudo -n pkill -x yes 2>/dev/null
+          kill "${pids[@]}" 2>/dev/null
+          wait 2>/dev/null
+          cat "$logdir/summary.txt"
+          if [ -f "$logdir/unloaded-suite-cost.txt" ]; then
+            echo "## Unloaded suite cost" >> "$GITHUB_STEP_SUMMARY"
+            sed 's/^/    /' "$logdir/unloaded-suite-cost.txt" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          ! grep "^candidate " "$logdir/summary.txt" | grep -vq " touched=0 "
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: macos-remaining-waits-${{ matrix.shard }}
+          path: ${{ runner.temp }}/remaining-waits/*
+          if-no-files-found: ignore
+          retention-days: 7
