@@ -22,6 +22,7 @@ import type {
   OpenClawAgentDatabase,
   OpenClawAgentDatabaseOptions,
   OpenClawAgentDatabaseRegistrationObserver,
+  OpenClawAgentDatabaseRepairAdmission,
 } from "./openclaw-agent-db-contract.js";
 import type { prepareOpenClawAgentDatabaseWorkerLease } from "./openclaw-agent-db-lease.js";
 import {
@@ -96,6 +97,7 @@ export function createOpenClawAgentDatabaseAdmissionOwner(
     pending?: PendingAgentDatabaseOpen,
     preparedLease?: ReturnType<typeof prepareOpenClawAgentDatabaseWorkerLease>,
     registrationObserver?: OpenClawAgentDatabaseRegistrationObserver,
+    repairAdmission?: OpenClawAgentDatabaseRepairAdmission,
   ) => SqliteIntegrityOperation<OpenClawAgentDatabase>,
 ) {
   /** Open or return a cached per-agent database after schema and owner validation. */
@@ -104,18 +106,36 @@ export function createOpenClawAgentDatabaseAdmissionOwner(
     preparedLease?: ReturnType<typeof prepareOpenClawAgentDatabaseWorkerLease>,
     registrationObserver?: OpenClawAgentDatabaseRegistrationObserver,
   ): OpenClawAgentDatabase {
+    return openAgentDatabase(options, preparedLease, registrationObserver);
+  }
+
+  function openAgentDatabase(
+    options: OpenClawAgentDatabaseOptions,
+    preparedLease?: ReturnType<typeof prepareOpenClawAgentDatabaseWorkerLease>,
+    registrationObserver?: OpenClawAgentDatabaseRegistrationObserver,
+    repairAdmission?: OpenClawAgentDatabaseRepairAdmission,
+  ): OpenClawAgentDatabase {
     const run = () => {
-      const steps = openSteps(options, undefined, preparedLease, registrationObserver);
+      const steps = openSteps(
+        options,
+        undefined,
+        preparedLease,
+        registrationObserver,
+        repairAdmission,
+      );
       return runSqliteIntegrityOperationSync(
         steps,
-        preparedLease && !isMainThread
+        (preparedLease && !isMainThread) || repairAdmission?.assertCurrent
           ? () =>
-              assertAgentDatabaseOpenAuthority(steps, () =>
-                requestSqliteWorkerOperationAdmission({
-                  stage: "prepare",
-                  facts: { kind: "agent-open-resume", lease: preparedLease.receipt },
-                }),
-              )
+              assertAgentDatabaseOpenAuthority(steps, () => {
+                repairAdmission?.assertCurrent?.();
+                if (preparedLease && !isMainThread) {
+                  requestSqliteWorkerOperationAdmission({
+                    stage: "prepare",
+                    facts: { kind: "agent-open-resume", lease: preparedLease.receipt },
+                  });
+                }
+              })
           : undefined,
       );
     };
@@ -423,6 +443,10 @@ export function createOpenClawAgentDatabaseAdmissionOwner(
 
   return {
     openOpenClawAgentDatabase,
+    openForRepair: (
+      options: OpenClawAgentDatabaseOptions,
+      admission: OpenClawAgentDatabaseRepairAdmission,
+    ) => openAgentDatabase(options, undefined, undefined, admission),
     withOpenClawAgentDatabaseAsync,
     withOpenClawAgentDatabaseAdmission,
   };

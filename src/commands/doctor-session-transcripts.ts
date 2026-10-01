@@ -32,6 +32,7 @@ import {
 } from "./doctor-session-canonical-keys.js";
 import {
   repairCanonicalSessionDeliveryStates,
+  repairLegacySessionEntryStates,
   repairCanonicalSessionResolvedSkills,
   type SessionDeliveryStateRepairReport,
 } from "./doctor-session-delivery-state.js";
@@ -220,6 +221,11 @@ export async function noteSessionTranscriptHealth(options?: {
     repaired: 0,
     scannedStores: 0,
   };
+  let entryStateReport: SessionDeliveryStateRepairReport = {
+    found: 0,
+    repaired: 0,
+    scannedStores: 0,
+  };
   let canonicalKeyReport: CanonicalSessionKeyRepairReport = {
     archivedTranscriptDirectories: [],
     foundGroups: 0,
@@ -261,12 +267,25 @@ export async function noteSessionTranscriptHealth(options?: {
     return postSessionPluginReceipt;
   };
   const runSessionSqlite = async (maintenanceAuthority?: DoctorSqliteMaintenanceAuthority) => {
-    const report = await runDoctorSessionSqlite({
-      allAgents: true,
-      ...(params.cfg ? { cfg: params.cfg } : {}),
-      env: params.env,
-      mode: params.shouldRepair ? "import" : "dry-run",
-    });
+    if (!params.shouldRepair) {
+      entryStateReport = await repairLegacySessionEntryStates({
+        apply: false,
+        cfg: params.cfg ?? {},
+        env: params.env,
+      });
+      if (entryStateReport.found > 0) {
+        return undefined;
+      }
+    }
+    const report = await runDoctorSessionSqlite(
+      {
+        allAgents: true,
+        ...(params.cfg ? { cfg: params.cfg } : {}),
+        env: params.env,
+        mode: params.shouldRepair ? "import" : "dry-run",
+      },
+      maintenanceAuthority,
+    );
     const { migrateLegacyMainSessionKeys } =
       await import("../config/sessions/legacy-main-session-migration.js");
     legacyMainSessionResult = await migrateLegacyMainSessionKeys({
@@ -397,6 +416,15 @@ export async function noteSessionTranscriptHealth(options?: {
       code: "sqlite-maintenance-unavailable",
       message: failure,
     });
+    return postSessionPluginReceipt;
+  }
+  if (entryStateReport.found > 0) {
+    note(
+      `- Found ${entryStateReport.found} durable session row(s) with legacy pending-delivery, fallback, or memory-flush state. Run "openclaw doctor --fix" before further session inspection.`,
+      "Session SQLite",
+    );
+  }
+  if (!report) {
     return postSessionPluginReceipt;
   }
   if (worktreeWorkspaceReport.found > 0) {

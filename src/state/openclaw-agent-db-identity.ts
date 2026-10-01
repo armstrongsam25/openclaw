@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { statSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseFileIdentity } from "../infra/sqlite-worker-identity.js";
 import { resolveGlobalSingleton } from "../shared/global-singleton.js";
 
 type AgentDatabaseOwner = { db: DatabaseSync };
@@ -63,6 +64,20 @@ export function isOpenClawAgentDatabasePathCurrent(
   }
   const current = statSync(database.path, { bigint: true, throwIfNoEntry: false });
   return current !== undefined && identity === `${current.dev}:${current.ino}`;
+}
+
+export function assertOpenClawAgentDatabaseIdentity(
+  database: AgentDatabaseOwner & { path: string },
+  expected: DatabaseFileIdentity,
+): void {
+  const identity = readOpenClawAgentDatabaseIdentity(database);
+  if (
+    `file:${String(identity.identity)}` !== expected.key ||
+    (expected.birthtime !== undefined && identity.birthtime !== expected.birthtime) ||
+    !isOpenClawAgentDatabasePathCurrent(database)
+  ) {
+    throw new Error("Agent database changed during repair admission");
+  }
 }
 
 export type OpenClawAgentDatabaseClaim = {

@@ -47,6 +47,7 @@ import {
   type SessionSqliteMigrationMoveKind,
 } from "../infra/session-sqlite-migration-manifest.js";
 import {
+  projectExistingAgentDatabaseTargets,
   readOnlySqliteValidationSnapshot,
   readSqliteEntryCount,
   resolveTargetSqlitePath,
@@ -130,6 +131,7 @@ const retainedArchivePlans = new WeakMap<
 /** Destructive production callers hold the Gateway/SQLite-maintenance state lock for the full call. */
 export async function runDoctorSessionSqlite(
   options: DoctorSessionSqliteOptions,
+  authority?: DoctorSqliteMaintenanceAuthority,
 ): Promise<DoctorSessionSqliteReport> {
   const env = options.env ?? process.env;
   const cfg = resolveDoctorSessionSqliteConfig(options);
@@ -147,6 +149,21 @@ export async function runDoctorSessionSqlite(
       resolveDoctorSessionSqliteMaintenancePaths(candidates),
       resolveDoctorSessionSqliteMaintenanceRoots(candidates, env),
     );
+  }
+  const repairEntryStates = async (selectedTargets: readonly SessionStoreTarget[]) => {
+    authority?.assertCurrent();
+    const { repairLegacySessionEntryStates } = await import("./doctor-session-delivery-state.js");
+    return await repairLegacySessionEntryStates({
+      apply: true,
+      cfg,
+      env,
+      authority,
+      targets: projectExistingAgentDatabaseTargets(selectedTargets, env, cfg),
+      deferSchemaRepair: options.mode === "import",
+    });
+  };
+  if (options.mode === "import") {
+    await repairEntryStates(candidates);
   }
   const settlements =
     options.mode === "import" || options.mode === "recover"
@@ -177,22 +194,27 @@ export async function runDoctorSessionSqlite(
       env,
       options,
       targets,
+      prepareTarget: (target) => repairEntryStates([target]),
       recoveryInventory: historicalSources?.inventory,
       historicalArchiveStores: new Set([
         ...historicalArchives.keys(),
         ...settlements.map(({ target }) => target.storePath),
       ]),
       validateTarget: async (target) => {
+        authority?.assertCurrent();
         const report = collectHistoricalArchiveSources({ cfg, env }).sources.get(target.storePath)
           ?.transcripts.length
           ? (
-              await runDoctorSessionSqlite({
-                cfg,
-                env,
-                mode: "import",
-                store: target.storePath,
-                agent: target.agentId,
-              })
+              await runDoctorSessionSqlite(
+                {
+                  cfg,
+                  env,
+                  mode: "import",
+                  store: target.storePath,
+                  agent: target.agentId,
+                },
+                authority,
+              )
             ).targets[0]!
           : await inspectOrMigrateTarget({
               configuredAgentIds,
