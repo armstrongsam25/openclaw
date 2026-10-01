@@ -449,8 +449,19 @@ async function ensureFinalTag(ctx: ReleaseContext): Promise<void> {
   );
   if (tagged.exitCode !== 0) {
     const local = await ctx.run("git", ["rev-parse", `${state.tag}^{}`], { allowFailure: true });
-    const verified = await ctx.run("git", ["verify-tag", state.tag], { allowFailure: true });
-    if (local.exitCode !== 0 || local.stdout.trim() !== sha || verified.exitCode !== 0) {
+    const tagObject = await ctx.run("git", ["cat-file", "-p", state.tag], {
+      allowFailure: true,
+    });
+    const hasSignature =
+      /-----BEGIN (?:PGP|SSH) SIGNATURE-----|-----BEGIN SIGNED MESSAGE-----/u.test(
+        tagObject.stdout,
+      );
+    if (
+      local.exitCode !== 0 ||
+      local.stdout.trim() !== sha ||
+      tagObject.exitCode !== 0 ||
+      !hasSignature
+    ) {
       throw new ReleaseRefusal(
         `Could not create signed final tag ${state.tag} at ${sha}. Configure Git tag signing and resume publication.`,
         [ctx.resume("publish")],

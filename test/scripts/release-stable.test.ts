@@ -436,11 +436,39 @@ describe("release:stable CLI", () => {
         exit: 1,
       }),
       step("git", ["rev-parse", `v${RELEASE}^{}`], CUT_SHA),
-      step("git", ["verify-tag", `v${RELEASE}`], "", { exit: 1 }),
+      step("git", ["cat-file", "-p", `v${RELEASE}`], `object ${CUT_SHA}\ntype commit\n`),
     ]);
     expect(result.status, result.output).toBe(2);
     expect(result.stderr).toContain(`Could not create signed final tag v${RELEASE}`);
     expect(result.calls.some((call) => call.bin === "git" && call.args[0] === "push")).toBe(false);
+  });
+
+  it("resumes publication with an existing SSH-signed local final tag", () => {
+    const release = fixture();
+    const state = publishState();
+    state.operator.publicationApproved = null;
+    release.seed(state);
+    release.candidate(CANDIDATE_COMMAND);
+    const result = release.run([
+      step("pnpm", ["release:candidate", "--", "--tag", `v${RELEASE}`]),
+      step("git", ["ls-remote", "--tags", "origin", `v${RELEASE}`, `v${RELEASE}^{}`]),
+      step("git", ["tag", "-s", `v${RELEASE}`, CUT_SHA, "-m", `OpenClaw ${RELEASE}`], "", {
+        exit: 1,
+      }),
+      step("git", ["rev-parse", `v${RELEASE}^{}`], CUT_SHA),
+      step(
+        "git",
+        ["cat-file", "-p", `v${RELEASE}`],
+        `object ${CUT_SHA}\ntype commit\n-----BEGIN SSH SIGNATURE-----\nfixture\n-----END SSH SIGNATURE-----\n`,
+      ),
+      step("git", ["push", "origin", `refs/tags/v${RELEASE}`]),
+    ]);
+
+    expect(result.stderr).not.toContain(`Could not create signed final tag v${RELEASE}`);
+    expect(result.calls).toContainEqual({
+      bin: "git",
+      args: ["push", "origin", `refs/tags/v${RELEASE}`],
+    });
   });
 
   it("prints child approval guidance, approves only parent gates, and resumes without redispatch", () => {
