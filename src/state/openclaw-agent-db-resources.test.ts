@@ -1,6 +1,8 @@
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
+import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 import { createDeferredCore } from "../shared/deferred.js";
 import {
   closeOpenClawAgentDatabaseByPath,
@@ -22,6 +24,7 @@ import {
 } from "./openclaw-state-db-async-lifecycle.js";
 
 const root = path.join(os.tmpdir(), `agent-resource-lifecycle-${process.pid}`);
+const tempDirs = useAutoCleanupTempDirTracker(afterEach);
 
 afterEach(async () => {
   await closeOpenClawAgentDatabasesAsync(root);
@@ -124,6 +127,46 @@ it("blocks new resources in a draining root without retiring a sibling root", as
   } finally {
     gate.resolve();
     await closing;
+  }
+});
+
+it("drains owners registered at the physical target of a symlinked root or path", async () => {
+  const base = tempDirs.make("agent-resource-link-");
+  const linkType = process.platform === "win32" ? "junction" : "dir";
+  const target = path.join(base, "target");
+  const retarget = path.join(base, "retarget");
+  const link = path.join(base, "link");
+  fs.mkdirSync(target);
+  fs.mkdirSync(retarget);
+  fs.symlinkSync(target, link, linkType);
+  // Native owners such as the session reclamation Worker register the path they opened.
+  const register = (pathname: string) => {
+    const resource = { agentId: "worker", path: pathname, revoke: vi.fn(), close: vi.fn() };
+    registerOpenClawAgentDatabaseAsyncResource({
+      ...resource,
+      close: async () => resource.close(),
+    });
+    return resource;
+  };
+  try {
+    const exact = register(path.join(target, "exact.sqlite"));
+    const rooted = register(path.join(target, "rooted.sqlite"));
+    await closeOpenClawAgentDatabaseByPathAsync(path.join(link, "exact.sqlite"), "worker");
+    expect(exact.close).toHaveBeenCalledOnce();
+    expect(rooted.revoke).not.toHaveBeenCalled();
+    await closeOpenClawAgentDatabasesAsync(link);
+    expect(rooted.close).toHaveBeenCalledOnce();
+
+    // A retargeted link selects its current target, never the database it used to name.
+    const previous = register(path.join(target, "previous.sqlite"));
+    fs.unlinkSync(link);
+    fs.symlinkSync(retarget, link, linkType);
+    const current = register(path.join(retarget, "current.sqlite"));
+    await closeOpenClawAgentDatabasesAsync(link);
+    expect(current.close).toHaveBeenCalledOnce();
+    expect(previous.revoke).not.toHaveBeenCalled();
+  } finally {
+    await closeOpenClawAgentDatabasesAsync(base);
   }
 });
 

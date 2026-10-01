@@ -44,7 +44,7 @@ import {
   drainAgentDatabaseResources,
   matchesAgentDatabaseClose,
   revokeAgentDatabaseResources,
-  type AgentDatabaseCloseSelection,
+  type PreparedAgentDatabaseCloseSelection,
 } from "./openclaw-agent-db-resources.js";
 import {
   assertSupportedAgentSchemaVersion,
@@ -408,6 +408,7 @@ export function closeOpenClawAgentDatabaseByPath(
 ): boolean {
   // Cache keys are lexical resolved paths. Do not realpath aliases here: a
   // symlink swap must never redirect cleanup onto a different cached database.
+  // Registered resources also match the current physical target that native owners register.
   const resolvedPath = path.resolve(pathname);
   void revokeAgentDatabaseResources(
     { path: resolvedPath, agentId: expectedAgentId },
@@ -551,7 +552,7 @@ export function closeOpenClawAgentDatabases(rootPath?: string): void {
 }
 
 async function drainPendingAgentDatabaseOpens(
-  selection: AgentDatabaseCloseSelection,
+  selection: PreparedAgentDatabaseCloseSelection,
 ): Promise<void> {
   while (true) {
     const pending = [...cache.activePending].filter((owner) =>
@@ -575,8 +576,8 @@ export async function closeOpenClawAgentDatabasesAsync(rootPath?: string): Promi
       revokePendingAgentDatabaseOpen(owner.path);
     }
   }
-  await drainAgentDatabaseResources({ rootPath }, async () => {
-    await drainPendingAgentDatabaseOpens({ rootPath });
+  await drainAgentDatabaseResources({ rootPath }, async (selection) => {
+    await drainPendingAgentDatabaseOpens(selection);
     closeOpenClawAgentDatabases(rootPath);
   });
 }
@@ -586,12 +587,15 @@ export async function closeOpenClawAgentDatabaseByPathAsync(
   pathname: string,
   expectedAgentId?: string,
 ): Promise<boolean> {
-  const selection = { path: path.resolve(pathname), agentId: expectedAgentId };
-  revokePendingAgentDatabaseOpen(selection.path, expectedAgentId);
-  return drainAgentDatabaseResources(selection, async () => {
-    await drainPendingAgentDatabaseOpens(selection);
-    return closeOpenClawAgentDatabaseByPath(selection.path, expectedAgentId);
-  });
+  const resolvedPath = path.resolve(pathname);
+  revokePendingAgentDatabaseOpen(resolvedPath, expectedAgentId);
+  return drainAgentDatabaseResources(
+    { path: resolvedPath, agentId: expectedAgentId },
+    async (selection) => {
+      await drainPendingAgentDatabaseOpens(selection);
+      return closeOpenClawAgentDatabaseByPath(resolvedPath, expectedAgentId);
+    },
+  );
 }
 
 /** Read a database's durable role and agent owner without mutating it. */
