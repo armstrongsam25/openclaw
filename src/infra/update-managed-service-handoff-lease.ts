@@ -15,17 +15,14 @@ import {
   readManagedHandoffRepairMetadata,
 } from "./update-managed-service-handoff-database.js";
 import type {
+  BorrowedLegacyHandoffParent,
   LeaseAcquisition,
   ManagedHandoffLease,
   ManagedHandoffLeaseStoreOptions,
   ManagedHandoffParent,
   ManagedHandoffLeaseTransition,
-  ManagedHandoffRepair,
 } from "./update-managed-service-handoff-lease-types.js";
-import {
-  readBorrowedLegacyHandoffParent,
-  type BorrowedLegacyHandoffParent,
-} from "./update-managed-service-handoff-legacy-parent.js";
+import { readBorrowedLegacyHandoffParent } from "./update-managed-service-handoff-legacy-parent.js";
 import { createManagedHandoffMutationReader } from "./update-managed-service-handoff-mutation.js";
 import { createManagedHandoffOriginalAcquisition } from "./update-managed-service-handoff-original-acquisition.js";
 import {
@@ -58,8 +55,8 @@ const originalUpdateAdmissions = new WeakMap<
   ManagedHandoffOriginalAdmission
 >();
 
-export type { BorrowedLegacyHandoffParent } from "./update-managed-service-handoff-legacy-parent.js";
 export type {
+  BorrowedLegacyHandoffParent,
   LeaseAcquisition,
   ManagedHandoffLease,
   ManagedHandoffLeaseStoreOptions,
@@ -683,11 +680,7 @@ export function createManagedHandoffLeaseStore(
     properties,
     validFailure: (value: unknown) => triageFailureSchema.safeParse(value).success,
   };
-  const prepareRepair: (
-    root: string,
-    env: NodeJS.ProcessEnv,
-    timeoutMs?: number,
-  ) => Promise<ManagedHandoffRepair | null> = prepareManagedHandoffRepair.bind(null, store, {
+  const prepareRepair = prepareManagedHandoffRepair.bind(null, store, {
     rows: { handle, updateRow },
     withDatabase,
     processState,

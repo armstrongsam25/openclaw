@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { isDeepStrictEqual } from "node:util";
 import { executeSqliteQuerySync } from "./kysely-sync.js";
+import type { createManagedHandoffBootIdentityReader } from "./update-managed-service-handoff-boot.js";
 import {
   canCleanupLegacyManagedHandoff,
   readManagedHandoffRepairFacts,
@@ -19,7 +20,6 @@ import type {
   ManagedHandoffRepair,
   ManagedHandoffLeaseTransition,
 } from "./update-managed-service-handoff-lease-types.js";
-import type { createManagedHandoffLeaseStore } from "./update-managed-service-handoff-lease.js";
 import type { createManagedHandoffProcessIdentityReader } from "./update-managed-service-handoff-process.js";
 import { managedHandoffLeaseText as text } from "./update-managed-service-handoff-rows.js";
 import type { createManagedHandoffLeaseRows } from "./update-managed-service-handoff-rows.js";
@@ -110,7 +110,16 @@ export function readManagedHandoffAdmissionLease(
 }
 
 export async function prepareManagedHandoffRepair(
-  store: Omit<ReturnType<typeof createManagedHandoffLeaseStore>, "prepareRepair">,
+  store: Pick<Rows, "read"> & {
+    transact: <T>(db: DatabaseSync, operation: () => T) => T;
+    hasUnsettledChildren: (lease: ManagedHandoffLease, db?: DatabaseSync) => boolean;
+    processIdentity: () => ManagedHandoffLease["helper"];
+    bootIdentity: ReturnType<typeof createManagedHandoffBootIdentityReader>;
+    owns: (lease: ManagedHandoffLease) => boolean;
+    current: (lease: ManagedHandoffLease) => boolean;
+    settle: (lease: ManagedHandoffLease, phase: "closed") => ManagedHandoffLease | null;
+    release: (lease: ManagedHandoffLease) => boolean;
+  },
   context: {
     rows: Pick<Rows, "handle" | "updateRow">;
     withDatabase: ReturnType<typeof createManagedHandoffLeaseDatabase>;

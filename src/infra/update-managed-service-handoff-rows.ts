@@ -10,11 +10,13 @@ import {
   type LeaseTable,
   type ManagedUpdateLeaseDatabaseIdentity,
 } from "./update-managed-service-handoff-database.js";
-import type { ManagedHandoffLease } from "./update-managed-service-handoff-lease-types.js";
+import type {
+  BorrowedLegacyHandoffParent,
+  ManagedHandoffLease,
+} from "./update-managed-service-handoff-lease-types.js";
 import {
   readBorrowedLegacyHandoffParent,
   isBorrowedLegacyHandoffParentCurrent,
-  type BorrowedLegacyHandoffParent,
 } from "./update-managed-service-handoff-legacy-parent.js";
 import {
   isRetiredManagedHandoffLeasePayload,
