@@ -101,7 +101,7 @@ function generateTypes(db: DatabaseSync): string {
   return lines.join("\n");
 }
 
-export async function generateKyselyTypes(schemaSource: string): Promise<string> {
+async function generateKyselyTypes(schemaSource: string): Promise<string> {
   const { DatabaseSync } = await import("node:sqlite");
   const db = new DatabaseSync(":memory:");
   try {
