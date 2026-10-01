@@ -170,6 +170,53 @@ it("drains owners registered at the physical target of a symlinked root or path"
   }
 });
 
+it.each(["root", "path"] as const)(
+  "keeps a %s drain on the target it joined when the link is retargeted mid-drain",
+  async (scope) => {
+    const base = tempDirs.make("agent-resource-retarget-");
+    const linkType = process.platform === "win32" ? "junction" : "dir";
+    const target = path.join(base, "target");
+    const retarget = path.join(base, "retarget");
+    const link = path.join(base, "link");
+    fs.mkdirSync(target);
+    fs.mkdirSync(retarget);
+    fs.symlinkSync(target, link, linkType);
+    const gate = createDeferredCore();
+    const joined = {
+      agentId: "worker",
+      path: path.join(target, "worker.sqlite"),
+      revoke: vi.fn(),
+      close: () => gate.promise,
+    };
+    const successor = {
+      agentId: "worker",
+      path: path.join(retarget, "worker.sqlite"),
+      revoke: vi.fn(),
+      close: async () => {},
+    };
+    registerOpenClawAgentDatabaseAsyncResource(joined);
+    try {
+      const closing =
+        scope === "root"
+          ? closeOpenClawAgentDatabasesAsync(link)
+          : closeOpenClawAgentDatabaseByPathAsync(path.join(link, "worker.sqlite"), "worker");
+      try {
+        expect(joined.revoke).toHaveBeenCalledOnce();
+        fs.unlinkSync(link);
+        fs.symlinkSync(retarget, link, linkType);
+        registerOpenClawAgentDatabaseAsyncResource(successor);
+      } finally {
+        gate.resolve();
+        await closing;
+      }
+      // The drain returned after joining its target; it never started an unjoined close.
+      expect(successor.revoke).not.toHaveBeenCalled();
+    } finally {
+      await closeOpenClawAgentDatabasesAsync(base);
+    }
+  },
+);
+
 it.each(["known", "unresolved"] as const)(
   "retains a failed %s close after unregistering and retries it before readmission",
   async (ownership) => {

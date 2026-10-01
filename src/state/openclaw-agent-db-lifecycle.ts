@@ -414,6 +414,11 @@ export function closeOpenClawAgentDatabaseByPath(
     { path: resolvedPath, agentId: expectedAgentId },
     logResourceCloseFailure,
   );
+  return closeLifecycleAgentDatabase(resolvedPath, expectedAgentId);
+}
+
+// Registered resources belong to the caller's selection; these maps are keyed lexically.
+function closeLifecycleAgentDatabase(resolvedPath: string, expectedAgentId?: string): boolean {
   // Revocation is immediate; the async owner retains its lease until native work joins.
   revokePendingAgentDatabaseOpen(resolvedPath, expectedAgentId);
   for (const retained of cache.retainedCloses) {
@@ -534,6 +539,10 @@ export function invalidateOpenClawAgentWritableProjections(
 /** Close cached agent handles, optionally restricted to one runtime root. */
 export function closeOpenClawAgentDatabases(rootPath?: string): void {
   void revokeAgentDatabaseResources({ rootPath }, logResourceCloseFailure);
+  closeLifecycleAgentDatabases(rootPath);
+}
+
+function closeLifecycleAgentDatabases(rootPath?: string): void {
   for (const pathname of cache.pending.keys()) {
     if (rootPath === undefined || isPathInside(rootPath, pathname)) {
       revokePendingAgentDatabaseOpen(pathname);
@@ -546,7 +555,7 @@ export function closeOpenClawAgentDatabases(rootPath?: string): void {
   }
   for (const pathname of cache.databases.keys()) {
     if (rootPath === undefined || isPathInside(rootPath, pathname)) {
-      closeOpenClawAgentDatabaseByPath(pathname);
+      closeLifecycleAgentDatabase(pathname);
     }
   }
 }
@@ -576,9 +585,11 @@ export async function closeOpenClawAgentDatabasesAsync(rootPath?: string): Promi
       revokePendingAgentDatabaseOpen(owner.path);
     }
   }
+  // The drain joins every selected resource and refuses new matches until it settles.
+  // Resolving the locator again could start an unjoined close on a retargeted link.
   await drainAgentDatabaseResources({ rootPath }, async (selection) => {
     await drainPendingAgentDatabaseOpens(selection);
-    closeOpenClawAgentDatabases(rootPath);
+    closeLifecycleAgentDatabases(rootPath);
   });
 }
 
@@ -593,7 +604,7 @@ export async function closeOpenClawAgentDatabaseByPathAsync(
     { path: resolvedPath, agentId: expectedAgentId },
     async (selection) => {
       await drainPendingAgentDatabaseOpens(selection);
-      return closeOpenClawAgentDatabaseByPath(resolvedPath, expectedAgentId);
+      return closeLifecycleAgentDatabase(resolvedPath, expectedAgentId);
     },
   );
 }
