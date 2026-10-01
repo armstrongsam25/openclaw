@@ -4,11 +4,21 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import { setTimeout as waitForRuntimeTick } from "node:timers/promises";
 import type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 import { expectDefined } from "@openclaw/normalization-core";
 import { materializeRequesterScopedMcpToolsForHarnessRun } from "openclaw/plugin-sdk/agent-harness-runtime";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createDeferred, withinTest } from "../../test/helpers/promise.js";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  fixtureReceiptClientSource,
+  openFixtureReceiptChannel,
+  type FixtureReceiptChannel,
+} from "../../test/helpers/fixture-receipts.js";
+import {
+  awaitGateBeforeSettlement,
+  createDeferred,
+  withinTest,
+} from "../../test/helpers/promise.js";
 import {
   cleanupTempDirs,
   makeTempDir,
@@ -85,6 +95,13 @@ vi.mock("./mcp-auth-profile.js", () => ({
 }));
 
 const tempDirs: string[] = [];
+let receipts: FixtureReceiptChannel;
+beforeAll(async () => {
+  receipts = await openFixtureReceiptChannel();
+});
+afterAll(async () => {
+  await receipts.close();
+});
 beforeEach(async () => {
   await testing.resetSessionMcpRuntimeManager();
   // A drained manager must not retain another test file's mocked config loader.
@@ -107,7 +124,6 @@ type ConfiguredMcpServer = NonNullable<
   NonNullable<NonNullable<RuntimeParams["cfg"]>["mcp"]>["servers"]
 >[string];
 
-const LIST_TOOLS_SERVER_LOG_TIMEOUT_MS = 2_000;
 const LIST_TOOLS_TEST_DEADLINE_MS = 4_000;
 
 function readMcpText(
@@ -180,6 +196,8 @@ async function writeListToolsMcpServer(params: {
 import { appendFileSync } from "node:fs";
 import fs from "node:fs/promises";
 
+${fixtureReceiptClientSource(receipts.endpoint)}
+
 const {
   logPath, listToolsReleasePath, databasePath, pidPath, hangToolCallsUntilRestartMarkerPath,
   toolsByList, listToolsJsonRpcErrorMessage, toolPageCursors, callToolResult,
@@ -218,6 +236,9 @@ const firstInitialize = hangFirstInitializeMarkerPath
   ? await fs.writeFile(hangFirstInitializeMarkerPath, String(process.pid), { flag: "wx" })
       .then(() => true, () => false)
   : false;
+if (firstInitialize) {
+  log("first initialize pid " + process.pid);
+}
 if (databasePath) {
   const { DatabaseSync } = await import("node:sqlite");
   database = new DatabaseSync(databasePath);
@@ -237,6 +258,7 @@ if (hangToolCallsUntilRestartMarkerPath) {
 }
 function log(line) {
   appendFileSync(logPath, line + "\\n", "utf8");
+  sendReceipt(logPath, line);
 }
 function send(message) {
   process.stdout.write(JSON.stringify(message) + "\\n");
@@ -469,82 +491,27 @@ process.on("SIGINT", shutdown);`,
   );
 }
 
-async function waitForFileText(
-  filePath: string,
-  expectedText: string,
-  timeoutMs: number,
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  let lastText = "";
-  while (Date.now() < deadline) {
-    try {
-      lastText = await fs.readFile(filePath, "utf8");
-      if (lastText.includes(expectedText)) {
-        return;
-      }
-    } catch {
-      // The server may not have written the log file yet.
-    }
-    await new Promise((resolve) => {
-      setTimeout(resolve, 10);
-    });
-  }
-  throw new Error(
-    `Timed out waiting for ${expectedText} in ${filePath}; saw ${JSON.stringify(lastText)}`,
-  );
-}
-
-async function waitForPredicate(
+// Runtime invalidation/recovery and App expiry expose no completion promise.
+// A native tick also works while tests fake the product's RPC timers.
+async function waitForRuntimeState(
   predicate: () => boolean | Promise<boolean>,
   description: string,
-  timeoutMs: number,
+  signal: AbortSignal,
 ): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await predicate()) {
-      return;
+  try {
+    for (;;) {
+      signal.throwIfAborted();
+      if (await withinTest(Promise.resolve().then(predicate), signal)) {
+        return;
+      }
+      await waitForRuntimeTick(10, undefined, { signal });
     }
-    await new Promise((resolve) => {
-      setTimeout(resolve, 10);
-    });
-  }
-  throw new Error(`Timed out waiting for ${description}`);
-}
-
-async function waitForFileTextCount(
-  filePath: string,
-  expectedText: string,
-  expectedCount: number,
-  timeoutMs: number,
-): Promise<void> {
-  await waitForPredicate(
-    async () => {
-      const text = await fs.readFile(filePath, "utf8").catch(() => "");
-      return text.split(expectedText).length - 1 >= expectedCount;
-    },
-    `${expectedCount} occurrences of ${expectedText} in ${filePath}`,
-    timeoutMs,
-  );
-}
-
-/** Waits for a replacement child to register a pid different from the one that died. */
-async function waitForChangedPid(
-  pidPath: string,
-  previousPid: number,
-  timeoutMs: number,
-): Promise<number> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const raw = await fs.readFile(pidPath, "utf8").catch(() => "");
-    const pid = Number.parseInt(raw.trim(), 10);
-    if (Number.isFinite(pid) && pid !== previousPid) {
-      return pid;
+  } catch (error) {
+    if (signal.aborted) {
+      throw new Error(`Timed out waiting for ${description}`, { cause: error });
     }
-    await new Promise((resolve) => {
-      setTimeout(resolve, 10);
-    });
+    throw error;
   }
-  throw new Error(`Timed out waiting for a replacement child pid (still ${previousPid})`);
 }
 
 function makeRuntime(
@@ -852,7 +819,9 @@ describe("session MCP runtime", () => {
     }
   });
 
-  it("validates an in-flight result against its dispatch-time output schema", async () => {
+  it("validates an in-flight result against its dispatch-time output schema", async ({
+    signal,
+  }) => {
     const tempDir = tempDirTracker.make("bundle-mcp-dispatch-schema-");
     const serverPath = path.join(tempDir, "server.mjs");
     const logPath = path.join(tempDir, "server.log");
@@ -888,15 +857,18 @@ describe("session MCP runtime", () => {
         (value) => ({ value, error: undefined }),
         (error: unknown) => ({ value: undefined, error }),
       );
-      await waitForFileText(
-        logPath,
-        "notify tools/list_changed during tools/call",
-        LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
+      await withinTest(
+        awaitGateBeforeSettlement(
+          receipts.waitFor(logPath, "notify tools/list_changed during tools/call"),
+          calling,
+          `Timed out waiting for notify tools/list_changed during tools/call in ${logPath}`,
+        ),
+        signal,
       );
-      await waitForPredicate(
+      await waitForRuntimeState(
         () => runtime.peekCatalog() === null,
         "dispatch-time catalog invalidation",
-        LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
+        signal,
       );
       expect((await runtime.getCatalog()).tools.map((entry) => entry.toolName)).toEqual([
         "versioned",
@@ -998,7 +970,14 @@ describe("session MCP runtime", () => {
     );
 
     try {
-      await waitForFileText(logPath, "recv tools/list", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
+      await withinTest(
+        awaitGateBeforeSettlement(
+          receipts.waitFor(logPath, "recv tools/list"),
+          catalogResult,
+          `Timed out waiting for recv tools/list in ${logPath}`,
+        ),
+        signal,
+      );
       const result = await withinTest(catalogResult, signal);
 
       expect(result.status).toBe("resolved");
@@ -1125,21 +1104,16 @@ describe("session MCP runtime", () => {
       const staleCatalog = await withinTest(runtime.getCatalog(), signal);
       expect(staleCatalog).toBe(failedCatalog);
       expect(staleCatalog.diagnostics?.[0]?.serverName).toBe("retryServer");
-      await waitForFileTextCount(
-        retryLogPath,
-        "recv tools/list",
-        2,
-        LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
-      );
+      await withinTest(receipts.waitFor(retryLogPath, "recv tools/list", 2), signal);
       await expect(runtime.callTool("healthyServer", "healthy_tool", {})).resolves.toMatchObject({
         isError: false,
       });
       await fs.writeFile(retryReleasePath, "release", "utf8");
 
-      await waitForPredicate(
+      await waitForRuntimeState(
         () => staticRuntime.peekCatalog()?.servers.retryServer !== undefined,
         "background catalog recovery",
-        LIST_TOOLS_TEST_DEADLINE_MS,
+        signal,
       );
       const recoveredCatalog = await runtime.getCatalog();
 
@@ -1207,7 +1181,7 @@ describe("session MCP runtime", () => {
         { type: "text", text: "memo body" },
         { type: "text", text: "[audio audio/mpeg]" },
       ]);
-      await waitForFileText(logPath, "recv tools/call", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
+      expect(await fs.readFile(logPath, "utf8")).toContain("recv tools/call");
     } finally {
       await runtime.dispose();
     }
@@ -1372,14 +1346,13 @@ describe("session MCP runtime", () => {
       await expect(runtime.callTool("child", "slow_tool", {})).resolves.toMatchObject({
         isError: false,
       });
-      await waitForFileText(pidPath, "", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
       const pid = Number.parseInt((await fs.readFile(pidPath, "utf8")).trim(), 10);
       await fs.rm(listToolsReleasePath, { force: true });
       // SIGKILL rather than the default SIGTERM: this test is about what happens once the
       // child is actually gone, so the kill must not race the assertions below.
       process.kill(pid, "SIGKILL");
 
-      await waitForPredicate(
+      await waitForRuntimeState(
         () =>
           runtime
             .peekCatalog()
@@ -1387,19 +1360,19 @@ describe("session MCP runtime", () => {
               (entry) => entry.serverName === "child" && entry.message === "mcp transport closed",
             ) === true,
         "closed transport to schedule a catalog retry",
-        LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
+        signal,
       );
       // Background recovery may still hold the closed session or already have retired it.
       // Both states must reject while the replacement catalog remains blocked.
       await expect(runtime.callTool("child", "slow_tool", {})).rejects.toThrow(
         /^bundle-mcp server "child" is (?:not connected|disconnected: mcp transport closed)$/,
       );
-      await waitForFileTextCount(logPath, "recv tools/list", 2, LIST_TOOLS_TEST_DEADLINE_MS);
+      await withinTest(receipts.waitFor(logPath, "recv tools/list", 2), signal);
       await expect(
         withinTest(runtime.callTool("healthy", "slow_tool", {}), signal),
       ).resolves.toMatchObject({ isError: false });
       await fs.writeFile(listToolsReleasePath, "release", "utf8");
-      await waitForPredicate(
+      await waitForRuntimeState(
         async () => {
           try {
             return (await runtime.callTool("child", "slow_tool", {})).isError === false;
@@ -1408,9 +1381,10 @@ describe("session MCP runtime", () => {
           }
         },
         "child server to reconnect",
-        LIST_TOOLS_TEST_DEADLINE_MS,
+        signal,
       );
-      const replacementPid = await waitForChangedPid(pidPath, pid, LIST_TOOLS_TEST_DEADLINE_MS);
+      const replacementPid = Number.parseInt((await fs.readFile(pidPath, "utf8")).trim(), 10);
+      expect(Number.isFinite(replacementPid)).toBe(true);
       expect(replacementPid).not.toBe(pid);
     } finally {
       await runtime.dispose();
@@ -1418,7 +1392,7 @@ describe("session MCP runtime", () => {
     }
   });
 
-  it("retires a reused MCP session that exits during catalog refresh", async () => {
+  it("retires a reused MCP session that exits during catalog refresh", async ({ signal }) => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "bundle-mcp-refresh-exit-"));
     const serverPath = path.join(tempDir, "server.mjs");
     const logPath = path.join(tempDir, "server.log");
@@ -1437,11 +1411,11 @@ describe("session MCP runtime", () => {
     try {
       expect((await runtime.getCatalog()).tools).toHaveLength(1);
       await fs.writeFile(notifyReleasePath, "release", "utf8");
-      await waitForFileText(logPath, "notify tools/list_changed", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
-      await waitForPredicate(
+      await withinTest(receipts.waitFor(logPath, "notify tools/list_changed"), signal);
+      await waitForRuntimeState(
         () => runtime.peekCatalog() === null,
         "list_changed to invalidate the catalog",
-        LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
+        signal,
       );
 
       const refreshedCatalog = await runtime.getCatalog();
@@ -1530,7 +1504,7 @@ describe("session MCP runtime", () => {
         prompts: { listChanged: true },
       });
       expect(catalog.diagnostics ?? []).toEqual([]);
-      await waitForFileText(logPath, "recv initialize", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
+      expect(await fs.readFile(logPath, "utf8")).toContain("recv initialize");
     } finally {
       await runtime.dispose();
       await fs.rm(tempDir, { recursive: true, force: true });
@@ -1612,11 +1586,20 @@ describe("session MCP runtime", () => {
           await expect(fs.access(pidPath)).rejects.toMatchObject({ code: "ENOENT" });
           return;
         }
-        await waitForFileText(
-          logPath,
-          phase === "initialize" ? "recv initialize" : "recv tools/list",
-          LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
-        );
+        if (phase === "ready") {
+          await withinTest(pending, signal);
+          expect(await fs.readFile(logPath, "utf8")).toContain("recv tools/list");
+        } else {
+          const received = phase === "initialize" ? "recv initialize" : "recv tools/list";
+          await withinTest(
+            awaitGateBeforeSettlement(
+              receipts.waitFor(logPath, received),
+              pending,
+              `Timed out waiting for ${received} in ${logPath}`,
+            ),
+            signal,
+          );
+        }
         const pid = Number.parseInt((await fs.readFile(pidPath, "utf8")).trim(), 10);
         expect(() => process.kill(pid, 0)).not.toThrow();
         if (phase === "ready") {
@@ -1641,7 +1624,9 @@ describe("session MCP runtime", () => {
     },
   );
 
-  it("cancels a combined catalog waiter without cancelling the shared producer", async () => {
+  it("cancels a combined catalog waiter without cancelling the shared producer", async ({
+    signal,
+  }) => {
     const tempDir = tempDirTracker.make("bundle-mcp-catalog-cancel-");
     const serverPath = path.join(tempDir, "server.mjs");
     const logPath = path.join(tempDir, "server.log");
@@ -1674,11 +1659,19 @@ describe("session MCP runtime", () => {
     });
     let other: Promise<CallToolResult> | undefined;
     try {
-      await waitForFileText(logPath, "recv tools/list", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
+      await withinTest(
+        awaitGateBeforeSettlement(
+          receipts.waitFor(logPath, "recv tools/list"),
+          first,
+          `Timed out waiting for recv tools/list in ${logPath}`,
+        ),
+        signal,
+      );
       expect(cancelled).toBe(false);
       other = runtime.callTool("shared", "slow_tool", {});
       controller.abort(reason);
-      await vi.waitFor(() => expect(cancelled).toBe(true));
+      await withinTest(first, signal);
+      expect(cancelled).toBe(true);
       expect(failure).toMatchObject({ name: "AbortError", cause: reason });
       expect(await fs.readFile(logPath, "utf8")).not.toContain("recv notifications/cancelled");
       await fs.writeFile(releasePath, "release");
@@ -1696,7 +1689,7 @@ describe("session MCP runtime", () => {
     }
   });
 
-  it("cancels materialized MCP calls without pausing the healthy server", async () => {
+  it("cancels materialized MCP calls without pausing the healthy server", async ({ signal }) => {
     const tempDir = tempDirTracker.make("bundle-mcp-caller-cancel-");
     const serverPath = path.join(tempDir, "caller-cancel.mjs");
     const logPath = path.join(tempDir, "server.log");
@@ -1733,24 +1726,19 @@ describe("session MCP runtime", () => {
           materialized.tools.find((entry) => entry.name === call.toolName),
           call.toolName,
         ).execute(`cancel-${attempt}`, {}, controller.signal);
-        await waitForPredicate(
-          async () =>
-            (await fs.readFile(logPath, "utf8").catch(() => "")).includes(`recv ${call.method}`),
-          `MCP ${call.method} request to reach the server`,
-          LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
+        await withinTest(
+          awaitGateBeforeSettlement(
+            receipts.waitFor(logPath, `recv ${call.method}`),
+            pending,
+            `Timed out waiting for MCP ${call.method} request to reach the server`,
+          ),
+          signal,
         );
         controller.abort(new Error(`turn cancelled ${attempt}`));
         await expect(pending).rejects.toThrow(`turn cancelled ${attempt}`);
       }
 
-      await waitForPredicate(
-        async () =>
-          ((await fs.readFile(logPath, "utf8").catch(() => "")).match(
-            /recv notifications\/cancelled/g,
-          )?.length ?? 0) === 3,
-        "three MCP cancellation notifications",
-        LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
-      );
+      await withinTest(receipts.waitFor(logPath, "recv notifications/cancelled", 3), signal);
       await expect(runtime.callTool("healthy", "slow_tool", {})).resolves.toMatchObject({
         isError: false,
       });
@@ -1799,7 +1787,7 @@ describe("session MCP runtime", () => {
     }
   });
 
-  it("recycles an MCP server after repeated request timeouts", async () => {
+  it("recycles an MCP server after repeated request timeouts", async ({ signal }) => {
     const tempDir = tempDirTracker.make("bundle-mcp-timeout-recycle-");
     const serverPath = path.join(tempDir, "timeout-recycle.mjs");
     const logPath = path.join(tempDir, "server.log");
@@ -1818,7 +1806,6 @@ describe("session MCP runtime", () => {
 
     try {
       expect((await runtime.getCatalog()).tools).toHaveLength(1);
-      await waitForFileText(pidPath, "", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
       const pid = Number.parseInt((await fs.readFile(pidPath, "utf8")).trim(), 10);
 
       const results = await Promise.allSettled(
@@ -1831,7 +1818,7 @@ describe("session MCP runtime", () => {
             result.status === "rejected" && String(result.reason).includes("Request timed out"),
         ).length,
       ).toBeGreaterThanOrEqual(3);
-      await waitForPredicate(
+      await waitForRuntimeState(
         async () => {
           try {
             return (await runtime.callTool("hanging", "slow_tool", {})).isError === false;
@@ -1840,9 +1827,11 @@ describe("session MCP runtime", () => {
           }
         },
         "timed-out server to recover without stale backoff",
-        LIST_TOOLS_TEST_DEADLINE_MS,
+        signal,
       );
-      expect(await waitForChangedPid(pidPath, pid, LIST_TOOLS_TEST_DEADLINE_MS)).not.toBe(pid);
+      const replacementPid = Number.parseInt((await fs.readFile(pidPath, "utf8")).trim(), 10);
+      expect(Number.isFinite(replacementPid)).toBe(true);
+      expect(replacementPid).not.toBe(pid);
     } finally {
       await runtime.dispose();
       await fs.rm(tempDir, { recursive: true, force: true });
@@ -1936,7 +1925,7 @@ describe("session MCP runtime", () => {
       expect(
         catalog.diagnostics?.find((entry) => entry.serverName === "looping")?.message,
       ).toContain("repeated pagination cursor");
-      await waitForFileText(healthyLogPath, "recv tools/list", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
+      expect(await fs.readFile(healthyLogPath, "utf8")).toContain("recv tools/list");
     } finally {
       await runtime.dispose();
     }
@@ -1977,8 +1966,9 @@ describe("session MCP runtime", () => {
         { name: "prompt-1" },
         { name: "prompt-2" },
       ]);
-      await waitForFileText(logPath, 'resources/list cursor ""', LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
-      await waitForFileText(logPath, 'prompts/list cursor ""', LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
+      const log = await fs.readFile(logPath, "utf8");
+      expect(log).toContain('resources/list cursor ""');
+      expect(log).toContain('prompts/list cursor ""');
     } finally {
       await runtime.dispose();
     }
@@ -2133,9 +2123,9 @@ describe("session MCP runtime", () => {
     expect(testing.getCachedSessionIds()).not.toContain("session-view-reset");
   });
 
-  it.each(["run", "app"] as const)(
+  it.for(["run", "app"] as const)(
     "keeps an active MCP child and database lock until its %s lease retires",
-    async (retirementPath) => {
+    async (retirementPath, { signal }) => {
       const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "bundle-mcp-deferred-run-"));
       const serverPath = path.join(tempDir, "server.mjs");
       const logPath = path.join(tempDir, "server.log");
@@ -2189,7 +2179,6 @@ describe("session MCP runtime", () => {
         if (appRetirement) {
           expect(appView).toBeDefined();
         }
-        await waitForFileText(pidPath, "", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
         const pid = Number.parseInt((await fs.readFile(pidPath, "utf8")).trim(), 10);
         const { DatabaseSync } = await import("node:sqlite");
         const database = new DatabaseSync(databasePath);
@@ -2220,19 +2209,20 @@ describe("session MCP runtime", () => {
           } finally {
             clock.mockRestore();
           }
+          await waitForRuntimeState(
+            () => {
+              try {
+                process.kill(pid, 0);
+                return false;
+              } catch {
+                return true;
+              }
+            },
+            "deferred MCP child process exit",
+            signal,
+          );
         }
-        await waitForPredicate(
-          () => {
-            try {
-              process.kill(pid, 0);
-              return false;
-            } catch {
-              return true;
-            }
-          },
-          "deferred MCP child process exit",
-          LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
-        );
+        expect(() => process.kill(pid, 0)).toThrow();
         expect(testing.getCachedSessionIds()).not.toContain("session-run-child");
         expect(() => database.exec("BEGIN IMMEDIATE")).not.toThrow();
         database.exec("ROLLBACK");
@@ -2330,25 +2320,13 @@ describe("session MCP runtime", () => {
       const runtime = await manager.getOrCreate(params);
       await runtime.getCatalog();
       await runtime.callTool("child", "slow_tool", {});
-      await waitForFileText(pidPath, "", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
       const pid = Number.parseInt(await fs.readFile(pidPath, "utf8"), 10);
       clock.setTime(Date.now() + 86_400_000);
       expect(await manager.sweepIdleRuntimes()).toBe(0);
       expect(manager.peekSession({ sessionId: params.sessionId })).toBe(runtime);
       expect(() => process.kill(pid, 0)).not.toThrow();
       await manager.disposeSession(params.sessionId);
-      await waitForPredicate(
-        () => {
-          try {
-            process.kill(pid, 0);
-            return false;
-          } catch {
-            return true;
-          }
-        },
-        "keep-alive MCP child exit",
-        LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
-      );
+      expect(() => process.kill(pid, 0)).toThrow();
       expect(manager.listRuntimeKeys()).toEqual([]);
     } finally {
       await manager.disposeAll();
@@ -3583,7 +3561,7 @@ describe("disposeSession timeout", () => {
   it(
     "reconnects a stateful streamable-http server after its session expires",
     { timeout: 15_000 },
-    async () => {
+    async ({ signal }) => {
       let activeServerSessionId: string | undefined;
       let initializeCount = 0;
       const callAttempts: Array<{ attempt: unknown; sessionId: string | undefined }> = [];
@@ -3730,10 +3708,10 @@ describe("disposeSession timeout", () => {
         ]);
 
         await runtime.getCatalog();
-        await waitForPredicate(
+        await waitForRuntimeState(
           () => initializeCount === 2 && !runtime?.peekCatalog()?.diagnostics?.length,
           "stateful MCP server to replace its expired HTTP session",
-          LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
+          signal,
         );
 
         await expect(
@@ -3760,7 +3738,7 @@ describe("disposeSession timeout", () => {
   it(
     "keeps catalog recovery single-flight while another server is recycled",
     { timeout: 15_000 },
-    async () => {
+    async ({ signal }) => {
       const realSetTimeout = setTimeout;
       const recovering = await startCatalogRecoveryMcpServer("recovering");
       const trigger = await startCatalogRecoveryMcpServer("trigger");
@@ -3817,14 +3795,16 @@ describe("disposeSession timeout", () => {
         trigger.allowCalls();
         recovering.releaseLists();
         trigger.releaseLists();
-        const publishedCatalog = await vi.waitFor(
+        await waitForRuntimeState(
           () => {
-            const current = expectDefined(runtime.peekCatalog(), "published catalog");
-            expect(current.diagnostics ?? []).toEqual([]);
-            return current;
+            const current = runtime.peekCatalog();
+            return current !== null && (current.diagnostics?.length ?? 0) === 0;
           },
-          { timeout: LIST_TOOLS_SERVER_LOG_TIMEOUT_MS },
+          "published catalog without recovery diagnostics",
+          signal,
         );
+        const publishedCatalog = expectDefined(runtime.peekCatalog(), "published catalog");
+        expect(publishedCatalog.diagnostics ?? []).toEqual([]);
         expect(publishedCatalog.tools.map((tool) => `${tool.serverName}:${tool.toolName}`)).toEqual(
           ["recovering:probe", "trigger:probe"],
         );
@@ -3948,7 +3928,7 @@ describe("disposeSession timeout", () => {
   it(
     "starts MCP server catalog loading concurrently",
     { timeout: LIST_TOOLS_TEST_DEADLINE_MS },
-    async () => {
+    async ({ signal }) => {
       const tempDir = makeTempDir(tempDirs, "bundle-mcp-parallel-");
       const releasePath = path.join(tempDir, "release-list-tools");
       const serverPaths = Array.from({ length: 3 }, (_, i) => {
@@ -3991,10 +3971,17 @@ describe("disposeSession timeout", () => {
 
       const catalogPromise = runtime.getCatalog();
       try {
-        await Promise.all(
-          serverPaths.map(({ logPath }) =>
-            waitForFileText(logPath, "tools/list cursor", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS),
+        await withinTest(
+          Promise.all(
+            serverPaths.map(({ logPath }) =>
+              awaitGateBeforeSettlement(
+                receipts.waitFor(logPath, "tools/list cursor"),
+                catalogPromise,
+                `Timed out waiting for tools/list cursor in ${logPath}`,
+              ),
+            ),
           ),
+          signal,
         );
         await fs.writeFile(releasePath, "released", "utf8");
         const catalog = await catalogPromise;
@@ -4016,7 +4003,7 @@ describe("disposeSession timeout", () => {
   it(
     "awaits in-progress MCP session connections after catalog invalidation",
     { timeout: LIST_TOOLS_TEST_DEADLINE_MS },
-    async () => {
+    async ({ signal }) => {
       const tempDir = makeTempDir(tempDirs, "bundle-mcp-inflight-connect-");
       const invalidatingServer = {
         serverName: "invalidatingServer",
@@ -4065,10 +4052,13 @@ describe("disposeSession timeout", () => {
 
       try {
         const firstCatalog = runtime.getCatalog();
-        await waitForFileText(
-          invalidatingServer.logPath,
-          "notify tools/list_changed",
-          LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
+        await withinTest(
+          awaitGateBeforeSettlement(
+            receipts.waitFor(invalidatingServer.logPath, "notify tools/list_changed"),
+            firstCatalog,
+            `Timed out waiting for notify tools/list_changed in ${invalidatingServer.logPath}`,
+          ),
+          signal,
         );
 
         const secondCatalog = await runtime.getCatalog();
@@ -4088,7 +4078,7 @@ describe("disposeSession timeout", () => {
   it(
     "retires timed-out shared MCP sessions before later catalog retries",
     { timeout: 8_000 },
-    async () => {
+    async ({ signal }) => {
       const tempDir = makeTempDir(tempDirs, "bundle-mcp-timeout-retire-");
       const triggerServerPath = path.join(tempDir, "trigger-server.mjs");
       const triggerLogPath = path.join(tempDir, "trigger.log");
@@ -4136,11 +4126,21 @@ describe("disposeSession timeout", () => {
 
       try {
         const firstCatalog = runtime.getCatalog();
-        await waitForFileText(firstConnectMarkerPath, "", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
-        await waitForFileText(
-          triggerLogPath,
-          "notify tools/list_changed",
-          LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
+        await withinTest(
+          awaitGateBeforeSettlement(
+            receipts.waitFor(slowLogPath, "first initialize pid"),
+            firstCatalog,
+            `Timed out waiting for first initialize in ${firstConnectMarkerPath}`,
+          ),
+          signal,
+        );
+        await withinTest(
+          awaitGateBeforeSettlement(
+            receipts.waitFor(triggerLogPath, "notify tools/list_changed"),
+            firstCatalog,
+            `Timed out waiting for notify tools/list_changed in ${triggerLogPath}`,
+          ),
+          signal,
         );
 
         const secondCatalogPromise = runtime.getCatalog();
@@ -4157,15 +4157,13 @@ describe("disposeSession timeout", () => {
           content: [{ type: "text", text: "poked" }],
           isError: false,
         });
-        await waitForFileText(
-          triggerLogPath,
+        expect(await fs.readFile(triggerLogPath, "utf8")).toContain(
           "notify tools/list_changed during tools/call",
-          LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
         );
-        await waitForPredicate(
+        await waitForRuntimeState(
           () => runtime.peekCatalog() === null,
           "manual list_changed to retry timed-out server",
-          LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
+          signal,
         );
 
         const now = Date.now;
@@ -4173,10 +4171,10 @@ describe("disposeSession timeout", () => {
         let retriedCatalog;
         try {
           await runtime.getCatalog();
-          await waitForPredicate(
+          await waitForRuntimeState(
             () => runtime.peekCatalog()?.servers.slow !== undefined,
             "the timed-out server's own catalog retry",
-            LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
+            signal,
           );
           retriedCatalog = await runtime.getCatalog();
         } finally {
@@ -4188,11 +4186,7 @@ describe("disposeSession timeout", () => {
           "poke",
           "slow_tool",
         ]);
-        await waitForFileText(
-          slowLogPath,
-          "fast retry initialize",
-          LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
-        );
+        expect(await fs.readFile(slowLogPath, "utf8")).toContain("fast retry initialize");
       } finally {
         await runtime.dispose();
       }
@@ -4202,7 +4196,7 @@ describe("disposeSession timeout", () => {
   it(
     "serializes invalidated catalog generations on one session",
     { timeout: LIST_TOOLS_TEST_DEADLINE_MS * 2 },
-    async () => {
+    async ({ signal }) => {
       const tempDir = makeTempDir(tempDirs, "bundle-mcp-overlap-generation-");
       const serverPath = path.join(tempDir, "overlap-server.mjs");
       const logPath = path.join(tempDir, "server.log");
@@ -4228,12 +4222,22 @@ describe("disposeSession timeout", () => {
 
       try {
         const firstCatalog = runtime.getCatalog();
-        await waitForFileText(
-          logPath,
-          "notify tools/list_changed",
-          LIST_TOOLS_SERVER_LOG_TIMEOUT_MS,
+        await withinTest(
+          awaitGateBeforeSettlement(
+            receipts.waitFor(logPath, "notify tools/list_changed"),
+            firstCatalog,
+            `Timed out waiting for notify tools/list_changed in ${logPath}`,
+          ),
+          signal,
         );
-        await waitForFileText(logPath, "tools/list cursor", LIST_TOOLS_SERVER_LOG_TIMEOUT_MS);
+        await withinTest(
+          awaitGateBeforeSettlement(
+            receipts.waitFor(logPath, "tools/list cursor"),
+            firstCatalog,
+            `Timed out waiting for tools/list cursor in ${logPath}`,
+          ),
+          signal,
+        );
 
         const secondCatalog = await runtime.getCatalog();
         const firstCatalogResult = await firstCatalog;
