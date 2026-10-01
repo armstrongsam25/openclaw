@@ -18,6 +18,7 @@ import {
 import { hasErrnoCode } from "./errno.js";
 import { isPathInside } from "./path-guards.js";
 import { resolveSqliteDatabaseFilePaths } from "./sqlite-files.js";
+import type { PreparedTranscriptArchives } from "./state-migrations.transcript-directives-archives.js";
 import type { MigrationMessages } from "./state-migrations.types.js";
 
 export type AgentDatabaseMigrationTarget = {
@@ -30,6 +31,7 @@ export type AgentDatabaseMigrationTarget = {
 type CandidateTarget = Omit<AgentDatabaseMigrationTarget, "realPath">;
 
 export type PreparedAgentDatabaseMigrationDiscovery = {
+  preparedTranscriptArchives?: Map<string, PreparedTranscriptArchives>;
   stateDir: string;
   configuredAgentDatabaseTargets: readonly { agentId: string; path: string }[];
   registeredAgentDatabases: readonly { agentId: string; path: string }[];
@@ -70,6 +72,9 @@ export function prepareAgentDatabaseMigrationDiscovery(params: {
       registeredAgentDatabases,
       deletionJournal,
     }),
+    ...(params.preparedDiscovery?.stateDir === stateDir
+      ? { preparedTranscriptArchives: params.preparedDiscovery.preparedTranscriptArchives }
+      : {}),
   };
 }
 

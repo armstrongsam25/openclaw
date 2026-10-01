@@ -84,7 +84,12 @@ import {
   type PreparedAgentDatabaseMigrationDiscovery,
 } from "./state-migrations.media-persistence-targets.js";
 import { transformMediaArchiveContent } from "./state-migrations.media-persistence-transform.js";
+import {
+  readTranscriptArchiveVerification,
+  recordTranscriptArchiveVerification,
+} from "./state-migrations.transcript-archive-verification.js";
 import { migrateCanonicalTranscriptArchives } from "./state-migrations.transcript-directives-archives.js";
+import type { PreparedTranscriptArchives } from "./state-migrations.transcript-directives-archives.js";
 import type { MigrationMessages } from "./state-migrations.types.js";
 
 const PREVIOUS_MEDIA_SCHEMA_VERSION = AGENT_MEDIA_SCHEMA_VERSION - 1;
@@ -106,6 +111,7 @@ async function migrateAgentDatabase(params: {
   env: NodeJS.ProcessEnv;
   pathname: string;
   maintenance: OpenClawStateLeaseContext;
+  preparedArchives?: PreparedTranscriptArchives;
 }) {
   invalidateOpenClawAgentDatabaseIntegrityBeforeMutation(params.pathname);
   const database = openNodeSqliteDatabase(params.pathname);
@@ -120,18 +126,29 @@ async function migrateAgentDatabase(params: {
         assertSupportedAgentSchemaVersion(database, params.pathname);
       },
     });
-  const migrateArchives = () =>
-    migrateCanonicalTranscriptArchives({
+  const migrateArchives = async () => {
+    const previous = readTranscriptArchiveVerification(database);
+    const verified = new Set<string>();
+    const result = await migrateCanonicalTranscriptArchives({
       agentId: params.agentId,
       database,
       pathname: params.pathname,
       start: { generation: "", sessionId: "" },
-      // Imports and restores can introduce legacy media after any successful pass.
-      // Reuse archive repair without persisting the directive migration's cursor.
-      writeCursor: () => {},
+      prepared: params.preparedArchives,
+      verified: previous,
+      onVerified: (fingerprint) => verified.add(fingerprint),
       onArchive: (archivePath) => params.canonicalArchivePaths.add(archivePath),
       transformContent: transformMediaArchiveContent,
     });
+    recordTranscriptArchiveVerification(
+      database,
+      params.agentId,
+      params.pathname,
+      previous,
+      verified,
+    );
+    return result;
+  };
   try {
     configureSqliteMaintenanceCache(database);
     database.exec(`PRAGMA busy_timeout = ${OPENCLAW_SQLITE_BUSY_TIMEOUT_MS};`);
@@ -506,6 +523,7 @@ export async function migrateLegacyMediaPersistence(
               : undefined,
             pathname,
             maintenance,
+            preparedArchives: preparedDiscovery.preparedTranscriptArchives?.get(pathname),
           });
           maintenance.assertOwned();
           warnings.push(...result.warnings);

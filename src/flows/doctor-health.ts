@@ -140,6 +140,7 @@ async function runDoctorHealthFlowWithResult(
   let sqliteNoCowPaths: string[] = [];
   let exitCode: number | undefined;
   let healthContext: DoctorHealthFlowContext | undefined;
+  let preparedArchiveDiscovery: DoctorDatabasePreflight["agentDatabaseMigrationDiscovery"];
   let doctorResult: UpdatePostInstallDoctorResult = { status: "error" };
   const recordConfigWriteRefusal = (ctx: DoctorHealthFlowContext): boolean => {
     if (!ctx.configWriteRefusal) {
@@ -167,6 +168,25 @@ async function runDoctorHealthFlowWithResult(
     return true;
   };
   try {
+    if (options.repair === true || options.yes === true) {
+      try {
+        const { prepareDoctorDatabasePreflight } =
+          await import("../commands/doctor-database-preflight.js");
+        preparedArchiveDiscovery = (databasePreflight ?? (await prepareDoctorDatabasePreflight()))
+          .agentDatabaseMigrationDiscovery;
+        if (preparedArchiveDiscovery) {
+          const { prepareCanonicalTranscriptArchiveMigrations } =
+            await import("../infra/state-migrations.transcript-directives-archives.js");
+          await prepareCanonicalTranscriptArchiveMigrations(preparedArchiveDiscovery);
+        }
+      } catch (error) {
+        // Offline admission still owns repairable schema and discovery failures.
+        effectiveRuntime.log(`Archive verification preparation deferred: ${String(error)}`);
+      }
+      const { waitForCliSignalExit } = await import("../cli/signal-exit-barrier.js");
+      // Keep an accepted signal during preparation ahead of service custody.
+      await waitForCliSignalExit();
+    }
     const { beginDoctorMaintenance } = await import("../commands/doctor-maintenance.js");
     maintenance = await beginDoctorMaintenance({
       options,
@@ -204,8 +224,8 @@ async function runDoctorHealthFlowWithResult(
         options,
         signal: maintenance?.signal,
       });
-      // Explicit repair never offers an update. Acquire its owners before any
-      // snapshot; diagnostic Doctor still checks state before update admission.
+      // Explicit repair never offers an update. Its current-state preflight remains
+      // inside maintenance; diagnostic Doctor checks state before update admission.
       if (!maintenance) {
         if (!databasePreflight) {
           await prepareDoctorDatabasePreflight({ scope: "state" });
@@ -334,6 +354,10 @@ async function runDoctorHealthFlowWithResult(
       await noteStalePluginRuntimeSymlinks(root);
       noteStartupOptimizationHints();
 
+      if (schemas.agentDatabaseMigrationDiscovery && preparedArchiveDiscovery) {
+        schemas.agentDatabaseMigrationDiscovery.preparedTranscriptArchives =
+          preparedArchiveDiscovery.preparedTranscriptArchives;
+      }
       const { loadAndMaybeMigrateDoctorConfig } = await import("../commands/doctor-config-flow.js");
       const configResult = await loadAndMaybeMigrateDoctorConfig({
         options,
