@@ -1,8 +1,6 @@
-import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
-import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 import { createDeferredCore } from "../shared/deferred.js";
 import {
   closeOpenClawAgentDatabaseByPath,
@@ -24,7 +22,6 @@ import {
 } from "./openclaw-state-db-async-lifecycle.js";
 
 const root = path.join(os.tmpdir(), `agent-resource-lifecycle-${process.pid}`);
-const tempDirs = useAutoCleanupTempDirTracker(afterEach);
 
 afterEach(async () => {
   await closeOpenClawAgentDatabasesAsync(root);
@@ -129,93 +126,6 @@ it("blocks new resources in a draining root without retiring a sibling root", as
     await closing;
   }
 });
-
-it("drains owners registered at the physical target of a symlinked root or path", async () => {
-  const base = tempDirs.make("agent-resource-link-");
-  const linkType = process.platform === "win32" ? "junction" : "dir";
-  const target = path.join(base, "target");
-  const retarget = path.join(base, "retarget");
-  const link = path.join(base, "link");
-  fs.mkdirSync(target);
-  fs.mkdirSync(retarget);
-  fs.symlinkSync(target, link, linkType);
-  // Native owners such as the session reclamation Worker register the path they opened.
-  const register = (pathname: string) => {
-    const resource = { agentId: "worker", path: pathname, revoke: vi.fn(), close: vi.fn() };
-    registerOpenClawAgentDatabaseAsyncResource({
-      ...resource,
-      close: async () => resource.close(),
-    });
-    return resource;
-  };
-  try {
-    const exact = register(path.join(target, "exact.sqlite"));
-    const rooted = register(path.join(target, "rooted.sqlite"));
-    await closeOpenClawAgentDatabaseByPathAsync(path.join(link, "exact.sqlite"), "worker");
-    expect(exact.close).toHaveBeenCalledOnce();
-    expect(rooted.revoke).not.toHaveBeenCalled();
-    await closeOpenClawAgentDatabasesAsync(link);
-    expect(rooted.close).toHaveBeenCalledOnce();
-
-    // A retargeted link selects its current target, never the database it used to name.
-    const previous = register(path.join(target, "previous.sqlite"));
-    fs.unlinkSync(link);
-    fs.symlinkSync(retarget, link, linkType);
-    const current = register(path.join(retarget, "current.sqlite"));
-    await closeOpenClawAgentDatabasesAsync(link);
-    expect(current.close).toHaveBeenCalledOnce();
-    expect(previous.revoke).not.toHaveBeenCalled();
-  } finally {
-    await closeOpenClawAgentDatabasesAsync(base);
-  }
-});
-
-it.each(["root", "path"] as const)(
-  "keeps a %s drain on the target it joined when the link is retargeted mid-drain",
-  async (scope) => {
-    const base = tempDirs.make("agent-resource-retarget-");
-    const linkType = process.platform === "win32" ? "junction" : "dir";
-    const target = path.join(base, "target");
-    const retarget = path.join(base, "retarget");
-    const link = path.join(base, "link");
-    fs.mkdirSync(target);
-    fs.mkdirSync(retarget);
-    fs.symlinkSync(target, link, linkType);
-    const gate = createDeferredCore();
-    const joined = {
-      agentId: "worker",
-      path: path.join(target, "worker.sqlite"),
-      revoke: vi.fn(),
-      close: () => gate.promise,
-    };
-    const successor = {
-      agentId: "worker",
-      path: path.join(retarget, "worker.sqlite"),
-      revoke: vi.fn(),
-      close: async () => {},
-    };
-    registerOpenClawAgentDatabaseAsyncResource(joined);
-    try {
-      const closing =
-        scope === "root"
-          ? closeOpenClawAgentDatabasesAsync(link)
-          : closeOpenClawAgentDatabaseByPathAsync(path.join(link, "worker.sqlite"), "worker");
-      try {
-        expect(joined.revoke).toHaveBeenCalledOnce();
-        fs.unlinkSync(link);
-        fs.symlinkSync(retarget, link, linkType);
-        registerOpenClawAgentDatabaseAsyncResource(successor);
-      } finally {
-        gate.resolve();
-        await closing;
-      }
-      // The drain returned after joining its target; it never started an unjoined close.
-      expect(successor.revoke).not.toHaveBeenCalled();
-    } finally {
-      await closeOpenClawAgentDatabasesAsync(base);
-    }
-  },
-);
 
 it.each(["known", "unresolved"] as const)(
   "retains a failed %s close after unregistering and retries it before readmission",

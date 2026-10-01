@@ -44,7 +44,7 @@ import {
   drainAgentDatabaseResources,
   matchesAgentDatabaseClose,
   revokeAgentDatabaseResources,
-  type PreparedAgentDatabaseCloseSelection,
+  type AgentDatabaseCloseSelection,
 } from "./openclaw-agent-db-resources.js";
 import {
   assertSupportedAgentSchemaVersion,
@@ -408,17 +408,11 @@ export function closeOpenClawAgentDatabaseByPath(
 ): boolean {
   // Cache keys are lexical resolved paths. Do not realpath aliases here: a
   // symlink swap must never redirect cleanup onto a different cached database.
-  // Registered resources also match the current physical target that native owners register.
   const resolvedPath = path.resolve(pathname);
   void revokeAgentDatabaseResources(
     { path: resolvedPath, agentId: expectedAgentId },
     logResourceCloseFailure,
   );
-  return closeLifecycleAgentDatabase(resolvedPath, expectedAgentId);
-}
-
-// Registered resources belong to the caller's selection; these maps are keyed lexically.
-function closeLifecycleAgentDatabase(resolvedPath: string, expectedAgentId?: string): boolean {
   // Revocation is immediate; the async owner retains its lease until native work joins.
   revokePendingAgentDatabaseOpen(resolvedPath, expectedAgentId);
   for (const retained of cache.retainedCloses) {
@@ -539,10 +533,6 @@ export function invalidateOpenClawAgentWritableProjections(
 /** Close cached agent handles, optionally restricted to one runtime root. */
 export function closeOpenClawAgentDatabases(rootPath?: string): void {
   void revokeAgentDatabaseResources({ rootPath }, logResourceCloseFailure);
-  closeLifecycleAgentDatabases(rootPath);
-}
-
-function closeLifecycleAgentDatabases(rootPath?: string): void {
   for (const pathname of cache.pending.keys()) {
     if (rootPath === undefined || isPathInside(rootPath, pathname)) {
       revokePendingAgentDatabaseOpen(pathname);
@@ -555,13 +545,13 @@ function closeLifecycleAgentDatabases(rootPath?: string): void {
   }
   for (const pathname of cache.databases.keys()) {
     if (rootPath === undefined || isPathInside(rootPath, pathname)) {
-      closeLifecycleAgentDatabase(pathname);
+      closeOpenClawAgentDatabaseByPath(pathname);
     }
   }
 }
 
 async function drainPendingAgentDatabaseOpens(
-  selection: PreparedAgentDatabaseCloseSelection,
+  selection: AgentDatabaseCloseSelection,
 ): Promise<void> {
   while (true) {
     const pending = [...cache.activePending].filter((owner) =>
@@ -585,11 +575,9 @@ export async function closeOpenClawAgentDatabasesAsync(rootPath?: string): Promi
       revokePendingAgentDatabaseOpen(owner.path);
     }
   }
-  // The drain joins every selected resource and refuses new matches until it settles.
-  // Resolving the locator again could start an unjoined close on a retargeted link.
-  await drainAgentDatabaseResources({ rootPath }, async (selection) => {
-    await drainPendingAgentDatabaseOpens(selection);
-    closeLifecycleAgentDatabases(rootPath);
+  await drainAgentDatabaseResources({ rootPath }, async () => {
+    await drainPendingAgentDatabaseOpens({ rootPath });
+    closeOpenClawAgentDatabases(rootPath);
   });
 }
 
@@ -598,15 +586,12 @@ export async function closeOpenClawAgentDatabaseByPathAsync(
   pathname: string,
   expectedAgentId?: string,
 ): Promise<boolean> {
-  const resolvedPath = path.resolve(pathname);
-  revokePendingAgentDatabaseOpen(resolvedPath, expectedAgentId);
-  return drainAgentDatabaseResources(
-    { path: resolvedPath, agentId: expectedAgentId },
-    async (selection) => {
-      await drainPendingAgentDatabaseOpens(selection);
-      return closeLifecycleAgentDatabase(resolvedPath, expectedAgentId);
-    },
-  );
+  const selection = { path: path.resolve(pathname), agentId: expectedAgentId };
+  revokePendingAgentDatabaseOpen(selection.path, expectedAgentId);
+  return drainAgentDatabaseResources(selection, async () => {
+    await drainPendingAgentDatabaseOpens(selection);
+    return closeOpenClawAgentDatabaseByPath(selection.path, expectedAgentId);
+  });
 }
 
 /** Read a database's durable role and agent owner without mutating it. */

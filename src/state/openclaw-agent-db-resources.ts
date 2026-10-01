@@ -1,7 +1,6 @@
 import path from "node:path";
 import { normalizeAgentId } from "@openclaw/normalization-core/agent-id";
 import { toErrorObject } from "@openclaw/normalization-core/error-coercion";
-import { resolveIdentityPathViaExistingAncestorSync } from "../infra/boundary-path.js";
 import { isPathInside } from "../infra/path-guards.js";
 import { createDeferredCore } from "../shared/deferred.js";
 import { resolveGlobalSingleton } from "../shared/global-singleton.js";
@@ -23,45 +22,20 @@ type AgentDatabaseResource =
       ownership: "unresolved";
       agentId?: never;
     });
-type AgentDatabaseCloseSelection = {
+export type AgentDatabaseCloseSelection = {
   path?: string;
   rootPath?: string;
   agentId?: string;
 };
-export type PreparedAgentDatabaseCloseSelection = Readonly<{
-  paths?: readonly string[];
-  rootPaths?: readonly string[];
-  agentId?: string;
-}>;
 
 const resources = resolveGlobalSingleton(
   Symbol.for("openclaw.agentDatabaseAsyncResources"),
   () => ({
     active: new Set<AgentDatabaseResource>(),
     closing: new Map<AgentDatabaseResource, Promise<void> | undefined>(),
-    selections: new Map<PreparedAgentDatabaseCloseSelection, Promise<void>>(),
+    selections: new Map<AgentDatabaseCloseSelection, Promise<void>>(),
   }),
 );
-
-/**
- * Native owners register the physical locator they opened, not the caller's alias. A close
- * selects both the caller's lexical locator and its current physical target, so a symlinked
- * root or path still reaches those owners. Adding the target never drops the lexical match.
- */
-function prepareAgentDatabaseCloseSelection(
-  selection: AgentDatabaseCloseSelection,
-): PreparedAgentDatabaseCloseSelection {
-  const locators = (pathname: string) => {
-    const lexical = path.resolve(pathname);
-    const physical = resolveIdentityPathViaExistingAncestorSync(lexical);
-    return physical === lexical ? [lexical] : [lexical, physical];
-  };
-  return {
-    ...(selection.path === undefined ? {} : { paths: locators(selection.path) }),
-    ...(selection.rootPath === undefined ? {} : { rootPaths: locators(selection.rootPath) }),
-    ...(selection.agentId === undefined ? {} : { agentId: selection.agentId }),
-  };
-}
 
 /** CLI cleanup can skip loading native database owners when no Worker was admitted. */
 export function hasOpenClawAgentDatabaseAsyncResources(): boolean {
@@ -102,7 +76,7 @@ export function matchesAgentDatabaseReadCandidatePath(
 }
 
 export function matchesAgentDatabaseClose(
-  selection: PreparedAgentDatabaseCloseSelection,
+  selection: AgentDatabaseCloseSelection,
   resource:
     | { agentId: string; path: string; ownership?: "known" }
     | (Pick<OpenClawAgentDatabaseReadCandidateResource, "path" | "scope"> & {
@@ -110,20 +84,15 @@ export function matchesAgentDatabaseClose(
         ownership: "unresolved";
       }),
 ): boolean {
-  const unresolved = resource.ownership === "unresolved";
   return (
-    (selection.paths === undefined ||
-      selection.paths.some(
-        (pathname) =>
-          pathname === resource.path ||
-          (unresolved && matchesAgentDatabaseReadCandidatePath(resource, pathname)),
-      )) &&
-    (selection.rootPaths === undefined ||
-      selection.rootPaths.some(
-        (rootPath) =>
-          isPathInside(rootPath, resource.path) ||
-          (unresolved && matchesAgentDatabaseReadCandidatePath(resource, rootPath)),
-      )) &&
+    (selection.path === undefined ||
+      selection.path === resource.path ||
+      (resource.ownership === "unresolved" &&
+        matchesAgentDatabaseReadCandidatePath(resource, selection.path))) &&
+    (selection.rootPath === undefined ||
+      isPathInside(selection.rootPath, resource.path) ||
+      (resource.ownership === "unresolved" &&
+        matchesAgentDatabaseReadCandidatePath(resource, selection.rootPath))) &&
     (selection.agentId === undefined ||
       resource.ownership === "unresolved" ||
       selection.agentId === resource.agentId)
@@ -242,16 +211,6 @@ export function revokeAgentDatabaseResources(
   selection: AgentDatabaseCloseSelection,
   onCloseError?: (pathname: string, error: unknown) => void,
 ): Promise<void>[] {
-  return revokeSelectedAgentDatabaseResources(
-    prepareAgentDatabaseCloseSelection(selection),
-    onCloseError,
-  );
-}
-
-function revokeSelectedAgentDatabaseResources(
-  selection: PreparedAgentDatabaseCloseSelection,
-  onCloseError?: (pathname: string, error: unknown) => void,
-): Promise<void>[] {
   const closing = new Set([...resources.active, ...resources.closing.keys()]);
   const pending: Promise<void>[] = [];
   for (const resource of closing) {
@@ -265,22 +224,22 @@ function revokeSelectedAgentDatabaseResources(
 
 export async function drainAgentDatabaseResources<T>(
   selection: AgentDatabaseCloseSelection,
-  closeNative: (selection: PreparedAgentDatabaseCloseSelection) => Promise<T>,
+  closeNative: () => Promise<T>,
 ): Promise<T> {
-  const ownedSelection = prepareAgentDatabaseCloseSelection(selection);
+  const ownedSelection = { ...selection };
   const completion = createDeferredCore();
   // A close may have no observer; its caller still receives the original failure.
   void completion.promise.catch(() => {});
   resources.selections.set(ownedSelection, completion.promise);
   try {
-    const results = await Promise.allSettled(revokeSelectedAgentDatabaseResources(ownedSelection));
+    const results = await Promise.allSettled(revokeAgentDatabaseResources(ownedSelection));
     const errors = results.flatMap((result) =>
       result.status === "rejected" ? [result.reason] : [],
     );
     if (errors.length > 0) {
       throw new AggregateError(errors, "Agent database resource drainage failed");
     }
-    const result = await closeNative(ownedSelection);
+    const result = await closeNative();
     completion.resolve();
     return result;
   } catch (error) {
