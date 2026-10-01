@@ -126,7 +126,7 @@ src/process/spawn-broker/event-order.test.ts	1
 src/process/spawn-broker/relay.test.ts	2
 src/process/spawn-broker/restart.test.ts	2
 src/process/spawn-broker/startup.test.ts	1
-src/process/supervisor/adapters/child.service-lifecycle.test.ts	4
+src/process/supervisor/adapters/child.service-lifecycle.test.ts	3
 src/process/supervisor/service-child-relay-host.awaited-output.test.ts	1
 src/process/supervisor/service-child-relay-host.owned-worker.test.ts	1
 src/process/supervisor/service-child-relay-host.retirement.test.ts	2
