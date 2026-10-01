@@ -28,6 +28,11 @@ OpenClaw loads this instead of the full entry when a channel is disabled or
 unconfigured. See
 [Setup and Config](/plugins/sdk-setup#setup-entry) for when this matters.
 
+Doctor also inspects this public setup entry when finishing a deferred plugin
+upgrade. It uses `plugin.lifecycle.detectLegacyStateMigrations` when provided;
+an inspected plugin without that detector can finish its installation-only
+upgrade obligation. Missing or broken setup entries keep the obligation pending.
+
 Pair `defineSetupPluginEntry(...)` with the narrow setup helper families:
 
 | Import                                  | Use for                                                                                                                                                                            |

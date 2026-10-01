@@ -121,12 +121,14 @@ async function installStatelessFixture(
     | "config-only"
     | "broken"
     | "setup-only"
+    | "public-setup-only"
     | "setup-invalid-detector"
     | "setup-broken" = "absent",
   channel = false,
 ) {
   const setup =
     contract === "setup-only" ||
+    contract === "public-setup-only" ||
     contract === "setup-broken" ||
     contract === "setup-invalid-detector";
   await fs.mkdir(root, { recursive: true });
@@ -180,9 +182,11 @@ async function installStatelessFixture(
       path.join(root, "setup-entry.cjs"),
       contract === "setup-broken"
         ? 'throw new Error("Fixture setup contract unavailable");\n'
-        : contract === "setup-invalid-detector"
-          ? 'module.exports = { kind: "bundled-channel-setup-entry", loadSetupPlugin() { return {}; }, loadLegacyStateMigrationDetector() { return undefined; } };\n'
-          : 'module.exports = { kind: "bundled-channel-setup-entry", loadSetupPlugin() { return {}; } };\n',
+        : contract === "public-setup-only"
+          ? `module.exports = { plugin: { id: ${JSON.stringify(pluginId)} } };\n`
+          : contract === "setup-invalid-detector"
+            ? 'module.exports = { kind: "bundled-channel-setup-entry", loadSetupPlugin() { return {}; }, loadLegacyStateMigrationDetector() { return undefined; } };\n'
+            : 'module.exports = { kind: "bundled-channel-setup-entry", loadSetupPlugin() { return {}; } };\n',
     );
   }
 }
@@ -373,9 +377,12 @@ describe("configured plugin migration deferral", () => {
     },
   );
 
-  it.each([false, true])(
-    "clears installation-only deferral for a stateless plugin (next Doctor: %s)",
-    async (nextDoctor) => {
+  it.each([
+    { nextDoctor: false, contract: "absent" },
+    { nextDoctor: true, contract: "public-setup-only" },
+  ] as const)(
+    "clears installation-only deferral for a stateless $contract plugin (next Doctor: $nextDoctor)",
+    async ({ nextDoctor, contract }) => {
       await withDoctorConfigPreflightHome(async (home) => {
         const pluginRoot = path.join(home, "stateless-plugin");
         const pluginId = "stateless-fixture";
@@ -393,7 +400,7 @@ describe("configured plugin migration deferral", () => {
               preparePluginMetadataSnapshot: true,
             });
             expect(readDeferredPluginMigrations()).toEqual([expect.objectContaining({ pluginId })]);
-            await installStatelessFixture(pluginRoot, pluginId);
+            await installStatelessFixture(pluginRoot, pluginId, contract);
             installed = true;
             await writeOpenClawConfig(home, config);
           }
@@ -403,7 +410,7 @@ describe("configured plugin migration deferral", () => {
             measure: async (name, run) => {
               const measured = await run();
               if (name === "doctor.config-preflight.config-snapshot" && !installed) {
-                await installStatelessFixture(pluginRoot, pluginId);
+                await installStatelessFixture(pluginRoot, pluginId, contract);
                 installed = true;
               }
               return measured;
