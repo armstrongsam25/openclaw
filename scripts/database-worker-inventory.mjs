@@ -224,7 +224,17 @@ export function inventory(root = defaultRoot, ref = "", staged = false) {
   const result = spawnSync(
     snapshot ? "git" : "rg",
     snapshot
-      ? ["grep", "-l", "-z", "-E", pattern, ...(ref ? [ref] : ["--cached"]), "--", ...roots]
+      ? [
+          "grep",
+          "-l",
+          "-z",
+          "-E",
+          ...(ref ? [] : ["--cached"]),
+          pattern,
+          ...(ref ? [ref] : []),
+          "--",
+          ...roots,
+        ]
       : [
           "-l",
           "--null",

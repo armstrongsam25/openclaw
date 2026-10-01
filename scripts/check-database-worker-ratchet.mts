@@ -2,6 +2,7 @@ import { inventory } from "./database-worker-inventory.mjs";
 import { isDirectRunUrl } from "./lib/direct-run.mjs";
 import {
   compareRatchetCounts,
+  listRatchetRenames,
   parseRatchetArgs,
   reportRatchetFailures,
   reportRatchetSuccess,
@@ -21,7 +22,15 @@ export function main(root = process.cwd(), argv = process.argv.slice(2)) {
     const counts = (rows: ReturnType<typeof inventory>) =>
       new Map(rows.filter((row) => row.tier === "T1").map((row) => [row.file, row.calls.length]));
     const head = inventory(root, "", args.staged);
-    const { increased } = compareRatchetCounts(counts(head), counts(inventory(root, base)));
+    const before = counts(inventory(root, base));
+    const oldPaths = new Map(
+      listRatchetRenames(root, base, args.staged, []).map(({ from, to }) => [to, from]),
+    );
+    const after = counts(head);
+    const { increased } = compareRatchetCounts(
+      after,
+      new Map([...after.keys()].map((file) => [file, before.get(oldPaths.get(file) ?? file) ?? 0])),
+    );
     if (
       reportRatchetFailures(
         [

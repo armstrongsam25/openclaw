@@ -25,6 +25,7 @@ it("rejects T1 growth with call sites and allows unchanged, shrinking, and worke
   const errors = vi.spyOn(console, "error").mockImplementation(() => {});
   vi.spyOn(console, "log").mockImplementation(() => {});
   expect(main(root, ["--base", "HEAD"])).toBe(0);
+  expect(main(root, ["--base", "HEAD", "--staged"])).toBe(0);
   fs.writeFileSync(file, source.repeat(3));
   expect(main(root, ["--base", "HEAD"])).toBe(1);
   expect(errors).toHaveBeenCalledWith(expect.stringContaining("src/runtime.ts: 2 -> 3"));
@@ -33,11 +34,18 @@ it("rejects T1 growth with call sites and allows unchanged, shrinking, and worke
   );
   git("add", ".");
   fs.writeFileSync(file, source);
+  errors.mockClear();
   expect(main(root, ["--base", "HEAD", "--staged"])).toBe(1);
+  expect(errors).toHaveBeenCalledWith(expect.stringContaining("src/runtime.ts: 2 -> 3"));
   fs.writeFileSync(path.join(root, "src/runtime.worker.ts"), source.repeat(3));
   errors.mockClear();
   expect(main(root, ["--base", "HEAD"])).toBe(0);
   fs.writeFileSync(file, "export {};\n");
   expect(main(root, ["--base", "HEAD"])).toBe(0);
   expect(errors).not.toHaveBeenCalled();
+  fs.writeFileSync(file, source.repeat(2));
+  git("mv", "src/runtime.ts", "src/renamed.ts");
+  expect(main(root, ["--base", "HEAD"])).toBe(0);
+  fs.writeFileSync(path.join(root, "src/renamed.ts"), source.repeat(3));
+  expect(main(root, ["--base", "HEAD"])).toBe(1);
 });
