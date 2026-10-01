@@ -429,9 +429,8 @@ export class VisitorAccessService {
         throw new VisitorAccessError("Provide a profileId, grantId, email, or GitHub login.");
       }
       const entries = await store.entries();
-      const profile = input.profileId
-        ? (await this.readAccess()).resolveProfile(input.profileId)
-        : undefined;
+      const access = input.profileId ? await this.readAccess() : undefined;
+      const profile = input.profileId ? access?.resolveProfile(input.profileId) : undefined;
       if (input.profileId && !profile) {
         throw new VisitorAccessError(
           "Profile not found. Use the current canonical profileId from visitor_list.",
@@ -456,57 +455,52 @@ export class VisitorAccessService {
           "Multiple invitations have that grantId. List visitors and cancel by exact email.",
         );
       }
-      const assertSelectedPerson = async (emails: Iterable<string>) => {
-        if (!profile) {
-          return;
+      const revokeSelected = async (
+        assertProfileCurrent?: () => void,
+      ): Promise<{ text: string; details: VisitorRevokeDetails }> => {
+        const assertRevocationCurrent = () => {
+          assertCurrent();
+          assertProfileCurrent?.();
+        };
+        const currentStore = this.actionStore(assertRevocationCurrent);
+        const now = Date.now();
+        for (const { key, value } of entries) {
+          if (targets.has(key) && (value.expiresAt === null || value.expiresAt > now)) {
+            await this.registerGrant({ ...value, expiresAt: now }, currentStore);
+          }
         }
-        const access = await this.readAccess();
-        if (
-          !access.resolveProfile(profile.id) ||
-          [...emails].some((email) => access.profileId(email) !== profile.id)
-        ) {
-          throw new VisitorAccessError(
-            "The person's email bindings changed. List visitors and retry with the current selection.",
-          );
+        let removed = false;
+        await this.policy.update((emails) => {
+          assertRevocationCurrent();
+          removed =
+            emails.some((email) => targets.has(email)) ||
+            entries.some((entry) => targets.has(entry.key));
+          return emails.filter((email) => !targets.has(email));
+        }, assertRevocationCurrent);
+        for (const email of targets) {
+          await this.deleteGrant(email, currentStore);
         }
+        const who = input.profileId
+          ? `profile ${input.profileId} (${targets.size} recorded emails)`
+          : input.grantId
+            ? `invitation ${input.grantId}`
+            : targets.size > 1
+              ? `@${input.github} (${targets.size} recorded emails)`
+              : [...targets].join(", ");
+        return {
+          text: removed
+            ? `Revoked visitor access for ${who}.`
+            : `No visitor grant found for ${who}; nothing to revoke.`,
+          details: {
+            outcome: removed ? "revoked" : "not_found",
+            emails: [...targets].toSorted(),
+            ...(!input.email && input.github ? { githubLogin: input.github } : {}),
+          },
+        };
       };
-      const now = Date.now();
-      for (const { key, value } of entries) {
-        if (targets.has(key) && (value.expiresAt === null || value.expiresAt > now)) {
-          await assertSelectedPerson([key]);
-          // An explicit end must survive a failed or ambiguous provider response.
-          await this.registerGrant({ ...value, expiresAt: now }, store);
-        }
-      }
-      let removed = false;
-      await this.policy.update(async (emails) => {
-        await assertSelectedPerson(targets);
-        removed =
-          emails.some((email) => targets.has(email)) ||
-          entries.some((entry) => targets.has(entry.key));
-        return emails.filter((email) => !targets.has(email));
-      }, assertCurrent);
-      for (const email of targets) {
-        assertCurrent();
-        await this.deleteGrant(email, store);
-      }
-      const who = input.profileId
-        ? `profile ${input.profileId} (${targets.size} recorded emails)`
-        : input.grantId
-          ? `invitation ${input.grantId}`
-          : targets.size > 1
-            ? `@${input.github} (${targets.size} recorded emails)`
-            : [...targets].join(", ");
-      return {
-        text: removed
-          ? `Revoked visitor access for ${who}.`
-          : `No visitor grant found for ${who}; nothing to revoke.`,
-        details: {
-          outcome: removed ? "revoked" : "not_found",
-          emails: [...targets].toSorted(),
-          ...(!input.email && input.github ? { githubLogin: input.github } : {}),
-        },
-      };
+      return profile && access
+        ? await access.withProfile(profile.id, [...targets], revokeSelected)
+        : await revokeSelected();
     }, assertCurrent);
   }
 

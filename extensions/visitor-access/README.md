@@ -126,12 +126,13 @@ roles, saved work, and existing PRs remain intact. Unmanaged policy entries stil
 require explicit email removal; person-wide revocation does not infer ownership
 for them.
 
-Person-wide selection is not a profile-binding lock. Fresh profile snapshots are
-checked before each local expiration is issued and after policy reads before
-removal. A changed binding observed by those checks stops subsequent effects.
-Concurrent reassignment after a check can still affect the selected email's
-invitation while an already-issued write finishes. Such effects are not rolled
-back; completed expirations remain ended, including when later cleanup fails.
+Person-wide revocation retains the selected aliases' original profile-binding
+lifetimes. The profile owner revalidates them at local grant commit and immediately
+before each policy request. Reassignment, including a move away and back, stops
+remaining mutations. Already committed expirations remain ended if later cleanup
+fails. An in-flight request may already have been accepted by Cloudflare; the
+existing cleanup path reconciles ended invitations without restoring them.
+This operation requires a Gateway with profile identity preparation support.
 
 An active renewal retains its grant ID. Expiry or revocation ends that lifetime;
 a new invitation gets a different ID, so canceling an old invitation cannot

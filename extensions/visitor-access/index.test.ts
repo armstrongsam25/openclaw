@@ -21,6 +21,7 @@ import { Value } from "typebox/value";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import plugin from "./index.js";
 import type { VisitorGrant } from "./src/visitors.js";
+import { visitorProfileFixture } from "./src/visitors.test-support.js";
 
 type PluginGatewayAccessPolicy = Parameters<OpenClawPluginApi["registerGatewayAccessPolicy"]>[0];
 
@@ -158,18 +159,9 @@ describe("visitor-access plugin lifecycle", () => {
       openKeyedStore: <T>(options: OpenAsyncKeyedStoreOptions) =>
         createPluginStateKeyedStoreForTests<T>("visitor-access", { ...options, env }),
     };
-    api.runtime.gateway = {
-      isAvailable: async () => true,
-      async readSessionFacts() {
-        throw new Error("Unexpected session facts request");
-      },
-      async request() {
-        throw new Error("Expected a mocked Gateway request");
-      },
-    };
-    const gatewayRequest = vi
-      .spyOn(api.runtime.gateway, "request")
-      .mockResolvedValue({ profiles: [] });
+    const directory = visitorProfileFixture();
+    api.runtime.gateway = directory.gateway;
+    const gatewayRequest = directory.request;
     api.runtime.config = {
       current: () => config,
       async mutateConfigFile() {
@@ -199,6 +191,7 @@ describe("visitor-access plugin lifecycle", () => {
     return {
       tools,
       gatewayRequest,
+      setProfiles: directory.setProfiles,
       logger,
       store,
       authorize: (
@@ -358,7 +351,7 @@ describe("visitor-access plugin lifecycle", () => {
       { id: "visitor-profile", emails: emails.slice(0, 2) },
       { id: "staff-profile", emails: [emails[2]], role: "staff" },
     ];
-    registered.gatewayRequest.mockResolvedValue({ profiles });
+    registered.setProfiles(profiles);
     await registered.start();
     for (const email of emails) {
       await expect(registered.execute("visitor_invite", { email })).resolves.not.toHaveProperty(
@@ -477,19 +470,19 @@ describe("visitor-access plugin lifecycle", () => {
     }
     expect(registered.policy.fetcher).not.toHaveBeenCalled();
     const original = registered.policy.fetcher.getMockImplementation();
+    let reassignedAfterRead = false;
     registered.policy.fetcher.mockImplementation(async (input, init) => {
       const response = await original!(input, init);
       if (init?.method === "GET") {
-        registered.gatewayRequest.mockResolvedValue({
-          profiles: [
-            { id: "visitor-profile", emails: [registered.emails[1]] },
-            {
-              id: "staff-profile",
-              emails: [registered.emails[0], registered.emails[2]],
-              role: "staff",
-            },
-          ],
-        });
+        reassignedAfterRead = true;
+        registered.setProfiles([
+          { id: "visitor-profile", emails: [registered.emails[1]] },
+          {
+            id: "staff-profile",
+            emails: [registered.emails[0], registered.emails[2]],
+            role: "staff",
+          },
+        ]);
       }
       return response;
     });
@@ -497,15 +490,25 @@ describe("visitor-access plugin lifecycle", () => {
       registered.execute("visitor_revoke", { profileId: "visitor-profile" }),
     ).resolves.toMatchObject({
       isError: true,
-      content: [{ type: "text", text: expect.stringContaining("bindings changed") }],
+      content: [
+        {
+          type: "text",
+          text: "Visitor access operation failed. Check gateway health and retry; use visitor_list to inspect drift.",
+        },
+      ],
     });
+    expect(reassignedAfterRead).toBe(true);
     expect(registered.policy.fetcher.mock.calls.every(([, init]) => init?.method === "GET")).toBe(
       true,
     );
     expect(registered.policy.emails()).toEqual([...registered.emails, "manual@example.test"]);
+    for (const email of registered.emails.slice(0, 2)) {
+      expect(await registered.store.lookup(email)).toMatchObject({ expiresAt: START_MS });
+    }
     expect(await registered.store.lookup(registered.emails[2])).toMatchObject({
       expiresAt: START_MS + 14 * DAY_MS,
     });
+    expect(await registered.store.lookup(registered.emails[3])).toEqual(pending);
   });
 
   it("denies available visitor tools without trusted owner authority", async () => {

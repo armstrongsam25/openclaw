@@ -19,6 +19,11 @@ type VisitorGatewayAccess = {
   assertInvitable: (email: string) => void;
   profileId: (email: string) => string | undefined;
   resolveProfile: (profileId: string) => VisitorProfile | undefined;
+  withProfile: <T>(
+    profileId: string,
+    emails: readonly string[],
+    run: (assertCurrent: () => void) => Promise<T>,
+  ) => Promise<T>;
 };
 
 export type ReadVisitorGatewayAccess = () => Promise<VisitorGatewayAccess>;
@@ -46,6 +51,15 @@ export function createVisitorAccessReader(
       describe: (email) => access(email).description,
       profileId: (email) => byEmail.get(email)?.id,
       resolveProfile: (profileId) => byId.get(profileId),
+      withProfile(profileId, emails, run) {
+        const withIdentity = runtime.gateway.withUserProfileIdentity;
+        if (!withIdentity) {
+          throw new VisitorAccessError(
+            "This Gateway cannot keep profile bindings current. Update OpenClaw before person-wide revocation.",
+          );
+        }
+        return withIdentity({ profileId, emails }, run);
+      },
       assertInvitable(email) {
         resolveVisitorRole(config);
         const result = access(email);
