@@ -42,7 +42,12 @@ describe("maybeWakeRequesterAfterAllChildrenSettled private batches", () => {
           status: "pending",
           attemptCount: 0,
           ...(yielded
-            ? { afterRequesterYield: true, requesterYieldBatch: true, rearmGeneration: 1 }
+            ? {
+                afterRequesterYield: true,
+                requesterYieldBatch: true,
+                rearmGeneration: 1,
+                yieldedFinalDeliverable: true,
+              }
             : {}),
         },
       }),
@@ -107,15 +112,23 @@ describe("maybeWakeRequesterAfterAllChildrenSettled private batches", () => {
     });
   });
 
-  it.each(["dispatching", "pending"] as const)(
-    "keeps the private policy for a %s batch already attempted without the marker",
-    async (status) => {
+  // The released yield writer stored private batches without the marker, including
+  // unattempted ones; after an upgrade they keep their admitted private policy.
+  it.each([
+    { status: "dispatching", attemptCount: 1 },
+    { status: "pending", attemptCount: 1 },
+    { status: "pending", attemptCount: 0 },
+  ] as const)(
+    "keeps the private policy for a markerless $status batch, attempts=$attemptCount",
+    async ({ status, attemptCount }) => {
       const children = settledPrivateChildren({ mixed: false, yielded: true, single: true });
-      Object.assign(children[0]!.requesterSettleWake!, {
+      const { yieldedFinalDeliverable: _marker, ...released } = children[0]!.requesterSettleWake!;
+      children[0]!.requesterSettleWake = {
+        ...released,
         status,
-        attemptCount: 1,
+        attemptCount,
         batchRunIds: ["run-b"],
-      });
+      };
       registryRuntimeMock.listSubagentRunsForRequester.mockReturnValue(children);
       expect(await maybeWakeRequesterAfterAllChildrenSettled(wakeParams())).toBe(true);
       expect(deliveredCallArg()).toMatchObject({

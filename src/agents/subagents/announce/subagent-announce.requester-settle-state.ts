@@ -100,9 +100,8 @@ export function captureRequesterRunOwner(requesterRun: SubagentRunRecord | null 
 /**
  * A yield hands continuation back to the requester, so its own final may reach the
  * conversation under its normal reply rules; private findings stay wake input. The
- * policy is frozen at first admission: a batch already attempted without the marker
- * was admitted as a private turn (possibly by an earlier build), and retrying it
- * under a different policy could republish that input.
+ * policy is fixed when the yield writes the batch: a batch without the marker came
+ * from an earlier build and stays private, so an upgrade cannot republish its input.
  */
 export function resolvePrivateSettlePolicy(
   completionRows: readonly SubagentRunRecord[],
@@ -114,10 +113,7 @@ export function resolvePrivateSettlePolicy(
   const privateRows = completionRows.filter((entry) => entry.completionTarget === "parent");
   const hasPrivateRows = privateRows.length > 0;
   const yieldedFinalDeliverable =
-    hasPrivateRows &&
-    requesterYielded &&
-    (state.yieldedFinalDeliverable === true ||
-      (state.status === "pending" && state.attemptCount === 0));
+    hasPrivateRows && requesterYielded && state.yieldedFinalDeliverable === true;
   const parentOnly = hasPrivateRows && !yieldedFinalDeliverable;
   // Private findings stay bound to the requester incarnation that produced them.
   const privateBinding = {

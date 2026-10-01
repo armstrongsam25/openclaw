@@ -391,6 +391,8 @@ describe("requester settle dispatch deadline", () => {
       if (legacy) {
         // An already-admitted unmarked batch retains the private-input policy.
         Object.assign(child.requesterSettleWake!, { status: "dispatching", attemptCount: 1 });
+      } else {
+        child.requesterSettleWake!.yieldedFinalDeliverable = true;
       }
       registryRead.listSubagentRunsForRequester.mockReturnValue([child]);
       deliver
