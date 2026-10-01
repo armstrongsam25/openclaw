@@ -103,7 +103,7 @@ describe("managed handoff lease repair", () => {
     expect(fixture.current()).toEqual(previous);
   });
 
-  it("preserves the legacy generation and heartbeat when recorded rollback is incomplete", async () => {
+  it("preserves an incomplete rollback across repair state overrides", async () => {
     const previous = fixture.seed();
     fixture.repairFacts.mockRestore();
     vi.spyOn(os, "tmpdir").mockReturnValue(fixture.root);
@@ -119,6 +119,25 @@ describe("managed handoff lease repair", () => {
     const recorded = getUpdateRun(run.runId, { env });
 
     await expect(prepareRepair()).rejects.toThrow(/rollback.*update status/u);
+
+    const directory = path.join(fixture.root, "openclaw-update-run-handoff-original-profile");
+    fs.mkdirSync(directory, { mode: 0o700 });
+    fs.writeFileSync(
+      path.join(directory, "handoff.json"),
+      JSON.stringify({
+        updateLeaseOwner: previous.owner,
+        updateLeaseKey: previous.key,
+        runId: run.runId,
+        cwd: fixture.root,
+      }),
+      { mode: 0o600 },
+    );
+    await expect(
+      fixture.store.prepareRepair(fixture.root, {
+        ...env,
+        OPENCLAW_STATE_DIR: path.join(fixture.root, "other-state"),
+      }),
+    ).rejects.toThrow("original profile and state overrides");
 
     expect(fixture.current()).toEqual(previous);
     expect(getUpdateRun(run.runId, { env })).toEqual(recorded);

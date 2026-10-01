@@ -217,8 +217,10 @@ recoverable larger recorded timeout extends that grace period. Gateway startup
 and borrowed update processes do not reclaim these leases.
 
 The original run must be identifiable from its retained helper, update history,
-or generation-bound repair metadata. Use the same profile and state overrides as
-the failed update; repair does not substitute a lease owner ID for a missing run.
+or generation-bound repair metadata, and readable in the selected state database.
+Repair needs that record to check rollback and recovery evidence. Use the same
+profile and state overrides as the failed update; repair does not substitute a
+lease owner ID for a missing run.
 
 Refusals name the processes, inspection gap, or remaining grace period. Stop
 named work through its owning terminal or service, then retry; do not delete the

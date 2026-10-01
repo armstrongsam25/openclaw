@@ -205,16 +205,16 @@ export async function readManagedHandoffRepairFacts(
     }
   }
   const runId = [...runIds][0];
-  if (!runId || runIds.size !== 1) {
-    throw new Error("Cannot identify handoff run; inspect openclaw update status --json.");
-  }
   const original = runs.find((run) => run.runId === runId);
-  const capture = original?.origin.updateRecoveryCapture;
+  if (!runId || !original || runIds.size !== 1) {
+    throw new Error("Cannot identify handoff run; use the original profile and state overrides.");
+  }
+  const capture = original.origin.updateRecoveryCapture;
   if (capture && !capture.restored && !capture.forwardResolution && !capture.retirement) {
     throw new Error(`Update ${runId} retains restoration; run openclaw doctor --fix.`);
   }
   await assertUpdateRecoveryAdmission({ env });
-  if (original && !capture) {
+  if (!capture) {
     const { resolvePublicUpdateStepId } = await import("./update-step-identity.js");
     const { isVerifiedUpdateRollback } = await import("../shared/update-outcome.js");
     const rollback = original.steps.filter(({ step, status }) => {

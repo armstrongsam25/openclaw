@@ -110,6 +110,7 @@ describe("managed handoff repair facts", () => {
     });
     const capture = path.join(`${env.OPENCLAW_STATE_DIR}.update-captures`, "retained-run");
     await fs.mkdir(capture, { recursive: true });
+    vi.mocked(listUpdateRunsAsync).mockResolvedValue([run("retained-run", {})]);
 
     expect(await readManagedHandoffRepairFacts(lease, env)).toEqual({
       runIds: ["retained-run"],
@@ -158,6 +159,7 @@ describe("managed handoff repair facts", () => {
     },
   ])("preserves the larger recorded $name phase budget", async ({ name, expected, ...fields }) => {
     await helper(name, fields);
+    vi.mocked(listUpdateRunsAsync).mockResolvedValue([run("retained-run", {})]);
     expect((await readManagedHandoffRepairFacts(lease, env)).timeoutMs).toBe(expected);
   });
 
@@ -187,6 +189,7 @@ describe("managed handoff repair facts", () => {
 
   it("preserves a native recovery owner's admission refusal", async () => {
     await helper("known-native");
+    vi.mocked(listUpdateRunsAsync).mockResolvedValue([run("retained-run", {})]);
     const refusal = new Error("Retained native recovery still owns its artifacts");
     vi.mocked(assertUpdateRecoveryAdmission).mockRejectedValueOnce(refusal);
     await expect(readManagedHandoffRepairFacts(lease, env)).rejects.toBe(refusal);
@@ -490,6 +493,7 @@ describe("managed handoff repair facts", () => {
     await helper("invalid-duration", {
       commandArgv: ["--timeout=9000.5", "--timeout", "Infinity"],
     });
+    vi.mocked(listUpdateRunsAsync).mockResolvedValue([run("retained-run", {})]);
     expect((await readManagedHandoffRepairFacts(lease, env)).timeoutMs).toBeNull();
   });
 });
