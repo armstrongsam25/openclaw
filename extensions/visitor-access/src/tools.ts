@@ -64,7 +64,7 @@ export function createVisitorTools(context: OpenClawPluginToolContext<2>): AnyAg
       name: "visitor_revoke",
       label: "Revoke visitor",
       description:
-        "Remove all recorded Visitor grants for a canonical profileId, or cancel one invitation by grantId, including before first sign-in. Use the IDs returned by visitor_list or visitor_invite. Email cancels one email's invitation and can remove an unmanaged policy entry. GitHub login removes matching grants. Do not combine profileId or grantId with another selector. Preserves saved work, existing PRs and independent staff access. Already absent grants are a no-op.",
+        "Select recorded Visitor invitations from a canonical profileId snapshot, or cancel one invitation by grantId, including before first sign-in. Use the IDs returned by visitor_list or visitor_invite. Person selection checks fresh snapshots before local expiry and after policy reads, but does not lock email bindings or roll back already-issued writes. Email cancels one email's invitation and can remove an unmanaged policy entry. GitHub login removes matching grants. Do not combine profileId or grantId with another selector. Preserves saved work, existing PRs and independent staff access. Already absent grants are a no-op.",
       parameters: Type.Object(
         {
           ...identityFields,

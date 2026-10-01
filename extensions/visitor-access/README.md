@@ -115,8 +115,8 @@ and optional `githubLogin`; list returns `counts`, `grants`, `unmanaged`, and `o
 Recorded list rows include `grantId` when the invitation has a qualified lifetime,
 and `profileId` when its email belongs to a current canonical profile.
 
-Use `visitor_revoke` with `profileId` to remove all recorded Visitor grants
-associated with that person's current verified email aliases. Use `grantId` to
+Use `visitor_revoke` with `profileId` to select the recorded Visitor grants
+associated with that person's verified email aliases in an initial profile snapshot. Use `grantId` to
 cancel only that invitation, including when first sign-in is still pending and
 no profile exists. Copy the IDs from `visitor_list` or the invite result; do not
 combine either ID with another selector. An absent grant ID is a no-op and never
@@ -125,6 +125,13 @@ listing again and selecting the current canonical profile. Independent staff
 roles, saved work, and existing PRs remain intact. Unmanaged policy entries still
 require explicit email removal; person-wide revocation does not infer ownership
 for them.
+
+Person-wide selection is not a profile-binding lock. Fresh profile snapshots are
+checked before each local expiration is issued and after policy reads before
+removal. A changed binding observed by those checks stops subsequent effects.
+Concurrent reassignment after a check can still affect the selected email's
+invitation while an already-issued write finishes. Such effects are not rolled
+back; completed expirations remain ended, including when later cleanup fails.
 
 An active renewal retains its grant ID. Expiry or revocation ends that lifetime;
 a new invitation gets a different ID, so canceling an old invitation cannot
