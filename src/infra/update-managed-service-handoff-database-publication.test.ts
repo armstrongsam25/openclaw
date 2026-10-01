@@ -298,9 +298,11 @@ describe("managed handoff database publication", () => {
       const bytes = fs.readFileSync(databasePath);
       const before = fs.statSync(databasePath);
       const store = createManagedHandoffLeaseStore({ databasePath, serviceManagerEnv: {} });
-      expect(store.read(root)).toMatchObject({
-        kind: state === "empty-file" || state === "empty-schema" ? "absent" : "unreadable",
-      });
+      expect(store.read(root)).toEqual(
+        state === "empty-file" || state === "empty-schema"
+          ? { kind: "absent" }
+          : { kind: "unreadable", error: expect.any(Error) },
+      );
       expect(fs.readFileSync(databasePath)).toEqual(bytes);
       expect(fs.statSync(databasePath).ino).toBe(before.ino);
       expect(fs.readdirSync(root)).toEqual([path.basename(databasePath)]);

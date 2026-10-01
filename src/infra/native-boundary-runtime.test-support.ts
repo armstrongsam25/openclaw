@@ -29,4 +29,24 @@ export const nativeBoundaryTestEntrypoints = {
     sourceWorkerName: "update-managed-service-handoff-database",
     distWorkerPath: "infra/update-managed-service-handoff-database.js",
   },
+  gatewayOwnerLease: {
+    currentModuleUrl: import.meta.url,
+    sourceWorkerName: "gateway-owner-lease",
+    distWorkerPath: "infra/gateway-owner-lease.js",
+  },
+  gatewayLock: {
+    currentModuleUrl: import.meta.url,
+    sourceWorkerName: "gateway-lock",
+    distWorkerPath: "infra/gateway-lock.js",
+  },
+  boundaryPath: {
+    currentModuleUrl: import.meta.url,
+    sourceWorkerName: "boundary-path",
+    distWorkerPath: "infra/boundary-path.js",
+  },
+  stateDatabasePaths: {
+    currentModuleUrl: import.meta.url,
+    sourceWorkerName: "../state/openclaw-state-db.paths",
+    distWorkerPath: "state/openclaw-state-db.paths.js",
+  },
 } as const;
