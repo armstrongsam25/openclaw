@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { resolveConfigEnvVars } from "../config/env-substitution.js";
 import { createConfigRuntimeEnv } from "../config/env-vars.js";
+import { getRuntimeConfigCapture } from "../config/runtime-config-capture-state.js";
 import { captureRuntimeConfig } from "../config/runtime-source-projection.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { PluginInstallRecord } from "../config/types.plugins.js";
@@ -116,6 +117,7 @@ function buildCacheKeys(params: {
   allowProcessHomeSessionCatalogs?: boolean;
   activate?: boolean;
   runtimeSideEffects: boolean;
+  registrationConfigOrigin?: number;
   registrationSnapshots?: readonly string[];
   mode: NonNullable<PluginLoadOptions["mode"]>;
   expectedSourceDigests?: Readonly<Record<string, string>>;
@@ -182,11 +184,12 @@ function buildCacheKeys(params: {
       : undefined,
   };
   const requestIdentity = JSON.stringify(cacheIdentity);
-  // Prepared, non-activating loads consume exact manifest sources, not workspace discovery.
+  // Routine provider lookups share captured inputs; explicit workspace owners stay distinct.
   const preparedIdentity = params.registrationSnapshots
     ? JSON.stringify({
         ...cacheIdentity,
         roots: { ...roots, workspace: undefined },
+        registrationConfigOrigin: params.registrationConfigOrigin,
         registrationSnapshots: params.registrationSnapshots,
       })
     : requestIdentity;
@@ -408,9 +411,14 @@ export function resolvePluginLoadCacheContext(options: PluginLoadOptions = {}) {
     allowProcessHomeSessionCatalogs: options.allowProcessHomeSessionCatalogs,
     activate: shouldActivate,
     runtimeSideEffects,
-    registrationSnapshots: !shouldActivate
-      ? [activationConfigFingerprint(runtimeConfig), activationConfigFingerprint(activationConfig)]
-      : undefined,
+    registrationConfigOrigin: resolveRuntimeBindingCacheId(options.registrationConfigOrigin),
+    registrationSnapshots:
+      !shouldActivate && getRuntimeConfigCapture(options.registrationConfigOrigin)
+        ? [
+            activationConfigFingerprint(runtimeConfig),
+            activationConfigFingerprint(activationConfig),
+          ]
+        : undefined,
     expectedSourceDigests: options.expectedSourceDigests,
     mode: options.mode ?? "full",
   });
