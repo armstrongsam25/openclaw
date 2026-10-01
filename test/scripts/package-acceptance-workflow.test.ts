@@ -7047,11 +7047,17 @@ wait_for_run "$WORKFLOW" 404 "$EXPECTED_SHA" "$STARTED_JOB" "$APPROVE_ENVIRONMEN
       writeFileSync(join(root, "git"), `#!/bin/sh\nprintf '%s\\n' '${"a".repeat(40)}'\n`, {
         mode: 0o755,
       });
+      writeFileSync(join(root, "gh"), `#!/bin/sh\nprintf '%s\\n' '${"c".repeat(40)}'\n`, {
+        mode: 0o755,
+      });
       const result = spawnSync("bash", ["-c", ref.run ?? ""], {
         cwd: root,
         encoding: "utf8",
         env: {
           PATH: `${root}:${process.env.PATH}`,
+          EXPECTED_SIGNED_TAG_SHA: "a".repeat(40),
+          EXPECTED_SIGNED_TAG_OBJECT_SHA: "c".repeat(40),
+          GITHUB_REPOSITORY: "openclaw/openclaw",
           RELEASE_TAG: "v2026.9.1",
           RELEASE_NPM_DIST_TAG: "latest",
           PUBLISH_OPENCLAW_NPM: "true",
@@ -7082,6 +7088,9 @@ wait_for_run "$WORKFLOW" 404 "$EXPECTED_SHA" "$STARTED_JOB" "$APPROVE_ENVIRONMEN
     writeFileSync(join(root, "git"), `#!/bin/sh\nprintf '%s\\n' '${"a".repeat(40)}'\n`, {
       mode: 0o755,
     });
+    writeFileSync(join(root, "gh"), `#!/bin/sh\nprintf '%s\\n' '${"c".repeat(40)}'\n`, {
+      mode: 0o755,
+    });
     const summaryPath = join(root, "summary");
     writeFileSync(summaryPath, "");
     const result = spawnSync("bash", ["-c", ref.run ?? ""], {
@@ -7089,6 +7098,9 @@ wait_for_run "$WORKFLOW" 404 "$EXPECTED_SHA" "$STARTED_JOB" "$APPROVE_ENVIRONMEN
       encoding: "utf8",
       env: {
         PATH: `${root}:${process.env.PATH}`,
+        EXPECTED_SIGNED_TAG_SHA: "a".repeat(40),
+        EXPECTED_SIGNED_TAG_OBJECT_SHA: "c".repeat(40),
+        GITHUB_REPOSITORY: "openclaw/openclaw",
         RELEASE_TAG: tag,
         RELEASE_NPM_DIST_TAG: tag.includes("-beta.") ? "beta" : "latest",
         PUBLISH_OPENCLAW_NPM: "true",
