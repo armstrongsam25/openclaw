@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 import { withMockedPlatform } from "../test-utils/vitest-spies.js";
+import * as packageFilesystem from "./package-update-filesystem.js";
 import { swapStagedPackageInstall } from "./package-update-swap.js";
 import { createPackageSwapFixture } from "./package-update-swap.test-support.js";
 import * as retry from "./retry.js";
@@ -68,7 +69,12 @@ it.each([
       }
       return rename(from, to);
     });
-    const result = await withMockedPlatform(platform, () => swapStagedPackageInstall(params));
+    // Native launcher preparation must keep the real host's filesystem backend.
+    const backup = packageFilesystem.backupNpmPackageRoot;
+    vi.spyOn(packageFilesystem, "backupNpmPackageRoot").mockImplementation((...args) =>
+      withMockedPlatform(platform, () => backup(...args)),
+    );
+    const result = await swapStagedPackageInstall(params);
     expect(result).toMatchObject({
       status: "failed",
       activePackageRoot: packageRoot,
