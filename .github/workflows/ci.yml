@@ -1965,7 +1965,10 @@ jobs:
           fi
 
           if [ "$RUN_DOCTOR_PLUGIN_INDEX" = "true" ]; then
+            # The built CLI holds a fixed 30 s budget per command in this proof.
+            # Finish it before the parallel verifier wave competes for the runner.
             run_verifier "doctor-plugin-index" run_doctor_plugin_index
+            wait_checks
           fi
 
           if [ "$RUN_SQLITE_SESSION_LIFECYCLE" = "true" ]; then
