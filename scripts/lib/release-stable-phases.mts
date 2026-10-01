@@ -449,24 +449,20 @@ async function ensureFinalTag(ctx: ReleaseContext): Promise<void> {
   );
   if (tagged.exitCode !== 0) {
     const local = await ctx.run("git", ["rev-parse", `${state.tag}^{}`], { allowFailure: true });
-    const tagType = await ctx.run("git", ["cat-file", "-t", state.tag], {
-      allowFailure: true,
-    });
-    const tagObject = await ctx.run("git", ["cat-file", "-p", state.tag], {
-      allowFailure: true,
-    });
-    const hasSignature =
-      /-----BEGIN (?:PGP|SSH) SIGNATURE-----|-----BEGIN SIGNED MESSAGE-----/u.test(
-        tagObject.stdout,
+    if (local.exitCode !== 0 || local.stdout.trim() !== sha) {
+      throw new ReleaseRefusal(
+        `Could not create signed final tag ${state.tag} at ${sha}. Configure Git tag signing and resume publication.`,
+        [ctx.resume("publish")],
       );
-    if (
-      local.exitCode !== 0 ||
-      local.stdout.trim() !== sha ||
-      tagType.exitCode !== 0 ||
-      tagType.stdout.trim() !== "tag" ||
-      tagObject.exitCode !== 0 ||
-      !hasSignature
-    ) {
+    }
+    const resigned = await ctx.run(
+      "git",
+      ["tag", "-s", "-f", state.tag, sha, "-m", `OpenClaw ${state.release}`],
+      {
+        allowFailure: true,
+      },
+    );
+    if (resigned.exitCode !== 0) {
       throw new ReleaseRefusal(
         `Could not create signed final tag ${state.tag} at ${sha}. Configure Git tag signing and resume publication.`,
         [ctx.resume("publish")],
