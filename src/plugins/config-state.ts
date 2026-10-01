@@ -54,13 +54,18 @@ export function isExplicitPluginDisableMarker(value: unknown): boolean {
   return isRecord(value) && value.enabled === false && Object.keys(value).length === 1;
 }
 
+/** Builds caller-owned policy without exposing the host's prepared objects. */
+export const createNormalizedPluginsConfig = (
+  config?: OpenClawConfig["plugins"],
+): NormalizedPluginsConfig => normalizePluginsConfigWithResolverCore(config, normalizePluginId);
+
 export const normalizePluginsConfig = (
   config?: OpenClawConfig["plugins"],
 ): NormalizedPluginsConfig => {
   if (preparedRuntimePluginsConfig && preparedRuntimePluginsConfig.source === config) {
     return preparedRuntimePluginsConfig.value;
   }
-  return normalizePluginsConfigWithResolverCore(config, normalizePluginId);
+  return createNormalizedPluginsConfig(config);
 };
 
 let preparedRuntimePluginsConfig:
@@ -73,7 +78,7 @@ export function prepareRuntimePluginsConfig(config: OpenClawConfig | null): void
     preparedRuntimePluginsConfig = undefined;
     return;
   }
-  const value = normalizePluginsConfigWithResolverCore(config.plugins, normalizePluginId);
+  const value = createNormalizedPluginsConfig(config.plugins);
   for (const entry of Object.values(value.entries)) {
     // Plugin payloads retain their original owner; only normalized policy is shared and frozen.
     const { config: _config, ...policy } = entry;
