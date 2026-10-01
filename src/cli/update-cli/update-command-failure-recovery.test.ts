@@ -66,6 +66,40 @@ afterEach(() => {
 });
 
 describe("post-update failure recovery observation", () => {
+  it.each([false, true])(
+    "finishes a no-restart activation failure without waiting for readiness (json=%s)",
+    async (json) => {
+      const env = { ...process.env };
+      const run = { runId: updateLedger.createUpdateRun({ trigger: "cli" }, { env }).runId, env };
+      mocks.converge.mockRejectedValueOnce(new Error("Doctor refused maintenance"));
+      await expect(
+        withUpdateCommandTerminalResult(async (registerRun) => {
+          registerRun(run);
+          await finishSuccessfulPackageSwitch(
+            { packageRoot: root, run, json },
+            { shouldRestart: false, opts: { restart: false, json, run } },
+          );
+        }),
+      ).rejects.toMatchObject({
+        result: { status: "error", reason: "post-update-failed" },
+      });
+      expect(verifyUpdatedGateway).not.toHaveBeenCalled();
+      expect(mocks.activePort).not.toHaveBeenCalled();
+      expect(mocks.managedService).not.toHaveBeenCalled();
+      expect(updateLedger.getUpdateRun(run.runId, { env })).toMatchObject({
+        status: "failed",
+        phase: "finished",
+        steps: expect.arrayContaining([
+          expect.objectContaining({
+            step: "restart",
+            status: "skipped",
+            detail: "skipped by operator",
+          }),
+        ]),
+      });
+    },
+  );
+
   it("settles a headless package rollback without waiting for a Gateway", async () => {
     const { packageRoot, transaction } = await createRetainedPackageSwap(root);
     const configPath = path.join(process.env.OPENCLAW_STATE_DIR!, "openclaw.json");

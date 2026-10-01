@@ -107,6 +107,9 @@ export async function verifyUpdateFailureRecovery(params: {
         });
         return;
       }
+      if (params.opts.restart === false) {
+        return;
+      }
       if (params.serviceStopped) {
         try {
           result.verification = {
