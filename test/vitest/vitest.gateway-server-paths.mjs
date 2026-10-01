@@ -23,6 +23,7 @@ export const gatewayDatabaseWorkerTestFiles = [
   "src/gateway/control-ui-assistant-media-policy.test.ts",
   "src/gateway/control-ui-session-pr-access.test.ts",
   "src/gateway/control-ui-session-prs-branch.test.ts",
+  "src/gateway/control-ui-session-prs-publication.test.ts",
   "src/gateway/control-ui-session-prs-retention.test.ts",
   "src/gateway/control-ui-session-prs-staleness.test.ts",
   "src/gateway/control-ui-session-prs.test.ts",

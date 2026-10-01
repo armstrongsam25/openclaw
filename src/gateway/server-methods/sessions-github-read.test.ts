@@ -293,7 +293,11 @@ describe("publication receipt reads", () => {
             expect.objectContaining({ assertCurrent: expect.any(Function) }),
           );
         }
-        expect(fixture.pullRequests.read).toHaveBeenCalledWith(target, expect.any(Function));
+        expect(fixture.pullRequests.read).toHaveBeenCalledWith(
+          target,
+          expect.any(Function),
+          "publication",
+        );
         expect(fixture.requestForSession).not.toHaveBeenCalled();
       });
     },

@@ -124,7 +124,7 @@ async function isSessionPublicationSuperseded(
     assertCurrent();
     target.assertCurrent?.();
   };
-  const published = await prOwner.read(target, assertReadCurrent);
+  const published = await prOwner.read(target, assertReadCurrent, "publication");
   assertReadCurrent();
   return published.status === "ready" && !published.rateLimited
     ? isGitHubPublicationSuperseded(snapshot, published.pullRequests, {
