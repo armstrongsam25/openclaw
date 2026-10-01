@@ -375,6 +375,7 @@ describe("resolveBuildAllSteps", () => {
 
   it("uses declaration-cache groups only for the full build", () => {
     expect(resolveBuildAllSteps("full").map((step) => step.label)).toEqual([
+      "native-protocol",
       "plugins:assets:build",
       "tsdown-ai",
       "tsdown-packages",
