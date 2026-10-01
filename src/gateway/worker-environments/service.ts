@@ -79,7 +79,7 @@ export function createWorkerEnvironmentService(options: WorkerEnvironmentService
     ...(options.inferenceStore ? { store: options.inferenceStore } : {}),
   });
   let reconcileInFlight: Promise<void> | undefined;
-  let started = false;
+  let serviceStarted = false;
   let unsubscribeSessionIdentityMutation: (() => void) | undefined;
   let unsubscribeTurnClaimClosed = options.placementStore?.registerTurnClaimClosedHandler(
     (claim) => {
@@ -420,7 +420,7 @@ export function createWorkerEnvironmentService(options: WorkerEnvironmentService
   };
 
   const start = () => {
-    if (started || stopping) {
+    if (serviceStarted || stopping) {
       return;
     }
     unsubscribeSessionIdentityMutation = onSessionIdentityMutation((mutation) => {
@@ -445,7 +445,7 @@ export function createWorkerEnvironmentService(options: WorkerEnvironmentService
         });
       },
     });
-    started = true;
+    serviceStarted = true;
     void reconcileOnce().catch(() => warn("Worker environment startup reconcile failed"));
   };
 
