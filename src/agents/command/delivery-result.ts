@@ -9,11 +9,7 @@ import { serializeDurableMessagePayloadOutcomes } from "../../channels/message/r
 import { formatErrorMessage } from "../../infra/errors.js";
 import type { projectOutboundPayloadPlanForJson } from "../../infra/outbound/payloads.js";
 import { hasAnyNonEmptyString as hasNonEmptyStringArray } from "../delivery-evidence-values.js";
-import type { MessagingToolSend } from "../embedded-agent-messaging.types.js";
-import type {
-  EmbeddedAgentRunMeta,
-  EmbeddedAgentRunResult,
-} from "../embedded-agent-runner/types.js";
+import type { EmbeddedAgentRunResult } from "../embedded-agent-runner/types.js";
 
 export type AgentCommandDeliveryStatus = {
   requested: true;
@@ -36,17 +32,17 @@ export type AgentCommandDeliveryResult = Pick<
   | "sourceReplyDelivered"
   | "sourceReplyDeliveryState"
   | "messagingToolSourceReplyPayloads"
+  | "meta"
+  | "didSendViaMessagingTool"
+  | "messagingToolSentTexts"
+  | "messagingToolSentMediaUrls"
+  | "messagingToolSentTargets"
+  | "acceptedSessionSpawns"
+  | "requesterContinuationSettled"
+  | "successfulCronAdds"
 > & {
   payloads: ReturnType<typeof projectOutboundPayloadPlanForJson>;
-  meta: EmbeddedAgentRunMeta;
-  didSendViaMessagingTool?: boolean;
-  messagingToolSentTexts?: string[];
-  messagingToolSentMediaUrls?: string[];
-  messagingToolSentTargets?: MessagingToolSend[];
   didSendDeterministicApprovalPrompt?: true;
-  acceptedSessionSpawns?: NonNullable<EmbeddedAgentRunResult["acceptedSessionSpawns"]>;
-  requesterContinuationSettled?: true;
-  successfulCronAdds?: number;
   deliverySucceeded?: boolean;
   deliveryStatus?: AgentCommandDeliveryStatus;
 };
@@ -113,21 +109,22 @@ export function deliveryStatusFromDurableSend(send: DurableSendResult): AgentCom
   const payloadOutcomes = serializeDurableMessagePayloadOutcomes(send.payloadOutcomes, {
     includeHookEffect: true,
   });
+  const status = {
+    requested: true,
+    attempted: true,
+    status: send.status,
+  } as const;
   switch (send.status) {
     case "sent":
       return {
-        requested: true,
-        attempted: true,
-        status: "sent",
+        ...status,
         succeeded: true,
         resultCount: send.results.length,
         ...(payloadOutcomes ? { payloadOutcomes } : {}),
       };
     case "suppressed":
       return {
-        requested: true,
-        attempted: true,
-        status: "suppressed",
+        ...status,
         succeeded: true,
         reason: send.reason,
         resultCount: 0,
@@ -135,9 +132,7 @@ export function deliveryStatusFromDurableSend(send: DurableSendResult): AgentCom
       };
     case "partial_failed":
       return {
-        requested: true,
-        attempted: true,
-        status: "partial_failed",
+        ...status,
         succeeded: "partial",
         error: true,
         errorMessage: formatErrorMessage(send.error),
@@ -147,9 +142,7 @@ export function deliveryStatusFromDurableSend(send: DurableSendResult): AgentCom
       };
     case "failed":
       return {
-        requested: true,
-        attempted: true,
-        status: "failed",
+        ...status,
         succeeded: false,
         error: true,
         errorMessage: formatErrorMessage(send.error),

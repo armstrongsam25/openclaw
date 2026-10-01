@@ -130,6 +130,12 @@ keeps the retained runtime for later cleanup, and preserves the command's exit
 status. This protection belongs to the installed updater: installing a release
 with the fix enables it for the next update that release performs.
 
+Updating from inside the installation keeps captured paths anchored to the
+invoking directory while the package is replaced. The updater keeps a valid
+working directory for background workers and restores the original directory
+when it still exists. This protection also belongs to the installed updater;
+a new candidate cannot change the working directory of an older driver.
+
 When a Dashboard update fails while the Gateway handles the request, the Gateway
 logs a warning with the public reason and a safe error summary. Successful and
 intentional no-op update logs are unchanged. This only affects Gateway logging,
@@ -188,6 +194,14 @@ the requested version or tag. The generated report includes the applicable next
 step. An already-running older updater cannot gain this diagnostic capture from
 its candidate package.
 
+On Windows, a temporarily locked live package can prevent the updater from renaming
+it into its backup location. The updater retries `EPERM`, `EBUSY`, and `EACCES`
+with bounded backoff (16 attempts and up to 57.75 seconds of waiting), recording
+each retry as a warning. If the rename still fails, the failure names both paths
+and leaves the installed package in place. Close processes holding that installation
+and check its permissions before retrying. This protection belongs to the installed
+updater; a newer candidate cannot add it to an older updater already running.
+
 ## Candidate-owned admission
 
 For package-manager updates, `openclaw update` privately stages the selected
@@ -204,6 +218,11 @@ When replacement is needed, the updater retains its running worker files before
 changing the installed package. Linux OverlayFS installations use private copies
 so hard-link copy-up cannot invalidate the retained files’ identity checks.
 Other supported filesystems keep the hard-link fast path and copy fallback.
+
+SQLite read-only workers use that retained generation through post-install
+verification, even after the package manager removes the previous package path.
+Already-installed older updaters, including 2026.9.6, still run their original
+worker-launch code; installing a corrected candidate cannot repair that first hop.
 
 Source updates retain a retired workspace dependency link when only its ignored `node_modules` directory remains.
 An older installed updater that fails at `updater-runtime-retention` needs this correction in its running code before retrying; a newer candidate cannot repair that earlier step.
@@ -332,6 +351,12 @@ require storing a task password.
 
 This target-CLI protection does not cover every Doctor or plugin child or the
 in-process service preparation before package mutation.
+
+After Scheduled Task autostart has been suspended, cancelling before installation
+mutation restores it before exit, while retaining checks on the original update
+owner and task identity. This protection belongs to the installed updater;
+installing a release with the fix enables it for the next update that release
+performs.
 
 ## Options
 
