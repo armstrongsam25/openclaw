@@ -1,20 +1,18 @@
 import { execFile } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { afterEach, expect, it } from "vitest";
-import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 import { resolveSessionStorePathCore } from "../config/sessions/paths.js";
 import { resolveSqliteTargetFromSessionStorePath } from "../config/sessions/session-sqlite-target.js";
+import { resolveRuntimeWorkerArgv, resolveRuntimeWorkerUrl } from "../infra/runtime-worker-url.js";
 import {
   closeOpenClawAgentDatabasesForTest,
   openOpenClawAgentDatabase,
 } from "../state/openclaw-agent-db.js";
 import { withStateDirEnv } from "../test-helpers/state-dir-env.js";
-import { buildCanonicalSessionRepairChild } from "./doctor-session-canonical-keys.bundle.test-support.js";
+import { doctorConfigRuntimeEntrypoints } from "./doctor-config-runtime.test-support.js";
 
 afterEach(() => closeOpenClawAgentDatabasesForTest());
-const tempDirs = useAutoCleanupTempDirTracker(afterEach);
 const execFileAsync = promisify(execFile);
 
 it("repairs deep owner aliases without losing a large healthy transcript", async () => {
@@ -79,15 +77,11 @@ it("repairs deep owner aliases without losing a large healthy transcript", async
     expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     closeOpenClawAgentDatabasesForTest();
-    const cacheDir = path.join(process.cwd(), "node_modules/.cache");
-    fs.mkdirSync(cacheDir, { recursive: true });
-    const childPath = await buildCanonicalSessionRepairChild(
-      tempDirs.make("canonical-scale-", cacheDir),
-    );
+    const child = resolveRuntimeWorkerUrl(doctorConfigRuntimeEntrypoints.canonicalSessionRepair);
     // Doctor runs on Node's main thread; Vitest's worker-thread stack masks this overflow.
     const { stdout } = await execFileAsync(
       process.execPath,
-      [childPath, stateDir, storeTemplate, "apply"],
+      [...resolveRuntimeWorkerArgv(child), stateDir, storeTemplate, "apply"],
       { cwd: process.cwd(), env, encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 60_000 },
     );
     expect(JSON.parse(stdout)).toMatchObject({
