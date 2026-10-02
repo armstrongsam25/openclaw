@@ -979,8 +979,8 @@ describe("tryDispatchAcpReplyCore", () => {
         },
       });
       const persistedMessages = (await loadTranscriptEvents(target)).flatMap((event) => {
-        const entry = requireRecord(event, "transcript event");
-        return entry.type === "message" ? [entry.message] : [];
+        const record = requireRecord(event, "transcript event");
+        return record.type === "message" ? [record.message] : [];
       });
       const expectedAssistant = {
         role: "assistant",
