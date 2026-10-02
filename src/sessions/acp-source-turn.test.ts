@@ -1,16 +1,91 @@
+import path from "node:path";
 import { afterAll, expect, test } from "vitest";
+import { AcpSessionManager } from "../acp/control-plane/manager.core.js";
+import { disposeAcpSessionManagerInstance } from "../acp/control-plane/manager.lifecycle.js";
+import { writeAcpSessionMetaForMigration } from "../acp/runtime/session-meta.js";
 import { buildAgentRunTerminalOutcomeFromLifecycleEvent } from "../agents/agent-run-terminal-outcome.js";
 import {
   loadSessionEntryReadOnly,
   replaceSessionEntry,
 } from "../config/sessions/session-accessor.js";
 import type { InternalSessionEntry } from "../config/sessions/types.js";
+import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
 import { useSessionStoreTempDirs } from "../test-utils/session-state-cleanup.js";
 import { finishAcpSourceTurn, prepareAcpSourceTurnInput } from "./acp-source-turn.js";
 import { createUserTurnTranscriptRecorder } from "./user-turn-transcript.js";
 import { createSqliteTranscriptTarget } from "./user-turn-transcript.test-support.js";
 
 const sessionDirs = useSessionStoreTempDirs(afterAll, "openclaw-acp-source-turn-");
+
+test("admits a canonical source routed to legacy ACP metadata without inventing a target incarnation", async () => {
+  await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
+    const source = {
+      agentId: "main",
+      sessionId: "legacy-acp-source",
+      sessionKey: "agent:main:webchat:legacy-acp-source",
+      storePath: path.join(state.sessionsDir("main"), "sessions.json"),
+    };
+    await replaceSessionEntry(source, { sessionId: source.sessionId, updatedAt: 1 });
+    const cfg = { session: { store: source.storePath } };
+    const sessionKey = "agent:main:acp:legacy-target";
+    writeAcpSessionMetaForMigration({
+      env: state.env,
+      sessionKey,
+      meta: {
+        backend: "acpx",
+        agent: "main",
+        runtimeSessionName: "legacy-runtime",
+        mode: "persistent",
+        state: "idle",
+        lastActivityAt: 1,
+      },
+    });
+    const manager = new AcpSessionManager();
+    try {
+      const target = await manager.resolveSessionAsync({ cfg, sessionKey });
+      expect(target).toMatchObject({ kind: "ready", sessionKey, entry: undefined });
+      if (target.kind !== "ready") {
+        throw new Error("Legacy ACP metadata was not resolved");
+      }
+      const recorder = createUserTurnTranscriptRecorder({
+        target: { ...source, sessionEntry: undefined },
+        input: { text: "Continue through the existing legacy ACP target" },
+      });
+      await prepareAcpSourceTurnInput(
+        recorder,
+        target,
+        "legacy-source-run",
+        () => {},
+        async () => {},
+      );
+      const running = loadSessionEntryReadOnly(source);
+      expect(running).toMatchObject({
+        status: "running",
+        activeWriterRunId: "legacy-source-run",
+        acpSourceTurn: {
+          sourceSessionId: source.sessionId,
+          runId: "legacy-source-run",
+          targetAgentId: "main",
+          targetSessionKey: sessionKey,
+          targetSessionId: null,
+        },
+      });
+      await finishAcpSourceTurn(
+        recorder,
+        "legacy-source-run",
+        buildAgentRunTerminalOutcomeFromLifecycleEvent({
+          phase: "end",
+          data: { status: "completed" },
+        }),
+        undefined,
+      );
+      expect(loadSessionEntryReadOnly(source)).toMatchObject({ status: "done" });
+      expect(loadSessionEntryReadOnly(source)?.acpSourceTurn).toBeUndefined();
+    } finally {
+      await disposeAcpSessionManagerInstance(manager, "test-complete");
+    }
+  });
+});
 
 test("channel ACP admission replaces a dead native writer and starts fresh lifecycle timing", async () => {
   const target = createSqliteTranscriptTarget({ dir: sessionDirs.make() });

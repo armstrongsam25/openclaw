@@ -32,8 +32,8 @@ export async function prepareAcpSourceTurnInput(
   await assertRouteCurrent();
   const source = recorder.getAdmissionReceipt();
   if (source) {
-    if (!target.entry?.sessionId || !persisted?.sessionEntry) {
-      throw new Error("ACP source and target session identities are required before dispatch.");
+    if (!persisted?.sessionEntry) {
+      throw new Error("ACP source session identity is required before dispatch.");
     }
     await claimAcpSourceTurn({
       source,
@@ -41,7 +41,7 @@ export async function prepareAcpSourceTurnInput(
       expectedLifecycleRevision: persisted.sessionEntry.lifecycleRevision,
       targetAgentId: target.agentId,
       targetSessionKey: target.sessionKey,
-      targetSessionId: target.entry.sessionId,
+      targetSessionId: target.entry?.sessionId ?? null,
       assertCurrent,
     });
     await assertRouteCurrent();
@@ -56,7 +56,7 @@ async function claimAcpSourceTurn(params: {
   expectedLifecycleRevision: string | undefined;
   targetAgentId: string;
   targetSessionKey: string;
-  targetSessionId: string;
+  targetSessionId: string | null;
   assertCurrent: () => void;
 }): Promise<void> {
   let incumbentRunIds: string[] = [];

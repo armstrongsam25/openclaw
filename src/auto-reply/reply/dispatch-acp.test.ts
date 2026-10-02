@@ -19,17 +19,13 @@ import { createHostChannelInboundEventContextBuilder } from "../../channels/inbo
 import { createChannelAdmissionAudit } from "../../channels/message-access/admission-evidence.js";
 import { createHostChannelIngressRuntime } from "../../channels/message-access/runtime.js";
 import type { OpenClawConfig } from "../../config/config.js";
-import {
-  loadTranscriptEvents,
-  upsertSessionEntryCore,
-} from "../../config/sessions/session-accessor.js";
+import { loadTranscriptEvents } from "../../config/sessions/session-accessor.js";
 import {
   OutboundDeliveryError,
   PlatformMessageNotDispatchedError,
 } from "../../infra/outbound/deliver-types.js";
 import type { SessionBindingRecord } from "../../infra/outbound/session-binding-service.js";
 import type { ApplyMediaUnderstandingResult } from "../../media-understanding/apply.js";
-import { createUserTurnTranscriptRecorder } from "../../sessions/user-turn-transcript.js";
 import { withFetchPreconnect } from "../../test-utils/fetch-mock.js";
 import { withOpenClawTestState } from "../../test-utils/openclaw-test-state.js";
 import type { ReplyDispatchRun } from "../get-reply-options.types.js";
@@ -37,7 +33,7 @@ import { getReplyPayloadMetadata, setReplyPayloadMetadata } from "../reply-paylo
 import type { ReplyPayload } from "../types.js";
 import { tryDispatchAcpReplyCore } from "./dispatch-acp.js";
 import { expectAcpSessionParticipantInput } from "./dispatch-acp.participant.test-support.js";
-import { runDispatch } from "./dispatch-acp.test-support.js";
+import { createAcpSourceTranscriptFixture, runDispatch } from "./dispatch-acp.test-support.js";
 import { createAbortAwareDispatcher } from "./dispatch-from-config.abort.js";
 import type { HistoryEntry } from "./history.types.js";
 import { finalizeInboundContext } from "./inbound-context.js";
@@ -428,7 +424,8 @@ describe("tryDispatchAcpReplyCore", () => {
     diagnosticMocks.markDiagnosticSessionProgress.mockReset();
     sessionMetaMocks.readAcpSessionEntry.mockReset();
     sessionMetaMocks.readAcpSessionEntry.mockReturnValue(null);
-    transcriptMocks.persistAcpDispatchTranscript.mockClear();
+    transcriptMocks.persistAcpDispatchTranscript.mockReset();
+    transcriptMocks.persistAcpDispatchTranscript.mockResolvedValue(undefined);
     bindingServiceMocks.listBySession.mockReset();
     bindingServiceMocks.listBySession.mockReturnValue([]);
     bindingServiceMocks.unbind.mockReset();
@@ -934,20 +931,22 @@ describe("tryDispatchAcpReplyCore", () => {
 
   it("keeps settled ACP completion aligned with transcript persistence during caller cancellation", async () => {
     await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
-      const target = {
-        agentId: "codex-acp",
-        sessionId: "acp-cancel-during-transcript",
+      const { target, entry, recorder } = await createAcpSourceTranscriptFixture(
+        state,
         sessionKey,
-        storePath: path.join(state.sessionsDir("codex-acp"), "sessions.json"),
-      };
-      await upsertSessionEntryCore(target, { sessionId: target.sessionId, updatedAt: 1 });
+        "acp-cancel-during-transcript",
+        "Cancel while saving this turn.",
+      );
+      managerMocks.resolveSessionAsync.mockResolvedValue({
+        kind: "ready",
+        sessionKey,
+        agentId: target.agentId,
+        meta: createAcpSessionMeta(),
+        entry,
+      });
       const text = "Completed output awaiting transcript persistence.";
       mockVisibleTextTurn(text);
       const controller = new AbortController();
-      const recorder = createUserTurnTranscriptRecorder({
-        target: { ...target, sessionEntry: undefined },
-        resolveInput: async () => ({ text: "Cancel while saving this turn." }),
-      });
       const actualTranscript = await vi.importActual<
         typeof import("./dispatch-acp-transcript.runtime.js")
       >("./dispatch-acp-transcript.runtime.js");
@@ -1024,7 +1023,7 @@ describe("tryDispatchAcpReplyCore", () => {
   });
 
   it("passes the ACP agent directory without declaring host-path access", async () => {
-    const agentDir = "/tmp/acp-agent";
+    const agentDir = path.resolve("/tmp/acp-agent");
     await runDispatch({
       bodyForAgent: "describe image",
       cfg: createAcpTestConfig({

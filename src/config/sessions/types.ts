@@ -633,7 +633,8 @@ export type InternalSessionEntryCore = SessionEntryCore & {
     runId: string;
     targetAgentId: string;
     targetSessionKey: string;
-    targetSessionId: string;
+    /** Null when legacy ready metadata selected no canonical target incarnation. */
+    targetSessionId: string | null;
   };
   /** Canonical remote repository awaiting preparation by this exact session generation. */
   pendingProjectGitUrl?: string;
