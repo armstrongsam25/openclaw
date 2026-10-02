@@ -68,6 +68,7 @@ export function generationValidPrivateFieldsForSameSession(
     ...(existingEntry.lifecycleRunId !== undefined
       ? { lifecycleRunId: existingEntry.lifecycleRunId }
       : {}),
+    ...(existingEntry.acpSourceTurn ? { acpSourceTurn: existingEntry.acpSourceTurn } : {}),
     ...(existingEntry.pendingProjectGitUrl !== undefined
       ? { pendingProjectGitUrl: existingEntry.pendingProjectGitUrl }
       : {}),

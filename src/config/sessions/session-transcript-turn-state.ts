@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import {
   mergeRestartRecoveryTerminalRunIds,
   sameRestartRecoveryTerminalRunIds,
@@ -17,6 +18,9 @@ export function buildRestartRecoveryExpectedState(
 ): SessionTranscriptTurnExpectedState {
   const expectedMainRestartRecovery = mainRestartRecovery ?? entry.mainRestartRecovery;
   return {
+    acpSourceTurn: entry.acpSourceTurn,
+    activeWriterRunId: entry.activeWriterRunId,
+    lifecycleRunId: entry.lifecycleRunId,
     abortedLastRun: entry.abortedLastRun,
     mainRestartRecoveryCycleId: expectedMainRestartRecovery?.cycleId,
     mainRestartRecoveryRevision: expectedMainRestartRecovery?.revision,
@@ -54,7 +58,12 @@ export function sessionMatchesExpectedTranscriptTurn<T extends { entry: SessionE
     (expected.expectedWriterRunId === undefined ||
       selected.entry.activeWriterRunId === expected.expectedWriterRunId) &&
     (expectedState === undefined ||
-      (selected.entry.abortedLastRun === expectedState.abortedLastRun &&
+      (isDeepStrictEqual(selected.entry.acpSourceTurn, expectedState.acpSourceTurn) &&
+        (!("activeWriterRunId" in expectedState) ||
+          selected.entry.activeWriterRunId === expectedState.activeWriterRunId) &&
+        (!("lifecycleRunId" in expectedState) ||
+          selected.entry.lifecycleRunId === expectedState.lifecycleRunId) &&
+        selected.entry.abortedLastRun === expectedState.abortedLastRun &&
         selected.entry.mainRestartRecovery?.cycleId === expectedState.mainRestartRecoveryCycleId &&
         selected.entry.mainRestartRecovery?.revision ===
           expectedState.mainRestartRecoveryRevision &&

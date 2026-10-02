@@ -15,7 +15,6 @@ import {
   toAcpRuntimeError,
 } from "../../acp/runtime/errors.js";
 import {
-  closeAdmittedRunDelegatedAuthority,
   getAdmittedRunDelegatedAuthority,
   type AdmittedRunContext,
 } from "../../agents/admitted-run-context.js";
@@ -48,6 +47,7 @@ import {
   type ExtractedFileImage,
 } from "../../media-understanding/extracted-file-images.js";
 import { resolveAgentIdFromSessionKey } from "../../routing/session-key.js";
+import { prepareAcpSourceTurnInput, finishAcpSourceTurn } from "../../sessions/acp-source-turn.js";
 import { recordAcceptedSessionParticipantInput } from "../../sessions/session-participant-input-recording.js";
 import { prepareChannelParticipantObservation } from "../../sessions/session-participant-input.js";
 import { classifySessionStateActor } from "../../sessions/session-state-events.js";
@@ -342,16 +342,6 @@ export async function tryDispatchAcpReplyCore(
     runId: params.runId,
   });
   const pendingAnswerText = params.ctx.agentText.trim();
-  const persistInput = inputRecorder
-    ? async () => {
-        assertInputCurrent();
-        await inputRecorder.persistApproved();
-        assertInputCurrent();
-        if (!inputRecorder.hasPersisted()) {
-          throw new Error("ACP input must be durably committed before dispatch.");
-        }
-      }
-    : undefined;
   try {
     if (
       pendingAnswerText &&
@@ -726,8 +716,13 @@ export async function tryDispatchAcpReplyCore(
     const onElicitation = createLazyAcpElicitationHandler(elicitationParams);
     // ACP can act before its terminal transcript arrives. Consume accepted input
     // before submission while leaving final assistant/outcome persistence below.
-    await persistInput?.();
-    await assertPreparedConversationBindingRouteCurrent(params.ctx);
+    await prepareAcpSourceTurnInput(
+      inputRecorder,
+      acpResolution,
+      auditRunId,
+      assertInputCurrent,
+      () => assertPreparedConversationBindingRouteCurrent(params.ctx),
+    );
     assertInputCurrent();
     if (getAdmittedRunDelegatedAuthority(turnAdmission) === undefined) {
       throw new Error("ACP turn admission ended before input dispatch.");
@@ -850,9 +845,7 @@ export async function tryDispatchAcpReplyCore(
       outcome: { kind: "error", error: acpError },
     });
   } finally {
-    if (admittedRunContext) {
-      closeAdmittedRunDelegatedAuthority(admittedRunContext);
-    }
+    await finishAcpSourceTurn(inputRecorder, auditRunId, terminalOutcome, admittedRunContext);
   }
 }
 /* oxlint-disable max-lines -- TODO: split this grandfathered oversized file. */
