@@ -1,5 +1,6 @@
 import {
   closeAdmittedRunDelegatedAuthority,
+  resolveAdmittedRunActiveAssertion,
   type AdmittedRunContext,
 } from "../agents/admitted-run-context.js";
 import {
@@ -10,7 +11,19 @@ import { hasCurrentAcpSourceTurn } from "../config/sessions/acp-source-turn-stat
 import { patchSessionEntryCore } from "../config/sessions/session-accessor.js";
 import type { TranscriptTurnAdmission } from "../config/sessions/transcript-entry-anchor.js";
 import { hasLiveAgentRunContext } from "../infra/agent-run-registry.js";
+import { formatErrorMessage } from "../infra/errors.js";
+import { createSubsystemLogger } from "../logging/subsystem.js";
 import type { UserTurnTranscriptRecorder } from "./user-turn-transcript.types.js";
+
+const log = createSubsystemLogger("sessions/acp");
+const ownedInputCustody = new WeakSet<UserTurnTranscriptRecorder>();
+
+export type AcpSourceTurnInputIdentity = {
+  agentId: string;
+  sessionKey: string;
+  sessionId: string;
+  lifecycleRevision: string | undefined;
+};
 
 export async function prepareAcpSourceTurnInput(
   recorder: UserTurnTranscriptRecorder | undefined,
@@ -18,12 +31,30 @@ export async function prepareAcpSourceTurnInput(
   runId: string,
   assertCurrent: () => void,
   assertRouteCurrent: () => Promise<void>,
+  expectedSource?: AcpSourceTurnInputIdentity,
+  assertCustodyCurrent?: () => void,
 ): Promise<void> {
   if (!recorder) {
     await assertRouteCurrent();
     return;
   }
   assertCurrent();
+  if (expectedSource) {
+    if (!assertCustodyCurrent) {
+      throw new Error("ACP source input custody requires live runtime authority.");
+    }
+    ownedInputCustody.add(recorder);
+    if (
+      !(await recorder.stageApproved?.({
+        runId,
+        assertCurrent,
+        assertAdmittedCurrent: assertCustodyCurrent,
+      }))
+    ) {
+      throw new Error("ACP source input custody could not be admitted before dispatch.");
+    }
+    assertCurrent();
+  }
   const persisted = await recorder.persistApproved();
   assertCurrent();
   if (!recorder.hasPersisted()) {
@@ -33,12 +64,27 @@ export async function prepareAcpSourceTurnInput(
   const source = recorder.getAdmissionReceipt();
   if (source) {
     if (!persisted?.sessionEntry) {
+      // A successful transcript-only recorder has no canonical execution owner to claim.
+      if (persisted && !expectedSource) {
+        return;
+      }
       throw new Error("ACP source session identity is required before dispatch.");
+    }
+    if (
+      expectedSource &&
+      (source.agentId !== expectedSource.agentId ||
+        source.sessionKey !== expectedSource.sessionKey ||
+        source.sessionId !== expectedSource.sessionId ||
+        persisted.sessionEntry.lifecycleRevision !== expectedSource.lifecycleRevision)
+    ) {
+      throw new Error("ACP source changed before input admission completed.");
     }
     await claimAcpSourceTurn({
       source,
       runId,
-      expectedLifecycleRevision: persisted.sessionEntry.lifecycleRevision,
+      expectedLifecycleRevision: expectedSource
+        ? expectedSource.lifecycleRevision
+        : persisted.sessionEntry.lifecycleRevision,
       targetAgentId: target.agentId,
       targetSessionKey: target.sessionKey,
       targetSessionId: target.entry?.sessionId ?? null,
@@ -99,7 +145,11 @@ async function claimAcpSourceTurn(params: {
         abortedLastRun: false,
       };
     },
-    { skipMaintenance: true, requireWriteSuccess: true, assertCommitAllowed: assertClaimCurrent },
+    {
+      skipMaintenance: true,
+      requireWriteSuccess: true,
+      workerGuard: { assertCurrent: assertClaimCurrent },
+    },
   );
   if (committed?.acpSourceTurn?.runId !== params.runId) {
     throw new Error("ACP source execution ownership was not persisted.");
@@ -111,6 +161,7 @@ async function settleAcpSourceTurn(params: {
   source: TranscriptTurnAdmission;
   runId: string;
   outcome: AgentRunTerminalOutcome;
+  assertCurrent?: () => void;
 }): Promise<void> {
   // Restart cancellation leaves the source for the new process's interruption notice.
   if (params.outcome.reason === "cancelled" && params.outcome.stopReason === "restart") {
@@ -146,7 +197,11 @@ async function settleAcpSourceTurn(params: {
         runtimeMs: Math.max(0, endedAt - (entry.startedAt ?? endedAt)),
       };
     },
-    { skipMaintenance: true, requireWriteSuccess: true },
+    {
+      skipMaintenance: true,
+      requireWriteSuccess: true,
+      workerGuard: { assertCurrent: params.assertCurrent },
+    },
   );
 }
 
@@ -156,14 +211,40 @@ export async function finishAcpSourceTurn(
   outcome: AgentRunTerminalOutcome | undefined,
   admittedRunContext: AdmittedRunContext | undefined,
 ): Promise<void> {
+  let source: TranscriptTurnAdmission | undefined;
   try {
-    const source = recorder?.getAdmissionReceipt();
+    source = recorder?.getAdmissionReceipt();
     if (source && outcome) {
-      await settleAcpSourceTurn({ source, runId, outcome });
+      const assertCurrent = admittedRunContext
+        ? resolveAdmittedRunActiveAssertion(admittedRunContext)
+        : undefined;
+      if (admittedRunContext && !assertCurrent) {
+        throw new Error("ACP source settlement admission is no longer active.");
+      }
+      await settleAcpSourceTurn({ source, runId, outcome, assertCurrent });
     }
+  } catch (error) {
+    // Cleanup cannot reopen consumed input after ACP execution or reply delivery.
+    // An uncommitted source fact remains recoverable; uncertain commits are logged.
+    log.warn("ACP source settlement failed after dispatch", {
+      runId,
+      sourceSessionKey: source?.sessionKey,
+      error: formatErrorMessage(error),
+    });
   } finally {
-    if (admittedRunContext) {
-      closeAdmittedRunDelegatedAuthority(admittedRunContext);
+    try {
+      if (recorder && ownedInputCustody.delete(recorder)) {
+        recorder.finishPendingInput?.("interrupted");
+      }
+    } catch (error) {
+      log.warn("ACP source input custody release failed", {
+        runId,
+        error: formatErrorMessage(error),
+      });
+    } finally {
+      if (admittedRunContext) {
+        closeAdmittedRunDelegatedAuthority(admittedRunContext);
+      }
     }
   }
 }

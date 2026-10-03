@@ -282,12 +282,18 @@ describe("session-store-runtime", () => {
   });
 
   it.each(["upsert", "replaceEntry"] as const)(
-    "preserves private ACP source provenance across same-generation $0 replacements",
+    "preserves running ACP source ownership across stale same-generation $0 replacements",
     async (mutation) => {
       const sessionKey = "agent:main:acp-source";
-      const acpSourceTurn = await seedAcpSourceSession(sessionKey);
+      await seedSessionEntry(sessionKey, {
+        lifecycleRevision: "source-revision",
+        sessionId: "source-session",
+        status: "done",
+        updatedAt: 5,
+      });
       const publicEntry = getSessionEntry({ sessionKey, storePath })!;
       expect(publicEntry).not.toHaveProperty("acpSourceTurn");
+      const acpSourceTurn = await seedAcpSourceSession(sessionKey);
       expect(listSessionEntries({ storePath })[0]?.entry).not.toHaveProperty("acpSourceTurn");
       const replacement = {
         ...publicEntry,
@@ -315,6 +321,7 @@ describe("session-store-runtime", () => {
         activeWriterRunId: acpSourceTurn.runId,
         lifecycleRunId: acpSourceTurn.runId,
         model: "replacement-model",
+        status: "running",
       });
       expect(getSessionEntry({ sessionKey, storePath })).not.toHaveProperty("acpSourceTurn");
     },

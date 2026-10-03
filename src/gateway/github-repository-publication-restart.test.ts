@@ -1,10 +1,8 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { patchSessionEntryCore } from "../config/sessions/session-accessor.js";
-import {
-  OPENCLAW_SQLITE_BUSY_TIMEOUT_MS,
-  openOpenClawStateDatabase,
-} from "../state/openclaw-state-db.js";
+import { closeOpenClawAgentDatabasesAsync } from "../state/openclaw-agent-db.js";
+import { openOpenClawStateDatabase } from "../state/openclaw-state-db.js";
 import {
   callPersonalPublicationRpc,
   createPersonalPublicationFixture,
@@ -16,6 +14,7 @@ import {
   SESSION_KEY,
   githubPublicationTestMocks,
   installGitHubPublicationTestHarness,
+  root,
 } from "./github-publication.test-support.js";
 import { readRepositoryGitHubPublication } from "./github-repository-publication-store.js";
 import {
@@ -160,14 +159,10 @@ describe("repository checkpoint GitHub publication", () => {
             .prepare("SELECT owner FROM state_leases WHERE scope = ? AND lease_key = ?")
             .all("session-workspace-action", SESSION_ID),
         ).toEqual([]);
-        // Setup uses normal lock admission; confirmation still must fail without waiting.
-        writer = new DatabaseSync(database.path, { timeout: OPENCLAW_SQLITE_BUSY_TIMEOUT_MS });
-        try {
-          writer.exec("BEGIN IMMEDIATE");
-        } catch (error) {
-          writer.close();
-          throw error;
-        }
+        // Restarted agent workers release their leases through shared state.
+        await closeOpenClawAgentDatabasesAsync(root);
+        writer = new DatabaseSync(database.path);
+        writer.exec("BEGIN IMMEDIATE");
       }
       const confirmation = {
         sessionKey: SESSION_KEY,

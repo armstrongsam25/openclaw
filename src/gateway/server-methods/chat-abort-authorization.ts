@@ -4,6 +4,10 @@ import {
   uniqueStrings,
 } from "@openclaw/normalization-core/string-normalization";
 import { setGatewayDedupeEntry } from "../agent-turn/agent-job.js";
+import {
+  isChatAbortTerminalPersistenceSettled,
+  isCurrentChatAbortExecution,
+} from "../chat-abort-lifecycle-internal.js";
 import type { ChatAbortControllerEntry } from "../chat-abort.js";
 import { listQueuedChatTurnsForSession } from "../chat-queued-turns.js";
 import { chatRunBelongsToAgent, resolveChatRunOwnerAgentId } from "../chat-run-owner.js";
@@ -542,7 +546,10 @@ export function hasGatewaySessionAbortOwner(params: SessionAbortOwnerParams): bo
       sessionIds: [params.sessionId],
       ...ownerScope,
       includeProtectedRuns: true,
-    }).authorizedRuns.length > 0 ||
+    }).authorizedRuns.some(
+      ({ entry }) =>
+        !isCurrentChatAbortExecution(entry) || !isChatAbortTerminalPersistenceSettled(entry),
+    ) ||
     resolveAuthorizedQueuedTurnsForSession({
       context: params.context,
       sessionId: params.sessionId,

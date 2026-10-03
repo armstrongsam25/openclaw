@@ -1,14 +1,22 @@
 import path from "node:path";
-import { afterAll, expect, test } from "vitest";
+import { afterAll, expect, test, vi } from "vitest";
+import { observeHostDataSql } from "../../test/helpers/sqlite-statement-execution-counter.js";
 import { AcpSessionManager } from "../acp/control-plane/manager.core.js";
 import { disposeAcpSessionManagerInstance } from "../acp/control-plane/manager.lifecycle.js";
 import { writeAcpSessionMetaForMigration } from "../acp/runtime/session-meta.js";
+import {
+  closeAdmittedRunDelegatedAuthority,
+  createOperationalRunInstanceRef,
+  prepareAgentRunAdmission,
+  resolveAdmittedRunActiveAssertion,
+} from "../agents/admitted-run-context.js";
 import { buildAgentRunTerminalOutcomeFromLifecycleEvent } from "../agents/agent-run-terminal-outcome.js";
 import {
   loadSessionEntryReadOnly,
   replaceSessionEntry,
 } from "../config/sessions/session-accessor.js";
 import type { InternalSessionEntry } from "../config/sessions/types.js";
+import * as admission from "../infra/sqlite-worker-operation-admission.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
 import { useSessionStoreTempDirs } from "../test-utils/session-state-cleanup.js";
 import { finishAcpSourceTurn, prepareAcpSourceTurnInput } from "./acp-source-turn.js";
@@ -87,7 +95,7 @@ test("admits a canonical source routed to legacy ACP metadata without inventing 
   });
 });
 
-test("channel ACP admission replaces a dead native writer and starts fresh lifecycle timing", async () => {
+test("channel ACP claim and settlement use the database worker and fresh lifecycle state", async () => {
   const target = createSqliteTranscriptTarget({ dir: sessionDirs.make() });
   const prior: InternalSessionEntry = {
     sessionId: target.sessionId,
@@ -105,15 +113,22 @@ test("channel ACP admission replaces a dead native writer and starts fresh lifec
     target: { ...target, sessionEntry: prior },
     input: { text: "Run this request through ACP" },
   });
+  await recorder.persistApproved();
   const beforeAdmission = Date.now();
   // Channel ACP can be audit-only; no Gateway lifecycle event supplies this state.
-  await prepareAcpSourceTurnInput(
-    recorder,
-    { agentId: "main", sessionKey: "agent:main:acp:target", entry: { sessionId: "acp-target" } },
-    "channel-acp-run",
-    () => {},
-    async () => {},
-  );
+  const claimSql = observeHostDataSql();
+  try {
+    await prepareAcpSourceTurnInput(
+      recorder,
+      { agentId: "main", sessionKey: "agent:main:acp:target", entry: { sessionId: "acp-target" } },
+      "channel-acp-run",
+      () => {},
+      async () => {},
+    );
+  } finally {
+    claimSql.restore();
+  }
+  expect.soft(claimSql.queries).toEqual([]);
   const running = loadSessionEntryReadOnly(target);
   expect(running).toMatchObject({
     status: "running",
@@ -129,18 +144,112 @@ test("channel ACP admission replaces a dead native writer and starts fresh lifec
   if (!running?.startedAt) {
     throw new Error("missing ACP source start");
   }
-  await finishAcpSourceTurn(
-    recorder,
-    "channel-acp-run",
-    buildAgentRunTerminalOutcomeFromLifecycleEvent({
-      phase: "end",
-      data: { status: "completed", startedAt: running.startedAt, endedAt: running.startedAt + 25 },
-      endedAt: running.startedAt + 25,
-    }),
-    undefined,
-  );
+  const settlementSql = observeHostDataSql();
+  try {
+    await finishAcpSourceTurn(
+      recorder,
+      "channel-acp-run",
+      buildAgentRunTerminalOutcomeFromLifecycleEvent({
+        phase: "end",
+        data: {
+          status: "completed",
+          startedAt: running.startedAt,
+          endedAt: running.startedAt + 25,
+        },
+        endedAt: running.startedAt + 25,
+      }),
+      undefined,
+    );
+  } finally {
+    settlementSql.restore();
+  }
+  expect(settlementSql.queries).toEqual([]);
   const completed = loadSessionEntryReadOnly(target);
   expect(completed).toMatchObject({ status: "done", runtimeMs: 25, lastRunId: "channel-acp-run" });
   expect(completed?.acpSourceTurn).toBeUndefined();
   expect(completed?.activeWriterRunId).toBeUndefined();
 });
+
+test.each(["claim", "settlement"] as const)(
+  "retains ACP %s authority until the worker commit barrier",
+  async (phase) => {
+    const target = createSqliteTranscriptTarget({ dir: sessionDirs.make() });
+    const prior = { sessionId: target.sessionId, updatedAt: 1 };
+    await replaceSessionEntry(target, prior);
+    const recorder = createUserTurnTranscriptRecorder({
+      target: { ...target, sessionEntry: prior },
+      input: { text: "Keep this source claim fenced until commit" },
+    });
+    await recorder.persistApproved();
+    const runId = `acp-worker-guard-${phase}`;
+    const context = await prepareAgentRunAdmission({
+      cfg: {},
+      facts: {
+        runId,
+        agentId: "main",
+        ingress: { kind: "system", state: "present", boundary: "test.acp-source-guard" },
+      },
+      operationalRunInstance: createOperationalRunInstanceRef(runId),
+    }).admit("acp");
+    const assertCurrent = resolveAdmittedRunActiveAssertion(context);
+    if (!assertCurrent) {
+      throw new Error("Missing admitted ACP authority");
+    }
+    const prepare = () =>
+      prepareAcpSourceTurnInput(
+        recorder,
+        { agentId: "main", sessionKey: "agent:main:acp:target" },
+        runId,
+        assertCurrent,
+        async () => {},
+      );
+    if (phase === "settlement") {
+      await prepare();
+    }
+    let reachedCommit = false;
+    const createAdmission = admission.createSqliteWorkerOperationAdmission;
+    const revoke = vi
+      .spyOn(admission, "createSqliteWorkerOperationAdmission")
+      .mockImplementation((callback, attachment) =>
+        createAdmission((request, grant) => {
+          if (request.stage === "commit") {
+            reachedCommit = true;
+            closeAdmittedRunDelegatedAuthority(context);
+          }
+          callback(request, grant);
+        }, attachment),
+      );
+    try {
+      if (phase === "claim") {
+        await expect(prepare()).rejects.toThrow("admitted run authority is no longer active");
+      } else {
+        await expect(
+          finishAcpSourceTurn(
+            recorder,
+            runId,
+            buildAgentRunTerminalOutcomeFromLifecycleEvent({
+              phase: "end",
+              data: { status: "completed" },
+            }),
+            context,
+          ),
+        ).resolves.toBeUndefined();
+      }
+      expect(reachedCommit).toBe(true);
+      const entry = loadSessionEntryReadOnly(target);
+      if (phase === "claim") {
+        expect(entry?.acpSourceTurn).toBeUndefined();
+        expect(entry?.activeWriterRunId).toBeUndefined();
+      } else {
+        expect(entry).toMatchObject({
+          status: "running",
+          activeWriterRunId: runId,
+          acpSourceTurn: { sourceSessionId: target.sessionId, runId },
+        });
+      }
+    } finally {
+      revoke.mockRestore();
+      closeAdmittedRunDelegatedAuthority(context);
+    }
+  },
+);

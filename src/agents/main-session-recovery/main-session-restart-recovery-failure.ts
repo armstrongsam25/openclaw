@@ -63,8 +63,11 @@ export async function interruptAcpSourceTurnWithNotice(params: {
     },
     text: INTERRUPTED_ACP_SOURCE_NOTICE,
     idempotencyKey,
-  });
+  }).catch((error: unknown) => ({ ok: false as const, reason: String(error) }));
   if (!result.ok) {
+    mainSessionRecoveryLog.warn(
+      `failed to write ACP interruption notice ${params.sessionKey}: ${result.reason}`,
+    );
     return "code" in result && result.code === "session-rebound" ? "skipped" : "failed";
   }
   const deliveryContext = resolveRestartRecoveryDeliveryContext({
