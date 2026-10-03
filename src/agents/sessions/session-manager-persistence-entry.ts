@@ -9,7 +9,6 @@ import {
 } from "../../config/sessions/transcript-entry-provenance.js";
 import { normalizeTranscriptJsonValue } from "../../config/sessions/transcript-json.js";
 import { copyPreparedModelVisibleToolText } from "../../logging/redact-internal.js";
-import { freezeJsonSnapshot } from "../../shared/immutable-data.js";
 import {
   copyCodeModeSourceAppend,
   getCodeModeSourceAppend,
@@ -129,10 +128,6 @@ export function canonicalizeSessionEntry<T extends SessionEntry>(
       sourceAppend,
       (source) => source,
     );
-  }
-  // Capture caller payloads before queue waits; the manager still owns envelope adoption.
-  for (const value of Object.values(canonicalEntry)) {
-    freezeJsonSnapshot(value);
   }
   // SAFETY: Manager-built envelopes retain T's checked discriminant; the codec validates their JSON storage shape.
   return canonicalEntry as T;
