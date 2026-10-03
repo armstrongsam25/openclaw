@@ -4,7 +4,10 @@ import type { ReplyOperation } from "../../../auto-reply/reply/reply-run-registr
 import { createDiagnosticEmbeddedRunOwner } from "../../../logging/diagnostic-run-activity.js";
 import type { NestedToolActivity } from "../../../sessions/nested-tool-activity.js";
 import { createDeferredCore } from "../../../shared/deferred.js";
-import { buildToolLifecycleErrorResult } from "../../embedded-agent-tool-results.js";
+import {
+  buildToolLifecycleErrorResult,
+  sanitizeToolResult,
+} from "../../embedded-agent-tool-results.js";
 import { createMediaGenerationOperation } from "../../media-generation-activity.js";
 import { resetGeneratedMediaTaskActivityForTests } from "../../media-generation-activity.test-support.js";
 import {
@@ -16,6 +19,7 @@ import {
 import { createResourceLoader } from "../../sessions/agent-session-loop-resource-loader.test-support.js";
 import type { AgentSession } from "../../sessions/agent-session.js";
 import { SessionManager } from "../../sessions/session-manager.js";
+import type { ToolEffectReceipt } from "../../tool-effect-receipt.js";
 import { isToolResultError } from "../../tool-result-error.js";
 import { ACTIVE_EMBEDDED_RUNS } from "../run-state.js";
 import { prepareEmbeddedAttemptStream } from "./attempt-stream-prepare.js";
@@ -195,22 +199,28 @@ export function createCatalogSubscription() {
     unsubscribe: vi.fn(),
     toolMetas: [],
     runToolLifecycle: vi.fn(async ({ args, execute, onTerminal }) => {
+      const effectReceipt: ToolEffectReceipt = { state: "uncertain" };
       try {
         const result = await execute(() => undefined);
-        await onTerminal?.({
+        const terminal = {
           result,
+          readSanitizedResult: () => sanitizeToolResult(result),
           isError: isToolResultError(result),
           executedArguments: structuredClone(args),
-          effectReceipt: { state: "uncertain" },
-        });
+          effectReceipt,
+        };
+        await onTerminal?.(terminal);
         return result;
       } catch (error) {
-        await onTerminal?.({
-          result: buildToolLifecycleErrorResult(error),
+        const result = buildToolLifecycleErrorResult(error);
+        const terminal = {
+          result,
+          readSanitizedResult: () => sanitizeToolResult(result),
           isError: true,
           executedArguments: structuredClone(args),
-          effectReceipt: { state: "uncertain" },
-        });
+          effectReceipt,
+        };
+        await onTerminal?.(terminal);
         throw error;
       }
     }),

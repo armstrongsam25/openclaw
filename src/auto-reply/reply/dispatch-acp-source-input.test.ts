@@ -475,9 +475,9 @@ describe("ACP source input lifecycle", () => {
           await upsertSessionEntryCore(recorderTarget, sourceEntry);
         }
         const input = createDeferredCore<{ text: string }>();
-        const resolving = createDeferredCore<void>();
-        const prepared = createDeferredCore<void>();
-        const resumeWorker = createDeferredCore<void>();
+        const resolving = createDeferredCore();
+        const prepared = createDeferredCore();
+        const resumeWorker = createDeferredCore();
         const recorder = createUserTurnTranscriptRecorder({
           ...(joinPhase
             ? {

@@ -130,7 +130,6 @@ export {
   auditMocks,
   policyMocks,
   routeMocks,
-  channelPluginMocks,
   messageActionMocks,
   ttsMocks,
   ttsCapabilityMocks,
@@ -263,9 +262,8 @@ vi.mock("./dispatch-acp-transcript.runtime.js", () => ({
 }));
 
 export const sessionKey = "agent:codex-acp:session-1";
-export const originalFetch = globalThis.fetch;
-export type MockTtsReply = Awaited<ReturnType<typeof ttsMocks.maybeApplyTtsToPayload>>;
-export type MockCallSource = { mock: { calls: Array<Array<unknown>> } };
+const originalFetch = globalThis.fetch;
+type MockCallSource = { mock: { calls: Array<Array<unknown>> } };
 
 export const requireRecord = createRequireRecord("object", "expected-label");
 

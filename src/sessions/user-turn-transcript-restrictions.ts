@@ -37,7 +37,7 @@ export function createUserTurnPersistenceRestrictions(
 
   return {
     restrict,
-    restrictSourceDatabase(identity: DatabaseFileIdentity) {
+    restrictSourceDatabase: (identity: DatabaseFileIdentity) => {
       if (
         sourceDatabase &&
         (sourceDatabase.key !== identity.key || sourceDatabase.birthtime !== identity.birthtime)
