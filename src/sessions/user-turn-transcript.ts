@@ -1,7 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import type { Result } from "@openclaw/normalization-core/result";
-import type { AgentRunTerminalOutcome } from "../agents/agent-run-terminal-outcome.types.js";
 import {
   bindSessionPendingInputSources,
   stageSessionPendingInput,
@@ -18,6 +16,7 @@ import {
   registerUserTurnTranscriptAdmissionOwner,
   resolveUserTurnTranscriptAdmission,
 } from "./user-turn-transcript-admission.js";
+import { createUserTurnProcessingCompletion } from "./user-turn-transcript-processing.js";
 import { createUserTurnPersistenceRestrictions } from "./user-turn-transcript-restrictions.js";
 import {
   buildLateResolvedMediaMessage,
@@ -136,7 +135,10 @@ export function createUserTurnTranscriptRecorder(
   let replacementText: string | undefined;
   let confirmedSteerTargetRunId: string | undefined;
   let pendingInput: Awaited<ReturnType<typeof stageSessionPendingInput>>;
-  let processingCompletion: Result<AgentRunTerminalOutcome, unknown> | undefined;
+  const processing = createUserTurnProcessingCompletion(
+    () => pendingInput,
+    params.pendingInputSources,
+  );
   let staging: Promise<boolean> | undefined;
   const persistenceRestrictions = createUserTurnPersistenceRestrictions(
     params.expectedLifecycleRevision,
@@ -500,27 +502,7 @@ export function createUserTurnTranscriptRecorder(
       return staging;
     },
     getPendingInputMessage: () => pendingInput?.message,
-    getProcessingCompletion: () =>
-      processingCompletion?.ok ? processingCompletion.value : pendingInput?.completion,
-    completeProcessing: (outcome) => {
-      if (!pendingInput?.complete) {
-        return undefined;
-      }
-      // Abort records its terminal outcome before releasing the controller.
-      // Final publication reuses that committed result (or the original write
-      // failure), without trying another write under revoked ownership.
-      if (!processingCompletion) {
-        try {
-          processingCompletion = { ok: true, value: pendingInput.complete(outcome) };
-        } catch (error) {
-          processingCompletion = { ok: false, error };
-        }
-      }
-      if (!processingCompletion.ok) {
-        throw processingCompletion.error;
-      }
-      return processingCompletion.value;
-    },
+    ...processing,
     isPendingInputConsumed: () => pendingInput?.state === "consumed",
     withPendingInput: (run) => (pendingInput ? pendingInput.run(run) : run()),
     finishPendingInput: (disposition) => {
