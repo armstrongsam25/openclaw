@@ -53,7 +53,10 @@ export type SessionPlacementAdmissionProvider = {
     currentTarget: SessionTranscriptRuntimeTarget;
     successorSessionId: string;
   }) => void;
-  recoverTerminalTurn?: (session: { sessionId: string; sessionKey?: string }) => string | undefined;
+  recoverTerminalTurn?: (
+    session: { sessionId: string; sessionKey?: string },
+    assertCurrent?: () => void,
+  ) => Promise<string | undefined>;
   executeLocalTurn: <T>(
     claim: LocalTurnPlacementClaim,
     runLocal: () => Promise<T>,
@@ -313,9 +316,15 @@ export async function resolveSessionPlacementSandbox(
 }
 
 /** The current placement owner alone can settle a proven terminal worker turn. */
-export function recoverTerminalSessionPlacementTurn(session: {
-  sessionId: string;
-  sessionKey?: string;
-}): string | undefined {
-  return state.provider?.recoverTerminalTurn?.(session);
+export async function recoverTerminalSessionPlacementTurn(
+  session: { sessionId: string; sessionKey?: string },
+  assertCurrent?: () => void,
+): Promise<string | undefined> {
+  const provider = state.provider;
+  return await provider?.recoverTerminalTurn?.(session, () => {
+    assertCurrent?.();
+    if (state.provider !== provider) {
+      throw new Error("session placement owner changed during terminal recovery");
+    }
+  });
 }

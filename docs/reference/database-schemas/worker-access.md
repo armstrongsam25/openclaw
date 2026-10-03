@@ -327,8 +327,20 @@ observers, then identity and message-completion callbacks settle within the same
 physical writer FIFO. Lost replies reconcile through the existing entry-patch
 transfer and native COMMIT receipt; uncertain outcomes never replay. Opaque
 released SDK callbacks and dependent callback batches retain their synchronous
-transaction visibility, and process-held incognito retains its existing owner. Reset remains a separate
-cutover. This changes no schema, durability, retention, or update behavior.
+transaction visibility, and process-held incognito retains its existing owner.
+
+Single-entry durable resets use the same executor and receipt owner. The host
+builds the replacement once outside the SQL transaction; the worker rereads the
+selected rows, appends the reset boundary, clears generation-bound collaboration,
+and writes the entry in one synchronous transaction. Current caller grants run
+at transaction and commit admission. Committed progress and identity notifications
+precede the reset callback, and accepted callbacks settle inside the physical
+writer FIFO. Lost replies use the acknowledged candidate without repeating the
+builder or SQL; uncertain outcomes remain fenced. Bundled reply initialization
+uses a typed upsert descriptor while its projection and opaque transaction
+callbacks retain their existing owner. Native-binding settlement and incognito
+activation remain separate cutovers. These changes require no schema, durability,
+retention, configuration, or update migration.
 
 Channel setup awaits a fresh policy read after the agent-selection prompt.
 Deferred plugin migration rows are read by the shared-state worker, and setup
@@ -614,9 +626,15 @@ library writes publish that revision before observers and preserve it on rollbac
 Copied durable session pins retain their existing revision access. The released
 synchronous skill-command and harness tool-surface SDKs retain their native
 metadata reader; Gateway status, embedded skill preparation, and sandbox
-synchronization use prepared reads. Import, upload, mutation, and
-authoring mutation guards remain for the next cutover. Schemas, quotas, retention,
-publication security checks, and update behavior are unchanged.
+synchronization use prepared reads. Import, upload, and mutations use typed
+shared-state writer commands. Files publish before their SQL references; failed
+SQL retains immutable unreferenced revision files, as before. Transactions reread
+revision CAS, quota, expiry, and profile ownership, with live host grants at
+transaction and commit. Native receipts publish the existing selection authority
+revision within the writer FIFO, including after lost replies; unknown outcomes
+never replay. Database close joins accepted mutations. Workspace authoring guards
+retain their existing owner. Schemas, quotas, retention, publication security checks,
+and update behavior are unchanged.
 
 ## Carry facts, publish after commit
 
@@ -737,6 +755,17 @@ known committed receipts, while unknown outcomes block further effects without
 authorizing inverse file changes or replay. Provider shutdown joins handoff before
 revoking the original environment. Schemas, retention, durability, and update
 behavior are unchanged.
+
+Placement transitions, drain/reconcile, and terminal-result failures also use
+that placement writer. The worker rereads the exact state, generation, environment,
+epoch, and claim before mutation; reclaim's claim-free drain remains a
+transaction-local predicate. Activation and environment demand still commit
+atomically, and their acknowledged facts publish through the existing owners
+before observers. Lifecycle barriers and terminal recovery join accepted writes.
+Unknown outcomes retain recovery custody without replaying a mutation or
+authorizing inverse filesystem effects. Native prepared-environment binding and
+placement moves remain separate work. Schemas, stored bytes, retention, durability,
+released SDK contracts, and update behavior are unchanged.
 
 Workspace reconciliation journal reads use the shared-state reader, and journal
 creation, cleanup, orphan pruning, and manifest acceptance use the existing
