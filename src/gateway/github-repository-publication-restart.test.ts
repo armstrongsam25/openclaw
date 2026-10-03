@@ -1,7 +1,10 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { patchSessionEntryCore } from "../config/sessions/session-accessor.js";
-import { openOpenClawStateDatabase } from "../state/openclaw-state-db.js";
+import {
+  OPENCLAW_SQLITE_BUSY_TIMEOUT_MS,
+  openOpenClawStateDatabase,
+} from "../state/openclaw-state-db.js";
 import {
   callPersonalPublicationRpc,
   createPersonalPublicationFixture,
@@ -157,8 +160,14 @@ describe("repository checkpoint GitHub publication", () => {
             .prepare("SELECT owner FROM state_leases WHERE scope = ? AND lease_key = ?")
             .all("session-workspace-action", SESSION_ID),
         ).toEqual([]);
-        writer = new DatabaseSync(database.path);
-        writer.exec("BEGIN IMMEDIATE");
+        // Setup uses normal lock admission; confirmation still must fail without waiting.
+        writer = new DatabaseSync(database.path, { timeout: OPENCLAW_SQLITE_BUSY_TIMEOUT_MS });
+        try {
+          writer.exec("BEGIN IMMEDIATE");
+        } catch (error) {
+          writer.close();
+          throw error;
+        }
       }
       const confirmation = {
         sessionKey: SESSION_KEY,

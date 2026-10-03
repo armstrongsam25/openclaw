@@ -501,27 +501,27 @@ describe("plugin cron registry ownership e2e", () => {
           slots: { memory: "none" },
         },
         agents: {
+          ownership: "explicit",
           defaults: {
             workspace: mainWorkspace,
             model: { primary: modelRef },
             models: { [modelRef]: { agentRuntime: { id: "openclaw" } } },
+            modelPolicy: { allow: [modelRef] },
+            systemAgent: { agentId: "main" },
             skills: [],
           },
-          list: [
-            {
-              id: "main",
-              default: true,
+          entries: {
+            main: {
               workspace: mainWorkspace,
               model: { primary: modelRef },
               skills: [],
             },
-            {
-              id: "worker",
+            worker: {
               workspace: workerWorkspace,
               model: { primary: modelRef },
               skills: [],
             },
-          ],
+          },
         },
         tools: { profile: "minimal" },
         models: {
