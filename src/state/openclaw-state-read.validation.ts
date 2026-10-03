@@ -71,6 +71,9 @@ export function isReadRequest(input: unknown): input is OpenClawStateReadRequest
         input.command.type === "restartSentinel.installReceipt") &&
         "input" in input.command &&
         input.command.input === undefined) ||
+      (input.command.type === "claws.packageOwnership" &&
+        typeof input.command.includeInstalls === "boolean" &&
+        (input.command.agentId === undefined || typeof input.command.agentId === "string")) ||
       (input.command.type === "acpSessions.metadata" &&
         Array.isArray(input.command.entries) &&
         input.command.entries.length <= 64 &&

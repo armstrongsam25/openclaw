@@ -51,7 +51,7 @@ const mocks = vi.hoisted(() => ({
   audit: vi.fn<typeof import("../daemon/service-audit.js").auditGatewayServiceConfig>(),
   confirm: vi.fn(),
   note: vi.fn(),
-  health: vi.fn(async () => ({ healthy: true })),
+  health: vi.fn(async () => ({ outcome: "ready", healthy: true })),
   suspend: vi.fn<typeof import("../daemon/schtasks.js").suspendScheduledTaskAutoStartForUpdate>(),
   resume: vi.fn<typeof import("../daemon/schtasks.js").resumeScheduledTaskAutoStartAfterUpdate>(),
 }));

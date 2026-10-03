@@ -33,6 +33,7 @@ import {
 import { stageSqliteTransactionState } from "../../infra/sqlite-post-commit.js";
 import { isIncognitoSessionKey } from "../../routing/session-key.js";
 import { runInDetachedAsyncContext } from "../../shared/async-work-scope.js";
+import { freezeJsonSnapshot } from "../../shared/immutable-data.js";
 import { readOpenClawAgentDatabaseIdentity } from "../../state/openclaw-agent-db-identity.js";
 import type { AgentMessage } from "../runtime/index.js";
 import { copyCodeModeSourceAppendOptions } from "../transcript-code-mode-source.js";
@@ -56,7 +57,7 @@ import {
   isSqliteTranscriptMutationConflict,
   SessionEntryCommittedError,
 } from "./session-manager-persistence-error.js";
-import type { SessionEntry, SessionLeafControl } from "./session-manager-types.js";
+import type { SessionEntry, SessionHeader, SessionLeafControl } from "./session-manager-types.js";
 import {
   withSessionManagerWrite,
   type SessionManagerWriteAdmission,
@@ -127,9 +128,10 @@ export class SessionManagerPersistence extends SessionManagerCore {
     entry: SessionEntry | SessionLeafControl,
     appendIntent: "active-branch" | undefined,
     writeAdmission: SessionManagerWriteAdmission,
-    message?: NonNullable<
-      SessionMetadataWorkerOperations["session.metadata.append"]["input"]["message"]
-    >,
+    message?: Omit<
+      NonNullable<SessionMetadataWorkerOperations["session.metadata.append"]["input"]["message"]>,
+      "messageJson"
+    > & { prepared: PreparedTranscriptMessageAppend<AgentMessage> },
     beforeFreshMessageCommit?: () => void,
     expectedMutationAt?: number | null,
     retryMutationConflicts = true,
@@ -204,6 +206,25 @@ export class SessionManagerPersistence extends SessionManagerCore {
         committedVersion: committed.after,
       };
     }
+    let wireEvent: SessionMetadataWorkerOperations["session.metadata.append"]["input"]["event"];
+    if (entry.type === "message") {
+      const { message: _message, ...envelope } = entry;
+      wireEvent = envelope;
+    } else {
+      wireEvent = JSON.stringify(entry);
+    }
+    // Fresh receipts reuse this exact prepared object across the worker handoff.
+    if (message) {
+      freezeJsonSnapshot(message.prepared.persistedMessage);
+    }
+    const wireMessage = message
+      ? {
+          messageJson: message.prepared.messageJson,
+          cwd: message.cwd,
+          validateTurn: message.validateTurn,
+          idempotencyLookup: message.idempotencyLookup,
+        }
+      : undefined;
     const { withSessionMetadataWorker } = await runInDetachedAsyncContext(
       () => import("./session-manager-metadata-runtime.js"),
     );
@@ -249,7 +270,8 @@ export class SessionManagerPersistence extends SessionManagerCore {
           assertCurrent();
         }
         const appendEvent = async (
-          event: Parameters<typeof worker.execute<"session.metadata.append">>[0]["input"]["event"],
+          event: SessionHeader | SessionEntry | SessionLeafControl,
+          bytes: SessionMetadataWorkerOperations["session.metadata.append"]["input"]["event"],
           mutationAt: number | null | undefined,
           intent?: "active-branch",
         ) => {
@@ -257,8 +279,8 @@ export class SessionManagerPersistence extends SessionManagerCore {
             type: "session.metadata.append",
             input: {
               scope: captured,
-              event,
-              ...(event.type === "message" ? { message } : {}),
+              event: bytes,
+              ...(event.type === "message" ? { message: wireMessage } : {}),
               options: {
                 ...(intent ? { appendIntent: intent } : {}),
                 ...(mutationAt !== undefined ? { expectedMutationAt: mutationAt } : {}),
@@ -290,7 +312,8 @@ export class SessionManagerPersistence extends SessionManagerCore {
             if (!header || header.type !== "session") {
               throw new Error("Session transcript header was not persisted");
             }
-            const headerSnapshot = (await appendEvent(header, mutationAt)).snapshot;
+            const headerSnapshot = (await appendEvent(header, JSON.stringify(header), mutationAt))
+              .snapshot;
             if (!headerSnapshot.ok || !headerSnapshot.value.result?.appended) {
               throw new Error("Session transcript header was not persisted", {
                 cause: headerSnapshot.ok ? undefined : headerSnapshot.error,
@@ -306,7 +329,7 @@ export class SessionManagerPersistence extends SessionManagerCore {
             mutationAt = this.transcriptMutationAt;
           }
           loadedVersion = this.transcriptVersion;
-          const outcome = await appendEvent(entry, mutationAt, appendIntent);
+          const outcome = await appendEvent(entry, wireEvent, mutationAt, appendIntent);
           const snapshot = outcome.snapshot;
           if (
             !snapshot.ok ||
@@ -344,20 +367,26 @@ export class SessionManagerPersistence extends SessionManagerCore {
         const { committed, reload } = outcome;
         const receipt = committed.result;
         if (entry.type === "message") {
-          if (!("messageId" in receipt)) {
+          if (!("messageId" in receipt) || !message) {
             throw new Error(`Session transcript parent entry was not persisted: ${entry.id}`);
           }
+          // Fresh worker replies omit their retained payload; provenance and adoption
+          // must consume the same canonical receipt.
+          const messageReceipt = {
+            ...receipt,
+            message: receipt.message ?? message.prepared.persistedMessage,
+          };
           // A successful message snapshot validated the canonical row in its original transaction.
           // Its reply retains the nullable revision; this native owner retains the original file.
           rememberTranscriptMessageProvenance(
-            [receipt],
+            [messageReceipt],
             captureTranscriptEntryProvenance(database, {
               sessionId,
               lifecycleRevision: committed.lifecycleRevision,
             }),
             captured,
           );
-          adoptCommittedMessagePayload(entry, receipt, message?.idempotencyLookup);
+          adoptCommittedMessagePayload(entry, messageReceipt, message.idempotencyLookup);
         }
         const effectiveParentId =
           "effectiveParentId" in receipt && receipt.effectiveParentId !== undefined
@@ -396,7 +425,8 @@ export class SessionManagerPersistence extends SessionManagerCore {
     entry: SessionEntry,
     options?: PersistRecordOptions,
   ): Promise<PersistRecordResult> {
-    const canonical = canonicalizeSessionEntry(entry, options);
+    // Raw callers retain their envelope; only nested immutable payloads are shared.
+    const canonical = { ...canonicalizeSessionEntry(entry, options) };
     return await withSessionManagerWrite(this, async (admission) => {
       const compactionPersistence = getSessionCompactionPersistenceAsync(this);
       if (!admission && compactionPersistence) {
@@ -667,36 +697,22 @@ export class SessionManagerPersistence extends SessionManagerCore {
     if (result.appended) {
       this.transcriptMutationAt = outcome.value.after.updatedAt;
     }
-    // Carry the canonical storage bytes even when adopting a context-excluded row.
-    entry.message = result.message;
+    const effectiveParentId = adoptCommittedMessagePayload(
+      entry,
+      result,
+      options?.idempotencyLookup,
+    );
     if (result.messageId !== entry.id) {
-      const idempotencyKey =
-        entry.message.role === "user" &&
-        "idempotencyKey" in entry.message &&
-        typeof entry.message.idempotencyKey === "string" &&
-        entry.message.idempotencyKey.length > 0
-          ? entry.message.idempotencyKey
-          : undefined;
-      if (idempotencyKey && options?.idempotencyLookup !== "caller-checked") {
-        // Ingress can commit the keyed user after this manager loaded. The
-        // caller reloads and adopts only when that canonical row is still active.
-        if (!result.anchor) {
-          throw new Error(`Session transcript anchor was not returned: ${result.messageId}`);
-        }
-        return {
-          adoptedMessageId: result.messageId,
-          anchor: result.anchor,
-          appended: result.appended,
-          effectiveParentId: result.effectiveParentId ?? null,
-        };
+      // A concurrent keyed user is adopted only after reloading its current path.
+      if (!result.anchor) {
+        throw new Error(`Session transcript anchor was not returned: ${result.messageId}`);
       }
-      throw new Error(`Session transcript parent entry was not persisted: ${entry.id}`);
-    }
-    if (options?.idempotencyLookup === "caller-checked" && !result.appended) {
-      throw new Error(`Session transcript append was not persisted: ${entry.id}`);
-    }
-    if (result.effectiveParentId === undefined) {
-      throw new Error(`Session transcript append parent was not returned: ${entry.id}`);
+      return {
+        adoptedMessageId: result.messageId,
+        anchor: result.anchor,
+        appended: result.appended,
+        effectiveParentId,
+      };
     }
     const reloadAfterAppend =
       result.appended && transcriptAppendNeedsReload(outcome.value.before, loadedVersion);
@@ -704,7 +720,7 @@ export class SessionManagerPersistence extends SessionManagerCore {
       ...(result.anchor ? { anchor: result.anchor } : {}),
       lifecycleRevision: outcome.value.lifecycleRevision,
       appended: result.appended,
-      effectiveParentId: result.effectiveParentId,
+      effectiveParentId,
       ...(reloadAfterAppend ? { reloadAfterAppend: true } : {}),
     };
   }

@@ -42,6 +42,7 @@ import {
   captureTranscriptEntryProvenance,
   rememberTranscriptMessageProvenance,
 } from "./transcript-entry-provenance.js";
+import { normalizeTranscriptJsonValue } from "./transcript-json.js";
 import { readMessageIdempotencyKey } from "./transcript-message-identity.js";
 import { prepareTranscriptPayloadForReuse } from "./transcript-payload.js";
 
@@ -100,7 +101,7 @@ function serializePreparedMessageEvent(envelope: TranscriptMessageEnvelope, mess
   return `${JSON.stringify(envelope).slice(0, -1)},"message":${messageJson}}`;
 }
 
-/** SessionManager owns a detached JSON message and retains this preparation across retries. */
+/** The append owner retains its canonical message and storage bytes across retries. */
 export function prepareTranscriptMessageAppend<TMessage extends object>(
   options: Pick<TranscriptMessageAppendOptions<TMessage>, "message" | "config">,
   candidate?: {
@@ -136,9 +137,11 @@ export function prepareTranscriptMessageAppendForWorker<TMessage extends object>
   options: Pick<TranscriptMessageAppendOptions<TMessage>, "message" | "config">,
 ): PreparedTranscriptMessageAppend<TMessage> {
   const message = redactTranscriptMessageForStorage(options.message, options);
-  const messageJson = JSON.stringify(canonicalizePersistedUserMessageMedia(message).message);
-  // SAFETY: Decode the detached canonical message from its own JSON storage bytes.
-  return { messageJson, persistedMessage: JSON.parse(messageJson) as TMessage };
+  const persistedMessage = normalizeTranscriptJsonValue(
+    canonicalizePersistedUserMessageMedia(message).message,
+    "",
+  ) as TMessage; // SAFETY: JSON normalization preserves the admitted message's storage shape.
+  return { messageJson: JSON.stringify(persistedMessage), persistedMessage };
 }
 
 export function appendTranscriptMessageInTransaction<TMessage>(
