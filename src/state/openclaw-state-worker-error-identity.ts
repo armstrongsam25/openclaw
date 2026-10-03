@@ -25,8 +25,8 @@ import {
   SecretStoreValidationError,
   isSecretStoreValidationCode,
 } from "../secrets/store/secret-store-validation-error.js";
-import { SkillLibraryError, type SkillLibraryErrorCode } from "../skills/library/errors.js";
 import { SkillUploadRequestError } from "../skills/lifecycle/upload-store-error.js";
+import { SkillLibraryError, type SkillLibraryErrorCode } from "../skills/skill-library-error.js";
 import { OpenClawAgentDatabaseMediaMigrationRequiredError } from "./openclaw-agent-db-migration-required.js";
 import { OpenClawStateDatabaseSchemaMigrationRequiredError } from "./openclaw-state-db-schema-migration-required.js";
 import {

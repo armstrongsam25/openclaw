@@ -5,7 +5,7 @@ import { resolveGlobalMap } from "../../shared/global-singleton.js";
 import type { OpenClawStateDatabaseReadAdmission } from "../../state/openclaw-state-db-async-lifecycle.js";
 import { registerOpenClawStateDatabaseLifecycleListener } from "../../state/openclaw-state-db-cache.js";
 import { captureOpenClawStateReadContext } from "../../state/openclaw-state-worker-context.js";
-import { SkillLibraryError } from "./errors.js";
+import { SkillLibraryError } from "../skill-library-error.js";
 
 type Store = { path: string; revision: object; pending: number };
 const stores = resolveGlobalMap<string, Store>(

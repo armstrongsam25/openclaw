@@ -25,8 +25,8 @@ import {
   selectResolvedUserProfileMetadataById,
   userProfilesDb,
 } from "../../state/user-profiles-internal.js";
+import { SkillLibraryError } from "../skill-library-error.js";
 import { managedSkillCommandName } from "./command-name.js";
-import { SkillLibraryError } from "./errors.js";
 import { stageSkillLibraryAuthorityChange } from "./store-authority.js";
 
 export type SkillLibraryAuthority = {

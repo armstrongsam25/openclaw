@@ -16,6 +16,7 @@ import {
   runOpenClawStateWriteTransaction,
   type OpenClawStateDatabaseOptions,
 } from "../../state/openclaw-state-db.js";
+import { SkillLibraryError } from "../skill-library-error.js";
 import {
   assertProposalContainsNoLiteralSecrets,
   scanProposalBundle,
@@ -27,7 +28,6 @@ import {
   skillLibraryRevisionDir,
   stageSkillLibraryBundle,
 } from "./bundle.js";
-import { SkillLibraryError } from "./errors.js";
 import { captureSkillLibraryAccess } from "./store-access.js";
 import {
   assertSkillLibraryNameAvailable,
