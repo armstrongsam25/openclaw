@@ -6,7 +6,7 @@ import type { NestedToolActivity } from "../../../sessions/nested-tool-activity.
 import { createDeferredCore } from "../../../shared/deferred.js";
 import {
   buildToolLifecycleErrorResult,
-  sanitizeToolResult,
+  prepareToolResult,
 } from "../../embedded-agent-tool-results.js";
 import { createMediaGenerationOperation } from "../../media-generation-activity.js";
 import { resetGeneratedMediaTaskActivityForTests } from "../../media-generation-activity.test-support.js";
@@ -19,7 +19,6 @@ import {
 import { createResourceLoader } from "../../sessions/agent-session-loop-resource-loader.test-support.js";
 import type { AgentSession } from "../../sessions/agent-session.js";
 import { SessionManager } from "../../sessions/session-manager.js";
-import type { ToolEffectReceipt } from "../../tool-effect-receipt.js";
 import { isToolResultError } from "../../tool-result-error.js";
 import { ACTIVE_EMBEDDED_RUNS } from "../run-state.js";
 import { prepareEmbeddedAttemptStream } from "./attempt-stream-prepare.js";
@@ -199,28 +198,25 @@ export function createCatalogSubscription() {
     unsubscribe: vi.fn(),
     toolMetas: [],
     runToolLifecycle: vi.fn(async ({ args, execute, onTerminal }) => {
-      const effectReceipt: ToolEffectReceipt = { state: "uncertain" };
       try {
         const result = await execute(() => undefined);
-        const terminal = {
+        await onTerminal?.({
           result,
-          readSanitizedResult: () => sanitizeToolResult(result),
+          readSanitizedResult: prepareToolResult(result),
           isError: isToolResultError(result),
           executedArguments: structuredClone(args),
-          effectReceipt,
-        };
-        await onTerminal?.(terminal);
+          effectReceipt: { state: "uncertain" },
+        });
         return result;
       } catch (error) {
         const result = buildToolLifecycleErrorResult(error);
-        const terminal = {
+        await onTerminal?.({
           result,
-          readSanitizedResult: () => sanitizeToolResult(result),
+          readSanitizedResult: prepareToolResult(result),
           isError: true,
           executedArguments: structuredClone(args),
-          effectReceipt,
-        };
-        await onTerminal?.(terminal);
+          effectReceipt: { state: "uncertain" },
+        });
         throw error;
       }
     }),
