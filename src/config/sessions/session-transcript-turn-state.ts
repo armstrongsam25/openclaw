@@ -111,6 +111,14 @@ export function buildExpectedTranscriptTurnSessionPatch(params: {
     (params.expectedSessionState !== undefined &&
       params.appendedMessages.some((message) => !message.appended));
   const touchUpdatedAt = params.touchSessionEntry === true && appendedCount > 0 ? Date.now() : 0;
+  const interruptedAcpRunId = params.currentEntry.acpSourceTurn?.runId;
+  const clearsInterruptedAcpWriter =
+    acceptedMessage &&
+    interruptedAcpRunId !== undefined &&
+    params.currentEntry.activeWriterRunId === interruptedAcpRunId &&
+    params.sessionLifecyclePatch?.status === "interrupted" &&
+    Object.hasOwn(params.sessionLifecyclePatch, "acpSourceTurn") &&
+    params.sessionLifecyclePatch.acpSourceTurn === undefined;
   const restartRecoveryTerminalRunIds = params.sessionLifecyclePatch?.restartRecoveryTerminalRunIds
     ? mergeRestartRecoveryTerminalRunIds(
         params.currentEntry.restartRecoveryTerminalRunIds,
@@ -119,6 +127,8 @@ export function buildExpectedTranscriptTurnSessionPatch(params: {
     : undefined;
   return {
     ...(acceptedMessage ? params.sessionLifecyclePatch : undefined),
+    // Retire only the ACP writer whose interruption is committed by this same transcript turn.
+    ...(clearsInterruptedAcpWriter ? { activeWriterRunId: undefined } : {}),
     ...(acceptedMessage && restartRecoveryTerminalRunIds ? { restartRecoveryTerminalRunIds } : {}),
     ...(touchUpdatedAt > 0
       ? {

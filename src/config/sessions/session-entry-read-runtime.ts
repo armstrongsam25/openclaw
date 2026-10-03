@@ -40,6 +40,7 @@ import {
   captureCanonicalSessionReaderContinuation,
   type CanonicalSessionReaderContinuation,
 } from "./session-canonical-key.js";
+import type { CapturedSessionEntryReadSource } from "./session-entry-read-source.types.js";
 import { resolveUnsuffixedSqliteTargetFromSessionStorePath } from "./session-sqlite-target-paths.js";
 import {
   assertSessionStoreReadCandidate,
@@ -96,6 +97,7 @@ export type SessionEntryReadWorkerOwner = {
   assertCurrent: () => void;
   scope?: SessionEntryReadOnlyWorkerScope;
   selectedStore?: Readonly<Pick<SessionStoreReadCandidate, "path" | "physicalPath">>;
+  source?: CapturedSessionEntryReadSource;
   onRegistryChange?: (change: AgentDatabaseRegistryChange) => void;
   refreshBeforeDispatch?: (assertRetainedTarget: () => void) => Promise<void>;
   revalidateTarget?: () => Promise<void>;
@@ -148,7 +150,12 @@ export async function withSessionEntryReadOnlyInWorker<T>(
       };
       const read = await reader.readEntryResult({ scope: readScope, continuation });
       owner.assertCurrent();
-      const value = await consumeRead(read, { ...owner, kind: "file", scope: readScope });
+      const value = await consumeRead(read, {
+        ...owner,
+        kind: "file",
+        scope: readScope,
+        source: reader.entryReadSource,
+      });
       owner.assertCurrent();
       return value;
     },

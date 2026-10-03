@@ -2,10 +2,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, matchesGlob } from "node:path";
 import { expectDefined } from "@openclaw/normalization-core";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import {
-  createChangedExtensionFallbackShards,
-  createChangedNodeTestShards,
-} from "../../scripts/lib/ci-changed-node-test-plan.mts";
+import { createChangedNodeTestShards } from "../../scripts/lib/ci-changed-node-test-plan.mts";
 import { rebalanceMeasuredSerialJobs } from "../../scripts/lib/ci-measured-compact-packing.mts";
 import * as nodeTestInventory from "../../scripts/lib/ci-node-test-inventory.mts";
 import {
@@ -3728,8 +3725,11 @@ describe("scripts/lib/ci-node-test-plan.mts", () => {
     expect(listMatchedTestFiles(worker)).toEqual(
       expect.arrayContaining([
         "src/gateway/github-publication-transcript.test.ts",
+        "src/gateway/server-worker-placement-session-evidence.test.ts",
+        "src/gateway/server-worker-placement-session-evidence.worker.test.ts",
         "src/gateway/session-lifecycle-run-failure.test.ts",
         "src/gateway/session-lifecycle-state.persistence.test.ts",
+        "src/gateway/talk/client-spoken-confirmation.test.ts",
         "src/gateway/worker-workspace-recovery-transcript.test.ts",
         "src/gateway/session-utils.queued-collector-admission.test.ts",
         "src/gateway/session-utils.queued-collector.test.ts",
@@ -3763,6 +3763,7 @@ describe("scripts/lib/ci-node-test-plan.mts", () => {
     const admitted = new Set(listMatchedTestFiles(infra));
     for (const file of [
       "src/agents/embedded-agent-runner/run/attempt-bootstrap-prepare.test.ts",
+      "src/agents/sandbox.context.github-identity.test.ts",
       "src/auto-reply/reply/session-reset-prompt.test.ts",
       "src/agents/prepared-model-runtime.hot-reload-dispatch.test.ts",
       "src/agents/subagents/registry/subagent-registry.session-failure.test.ts",
@@ -4012,20 +4013,19 @@ describe("scripts/lib/ci-node-test-plan.mts", () => {
     },
   );
 
-  it("keeps changed native browser tests in UI jobs and out of extension fallback", () => {
+  it("keeps changed native browser tests in UI jobs", () => {
     const target = "extensions/workboard/browser/catalog.test.ts";
     const shards = createChangedNodeTestShards([target]);
     expect(shards).not.toBeNull();
     expect(shards?.flatMap((shard) => shard.targets ?? shard.includePatterns ?? [])).toContain(
       target,
     );
-    expect(createChangedExtensionFallbackShards([target])).toEqual([]);
   });
 
   it.each(["extensions/telegram/src/bot.create-telegram-bot.native-pipeline.test.ts"])(
-    "prepares the provider runtime in extension fallback for %s",
+    "prepares the provider runtime for selected extension target %s",
     (target) => {
-      const owners = createChangedExtensionFallbackShards([target]).filter((shard) =>
+      const owners = (createChangedNodeTestShards([target]) ?? []).filter((shard) =>
         (shard.groups ?? [shard]).some((group) => group.includePatterns?.includes(target)),
       );
 
@@ -4052,10 +4052,7 @@ describe("scripts/lib/ci-node-test-plan.mts", () => {
       changedPaths,
       includeReleaseOnlyPluginShards: false,
     };
-    const shards = [
-      ...createNodeTestShards(options),
-      ...createChangedExtensionFallbackShards(changedPaths),
-    ];
+    const shards = createNodeTestShards(options);
     expect(shards.filter((shard) => shard.shardName === "agentic-plugins")).toEqual([
       {
         checkName: "checks-node-agentic-plugins",

@@ -5,12 +5,15 @@ import {
   type SessionTranscriptTurnPersistOptions,
 } from "../config/sessions/session-accessor.js";
 import { waitForSessionTranscriptProjection } from "../config/sessions/session-transcript-reconcile.js";
+import {
+  copyTranscriptEntryProvenance,
+  copyTranscriptMessageProvenanceToAnchor,
+} from "../config/sessions/transcript-entry-provenance.js";
 import { isUserMessage, resolvePersistedUserTurnMessage } from "./user-turn-transcript.message.js";
 import { preparePersistedUserTurnMessageForTranscriptWrite } from "./user-turn-transcript.metadata.js";
 import type {
   PersistUserTurnTranscriptParams,
   PersistedUserTurnMessage,
-  UserTurnTranscriptAdmissionReceipt,
   UserTurnTranscriptPersistResult,
 } from "./user-turn-transcript.types.js";
 
@@ -44,6 +47,7 @@ export async function persistUserTurnTranscript(
       ...(params.expectedLifecycleRevision !== undefined
         ? { expectedLifecycleRevision: params.expectedLifecycleRevision }
         : {}),
+      ...(params.assertCurrent ? { assertCurrent: params.assertCurrent } : {}),
       ...(params.initialSessionEntry ? { initialSessionEntry: params.initialSessionEntry } : {}),
       ...(params.expectedSessionState ? { expectedSessionState: params.expectedSessionState } : {}),
       ...(params.sessionLifecyclePatch
@@ -65,46 +69,48 @@ export async function persistUserTurnTranscript(
         {
           message,
           idempotencyLookup: "scan",
-          prepareMessageAfterIdempotencyCheck: (candidate) =>
-            preparePersistedUserTurnMessageForTranscriptWrite(
-              // SAFETY: This callback receives the single original-input message selected above.
-              candidate as PersistedUserTurnMessage,
-              params,
-            ),
+          workerPreparation: {
+            beforeFreshMessageCommit: params.beforeFreshMessageCommit,
+            prepareMessageAfterIdempotencyCheck: (candidate) =>
+              preparePersistedUserTurnMessageForTranscriptWrite(
+                // SAFETY: This callback receives the single original-input message selected above.
+                candidate as PersistedUserTurnMessage,
+                params,
+              ),
+          },
         },
       ],
     },
   );
-  // SAFETY: The single append returns our prepared input; role and anchor are checked before admission below.
-  let appended = turn.messages[0] as
-    | {
-        anchor?: Omit<UserTurnTranscriptAdmissionReceipt, "logicalTurnId" | "role">;
-        appended: boolean;
-        messageId: string;
-        message: PersistedUserTurnMessage;
-      }
-    | undefined;
-  if (appended && !appended.anchor && appended.message.role === "user") {
+  const result = turn.messages[0];
+  if (!result || !isUserMessage(result.message)) {
+    return undefined;
+  }
+  let appended = { ...result, message: result.message };
+  if (!appended.anchor) {
     await waitForSessionTranscriptProjection(params);
     const anchor = readActiveTranscriptEntryAnchor({ ...params, entryId: appended.messageId });
     appended = anchor ? { ...appended, anchor } : appended;
   }
-  if (!appended?.anchor || appended.message.role !== "user") {
+  if (!appended.anchor || appended.message.role !== "user") {
     return undefined;
   }
+  copyTranscriptMessageProvenanceToAnchor(result, appended.anchor);
   if (committedWithoutAnchor && appended.appended) {
     // A deferred projection supplies its anchor later; only the captured fresh
     // append may complete here, never an idempotent history match.
     params.onOriginalInputCommitted?.({ message: appended.message, anchor: appended.anchor });
   }
 
+  const admission = {
+    ...appended.anchor,
+    logicalTurnId: params.logicalTurnId ?? randomUUID(),
+    role: "user" as const,
+  };
+  copyTranscriptEntryProvenance(appended.anchor, admission);
   return {
     ...appended,
-    admission: {
-      ...appended.anchor,
-      logicalTurnId: params.logicalTurnId ?? randomUUID(),
-      role: "user",
-    },
+    admission,
     sessionEntry: turn.sessionEntry,
     ...(turn.sessionTurnMutationResult
       ? { sessionTurnMutationResult: turn.sessionTurnMutationResult }

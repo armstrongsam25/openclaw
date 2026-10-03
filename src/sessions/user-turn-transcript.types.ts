@@ -157,6 +157,8 @@ export type UserTurnTranscriptTargetResolver =
 
 export type PersistUserTurnTranscriptParams = UserTurnTranscriptTarget & {
   expectedLifecycleRevision?: SessionLifecycleRevisionExpectation;
+  assertCurrent?: () => void;
+  beforeFreshMessageCommit?: () => void;
   sessionTurnMutation?: SessionTranscriptTurnMutation;
   input?: UserTurnInput;
   message?: PersistedUserTurnMessage;
@@ -246,6 +248,8 @@ export type UserTurnTranscriptRecorder = {
   persistApproved: (
     params?: UserTurnPersistenceOptions & {
       expectedSessionId?: string;
+      /** Adds a source-generation restriction without replacing the producer's fence. */
+      expectedLifecycleRevision?: SessionLifecycleRevisionExpectation;
       expectedSessionState?: SessionTranscriptTurnExpectedState;
       sessionLifecyclePatch?: SessionTranscriptTurnLifecyclePatch;
       /** Allow a later explicit persistence attempt when this attempt appends nothing. */

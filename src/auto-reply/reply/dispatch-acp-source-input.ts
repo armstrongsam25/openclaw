@@ -9,6 +9,8 @@ import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { generateSecureUuid } from "../../infra/secure-random.js";
 import { normalizeMediaFacts } from "../../media/media-facts.js";
 import {
+  assertAcpSourceTurnDatabaseCurrent,
+  captureAcpSourceTurnDatabaseIdentity,
   prepareAcpSourceTurnInput,
   type AcpSourceTurnInputIdentity,
 } from "../../sessions/acp-source-turn.js";
@@ -39,15 +41,24 @@ export function createAcpSourceTurnInputOwner(params: {
   abortSignal?: AbortSignal;
 }) {
   let recorder = params.userTurnTranscriptRecorder;
+  let sourceIdentity: AcpSourceTurnInputIdentity | undefined;
+  let admittedSourceIdentity: AcpSourceTurnInputIdentity | undefined;
+  const assertSourceDatabaseCurrent = () => {
+    assertAcpSourceTurnDatabaseCurrent(sourceIdentity, recorder?.getAdmissionReceipt());
+    assertAcpSourceTurnDatabaseCurrent(admittedSourceIdentity, recorder?.getAdmissionReceipt());
+  };
   const assertCurrent = () => {
     params.abortSignal?.throwIfAborted();
     recorder?.withPendingInput?.(() => {});
+    assertSourceDatabaseCurrent();
   };
   return {
     get recorder() {
       return recorder;
     },
     assertCurrent,
+    // Settlement retains the physical source after producer custody has completed.
+    assertSourceDatabaseCurrent,
     async prepare(
       target: Parameters<typeof prepareAcpSourceTurnInput>[1],
       runId: string,
@@ -56,29 +67,37 @@ export function createAcpSourceTurnInputOwner(params: {
       assertRuntimeAuthority: () => void,
     ) {
       assertAdmittedCurrent();
-      let source: AcpSourceTurnInputIdentity | undefined;
-      if (!recorder) {
-        const fallback = await createCanonicalSourceRecorder(params, assertAdmittedCurrent);
-        recorder = fallback?.recorder;
-        source = fallback?.source;
+      const captured = await captureCanonicalSource(params, assertAdmittedCurrent);
+      sourceIdentity = captured?.source;
+      const createsRecorder = !recorder && captured !== undefined;
+      const assertSourceCurrent = () => {
+        assertAdmittedCurrent();
+        assertCurrent();
+        if (createsRecorder) {
+          assertRuntimeAuthority();
+        }
+      };
+      if (!recorder && captured) {
+        recorder = createCanonicalSourceRecorder(params, captured, assertSourceCurrent);
       }
       await prepareAcpSourceTurnInput(
         recorder,
         target,
         runId,
-        assertAdmittedCurrent,
+        assertSourceCurrent,
         assertRouteCurrent,
-        source,
-        () => {
-          params.abortSignal?.throwIfAborted();
-          assertRuntimeAuthority();
+        {
+          identity: captured?.source,
+          onSourceCaptured: (identity) => {
+            admittedSourceIdentity = identity;
+          },
         },
       );
     },
   };
 }
 
-async function createCanonicalSourceRecorder(
+async function captureCanonicalSource(
   { cfg, ctx }: { cfg: OpenClawConfig; ctx: FinalizedRuntimeMsgContext },
   assertCurrent: () => void,
 ) {
@@ -89,20 +108,42 @@ async function createCanonicalSourceRecorder(
   const agentId = resolveSessionAgentId({ sessionKey, config: cfg, fallbackAgentId: ctx.AgentId });
   const storePath = resolveSessionStorePathCore(cfg.session?.store, { agentId });
   // An actual absent row keeps transcript-only legacy dispatch supported. Read errors propagate.
-  const entry = await withSessionEntryReadOnlyInWorker(
+  const captured = await withSessionEntryReadOnlyInWorker(
     { agentId, sessionKey, storePath, readConsistency: "latest" },
     assertCurrent,
-    async (read) => {
+    async (read, owner) => {
       if (!read.ok) {
         throw read.error;
       }
-      return read.value;
+      return {
+        entry: read.value,
+        database: read.value
+          ? captureAcpSourceTurnDatabaseIdentity(owner.selectedStore, owner.source)
+          : undefined,
+      };
     },
   );
   assertCurrent();
+  const { entry, database } = captured;
   if (!entry) {
     return undefined;
   }
+  const source: AcpSourceTurnInputIdentity = {
+    agentId,
+    sessionKey,
+    sessionId: entry.sessionId,
+    lifecycleRevision: entry.lifecycleRevision,
+    ...(database ? { database } : {}),
+  };
+  return { source, entry, storePath };
+}
+
+function createCanonicalSourceRecorder(
+  { cfg, ctx }: { cfg: OpenClawConfig; ctx: FinalizedRuntimeMsgContext },
+  { source, entry, storePath }: NonNullable<Awaited<ReturnType<typeof captureCanonicalSource>>>,
+  assertCurrent: () => void,
+) {
+  const { agentId } = source;
   const media = normalizeMediaFacts(ctx.media);
   const conversation = conversationIdentityFromMsgContext({ ctx });
   const messageId =
@@ -117,13 +158,7 @@ async function createCanonicalSourceRecorder(
     (ctx.ChatType === "direct" &&
       ctx.InboundAccessAuthorized === true &&
       ctx.SenderIsSelf !== true);
-  const source = {
-    agentId,
-    sessionKey,
-    sessionId: entry.sessionId,
-    lifecycleRevision: entry.lifecycleRevision,
-  };
-  const recorder = createUserTurnTranscriptRecorder({
+  return createUserTurnTranscriptRecorder({
     input: {
       text: ctx.rawText,
       media,
@@ -156,5 +191,4 @@ async function createCanonicalSourceRecorder(
     errorContext: "ACP source user turn transcript",
     assertOriginalInputCommit: assertCurrent,
   });
-  return { recorder, source };
 }

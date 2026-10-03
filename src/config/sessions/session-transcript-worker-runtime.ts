@@ -261,6 +261,7 @@ export function retainSessionHistoryWorkerDatabase(
           !Array.isArray(received) &&
           (received.kind === "session-entry-read" ||
             received.kind === "session-entry-current" ||
+            received.kind === "session-runtime-target" ||
             received.kind === "session-diagnostic-text") &&
           received.source
         ) {
@@ -298,6 +299,9 @@ export function retainSessionHistoryWorkerDatabase(
     const owner: SessionHistoryWorkerDatabase = {
       generation: owned.generation,
       assertCurrent,
+      get entryReadSource() {
+        return entryReadSource;
+      },
       ...createSessionHistoryWorkerReaders(runRequest),
     };
     return { owner, release };

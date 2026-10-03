@@ -9,73 +9,186 @@ import {
 } from "../agents/agent-run-terminal-outcome.js";
 import { hasCurrentAcpSourceTurn } from "../config/sessions/acp-source-turn-state.js";
 import { patchSessionEntryCore } from "../config/sessions/session-accessor.js";
+import { withSessionEntryReadOnlyInWorker } from "../config/sessions/session-entry-read-runtime.js";
+import type { CapturedSessionEntryReadSource } from "../config/sessions/session-entry-read-source.types.js";
 import type { TranscriptTurnAdmission } from "../config/sessions/transcript-entry-anchor.js";
+import { readTranscriptEntryProvenance } from "../config/sessions/transcript-entry-provenance.js";
 import { hasLiveAgentRunContext } from "../infra/agent-run-registry.js";
 import { formatErrorMessage } from "../infra/errors.js";
+import {
+  readDatabasePathIdentitySync,
+  type DatabaseFileIdentity,
+} from "../infra/sqlite-worker-identity.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
+import { restrictUserTurnTranscriptSourceDatabase } from "./user-turn-transcript-admission.js";
 import type { UserTurnTranscriptRecorder } from "./user-turn-transcript.types.js";
 
 const log = createSubsystemLogger("sessions/acp");
-const ownedInputCustody = new WeakSet<UserTurnTranscriptRecorder>();
 
 export type AcpSourceTurnInputIdentity = {
   agentId: string;
   sessionKey: string;
   sessionId: string;
   lifecycleRevision: string | undefined;
+  database?: { path: string; identity: DatabaseFileIdentity };
 };
+
+export function captureAcpSourceTurnDatabaseIdentity(
+  selectedStore?: { path: string },
+  readSource?: CapturedSessionEntryReadSource,
+) {
+  // The read owner has already resolved this alias to an admitted SQLite source.
+  // Incognito retains its existing process-held namespace rather than a file owner.
+  if (!selectedStore) {
+    return undefined;
+  }
+  if (typeof readSource?.databaseIdentity !== "string") {
+    throw new Error("ACP source input requires its original database read identity.");
+  }
+  return {
+    path: selectedStore.path,
+    identity: {
+      key: `file:${readSource.databaseIdentity}`,
+      birthtime: readSource.databaseBirthtime,
+    },
+  };
+}
+
+/** File aliases must still name the original physical source throughout the turn. */
+export function assertAcpSourceTurnDatabaseCurrent(
+  source: AcpSourceTurnInputIdentity | undefined,
+  receipt?: Pick<TranscriptTurnAdmission, "storePath">,
+): void {
+  const database = source?.database;
+  if (!database) {
+    return;
+  }
+  for (const pathname of receipt ? [database.path, receipt.storePath] : [database.path]) {
+    const current = readDatabasePathIdentitySync(pathname);
+    if (
+      current.key !== database.identity.key ||
+      current.birthtime !== database.identity.birthtime
+    ) {
+      throw new Error("ACP input admission must retain the original physical source database.");
+    }
+  }
+}
 
 export async function prepareAcpSourceTurnInput(
   recorder: UserTurnTranscriptRecorder | undefined,
   target: { agentId: string; sessionKey: string; entry?: { sessionId: string } },
   runId: string,
-  assertCurrent: () => void,
+  assertCallerCurrent: () => void,
   assertRouteCurrent: () => Promise<void>,
-  expectedSource?: AcpSourceTurnInputIdentity,
-  assertCustodyCurrent?: () => void,
+  sourceInput?: {
+    identity?: AcpSourceTurnInputIdentity;
+    onSourceCaptured?: (identity: AcpSourceTurnInputIdentity) => void;
+  },
 ): Promise<void> {
+  let expectedSource = sourceInput?.identity;
+  const assertCurrent = () => {
+    assertCallerCurrent();
+    assertAcpSourceTurnDatabaseCurrent(expectedSource, recorder?.getAdmissionReceipt());
+  };
   if (!recorder) {
     await assertRouteCurrent();
     return;
   }
   assertCurrent();
-  if (expectedSource) {
-    if (!assertCustodyCurrent) {
-      throw new Error("ACP source input custody requires live runtime authority.");
-    }
-    ownedInputCustody.add(recorder);
-    if (
-      !(await recorder.stageApproved?.({
-        runId,
-        assertCurrent,
-        assertAdmittedCurrent: assertCustodyCurrent,
-      }))
-    ) {
-      throw new Error("ACP source input custody could not be admitted before dispatch.");
-    }
-    assertCurrent();
+  if (expectedSource?.database && !recorder.hasPersisted()) {
+    restrictUserTurnTranscriptSourceDatabase(recorder, expectedSource.database.identity);
   }
-  const persisted = await recorder.persistApproved();
+  const persisted = await recorder.persistApproved(
+    expectedSource
+      ? {
+          expectedSessionId: expectedSource.sessionId,
+          expectedLifecycleRevision: expectedSource.lifecycleRevision ?? null,
+        }
+      : undefined,
+  );
+  await recorder.waitForRuntimePersistence();
   assertCurrent();
   if (!recorder.hasPersisted()) {
     throw new Error("ACP input must be durably committed before dispatch.");
   }
-  await assertRouteCurrent();
   const source = recorder.getAdmissionReceipt();
+  if (expectedSource && !source) {
+    throw new Error(
+      "ACP canonical source input requires a durable admission receipt before dispatch.",
+    );
+  }
+  const provenance = source ? readTranscriptEntryProvenance(source) : undefined;
+  if (source && provenance) {
+    const originalSource: AcpSourceTurnInputIdentity = {
+      agentId: source.agentId,
+      sessionKey: source.sessionKey,
+      sessionId: provenance.canonicalSource?.sessionId ?? source.sessionId,
+      lifecycleRevision: provenance.canonicalSource?.lifecycleRevision,
+      database: provenance.database,
+    };
+    sourceInput?.onSourceCaptured?.(originalSource);
+    assertAcpSourceTurnDatabaseCurrent(originalSource, source);
+    if (
+      expectedSource &&
+      (!provenance.canonicalSource ||
+        expectedSource.agentId !== originalSource.agentId ||
+        expectedSource.sessionKey !== originalSource.sessionKey ||
+        expectedSource.sessionId !== originalSource.sessionId ||
+        expectedSource.lifecycleRevision !== originalSource.lifecycleRevision ||
+        expectedSource.database?.identity.key !== originalSource.database?.identity.key ||
+        expectedSource.database?.identity.birthtime !== originalSource.database?.identity.birthtime)
+    ) {
+      throw new Error(
+        "ACP input must retain the source admitted by its original transcript owner.",
+      );
+    }
+    if (provenance.canonicalSource && originalSource.sessionId !== source.sessionId) {
+      throw new Error("ACP input receipt changed its original source identity.");
+    }
+    // An attested rowless original cannot acquire a later canonical execution owner.
+    if (!provenance.canonicalSource) {
+      await assertRouteCurrent();
+      assertCurrent();
+      return;
+    }
+    expectedSource = originalSource;
+  }
+  await assertRouteCurrent();
   if (source) {
-    if (!persisted?.sessionEntry) {
+    // Runtime persistence can issue an admission without a new recorder write result.
+    const committedEntry = persisted?.sessionEntry;
+    let entry = committedEntry;
+    if (!entry || !expectedSource) {
+      entry = await withSessionEntryReadOnlyInWorker(
+        { ...source, readConsistency: "latest" },
+        assertCurrent,
+        async (read) => {
+          if (!read.ok) {
+            throw read.error;
+          }
+          return read.value;
+        },
+      );
+    }
+    if (!entry) {
       // A successful transcript-only recorder has no canonical execution owner to claim.
-      if (persisted && !expectedSource) {
+      if (!expectedSource) {
+        await assertRouteCurrent();
+        assertCurrent();
         return;
       }
       throw new Error("ACP source session identity is required before dispatch.");
     }
+    if (!provenance || !expectedSource) {
+      throw new Error("ACP canonical input requires its original source admission facts.");
+    }
     if (
-      expectedSource &&
-      (source.agentId !== expectedSource.agentId ||
-        source.sessionKey !== expectedSource.sessionKey ||
-        source.sessionId !== expectedSource.sessionId ||
-        persisted.sessionEntry.lifecycleRevision !== expectedSource.lifecycleRevision)
+      entry.sessionId !== source.sessionId ||
+      (expectedSource &&
+        (source.agentId !== expectedSource.agentId ||
+          source.sessionKey !== expectedSource.sessionKey ||
+          source.sessionId !== expectedSource.sessionId ||
+          entry.lifecycleRevision !== expectedSource.lifecycleRevision))
     ) {
       throw new Error("ACP source changed before input admission completed.");
     }
@@ -84,7 +197,7 @@ export async function prepareAcpSourceTurnInput(
       runId,
       expectedLifecycleRevision: expectedSource
         ? expectedSource.lifecycleRevision
-        : persisted.sessionEntry.lifecycleRevision,
+        : entry.lifecycleRevision,
       targetAgentId: target.agentId,
       targetSessionKey: target.sessionKey,
       targetSessionId: target.entry?.sessionId ?? null,
@@ -210,17 +323,23 @@ export async function finishAcpSourceTurn(
   runId: string,
   outcome: AgentRunTerminalOutcome | undefined,
   admittedRunContext: AdmittedRunContext | undefined,
+  assertSourceDatabaseCurrent?: () => void,
 ): Promise<void> {
   let source: TranscriptTurnAdmission | undefined;
   try {
     source = recorder?.getAdmissionReceipt();
     if (source && outcome) {
-      const assertCurrent = admittedRunContext
+      const assertAdmittedCurrent = admittedRunContext
         ? resolveAdmittedRunActiveAssertion(admittedRunContext)
         : undefined;
-      if (admittedRunContext && !assertCurrent) {
+      if (admittedRunContext && !assertAdmittedCurrent) {
         throw new Error("ACP source settlement admission is no longer active.");
       }
+      const assertCurrent = () => {
+        assertAdmittedCurrent?.();
+        assertSourceDatabaseCurrent?.();
+      };
+      assertCurrent();
       await settleAcpSourceTurn({ source, runId, outcome, assertCurrent });
     }
   } catch (error) {
@@ -232,19 +351,8 @@ export async function finishAcpSourceTurn(
       error: formatErrorMessage(error),
     });
   } finally {
-    try {
-      if (recorder && ownedInputCustody.delete(recorder)) {
-        recorder.finishPendingInput?.("interrupted");
-      }
-    } catch (error) {
-      log.warn("ACP source input custody release failed", {
-        runId,
-        error: formatErrorMessage(error),
-      });
-    } finally {
-      if (admittedRunContext) {
-        closeAdmittedRunDelegatedAuthority(admittedRunContext);
-      }
+    if (admittedRunContext) {
+      closeAdmittedRunDelegatedAuthority(admittedRunContext);
     }
   }
 }

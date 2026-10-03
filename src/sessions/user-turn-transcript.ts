@@ -12,11 +12,13 @@ import {
   type TranscriptEntryAnchor,
   type SessionTranscriptTurnPersistOptions,
 } from "../config/sessions/session-accessor.js";
+import { copyTranscriptEntryProvenance } from "../config/sessions/transcript-entry-provenance.js";
 import { createUserTurnAdmissionWrite } from "./user-turn-transcript-admission-write.js";
 import {
   registerUserTurnTranscriptAdmissionOwner,
   resolveUserTurnTranscriptAdmission,
 } from "./user-turn-transcript-admission.js";
+import { createUserTurnPersistenceRestrictions } from "./user-turn-transcript-restrictions.js";
 import {
   buildLateResolvedMediaMessage,
   isUserMessage,
@@ -136,6 +138,9 @@ export function createUserTurnTranscriptRecorder(
   let pendingInput: Awaited<ReturnType<typeof stageSessionPendingInput>>;
   let processingCompletion: Result<AgentRunTerminalOutcome, unknown> | undefined;
   let staging: Promise<boolean> | undefined;
+  const persistenceRestrictions = createUserTurnPersistenceRestrictions(
+    params.expectedLifecycleRevision,
+  );
 
   const applyReplacementText = (
     candidate: PersistedUserTurnMessage | undefined,
@@ -289,6 +294,9 @@ export function createUserTurnTranscriptRecorder(
     admission: UserTurnTranscriptAdmissionReceipt,
     persistedMessage: PersistedUserTurnMessage,
   ) => {
+    if (admissionReceipt) {
+      copyTranscriptEntryProvenance(admissionReceipt, admission);
+    }
     admissionReceipt = admission;
     admittedMessage = persistedMessage;
     runtimePersistedMessage = persistedMessage;
@@ -317,6 +325,7 @@ export function createUserTurnTranscriptRecorder(
     updateMode?: UserTurnTranscriptUpdateMode;
     cwd?: string;
     expectedSessionId?: string;
+    expectedLifecycleRevision?: SessionTranscriptTurnPersistOptions["expectedLifecycleRevision"];
     expectedSessionState?: SessionTranscriptTurnPersistOptions["expectedSessionState"];
     sessionLifecyclePatch?: SessionTranscriptTurnPersistOptions["sessionLifecyclePatch"];
     retryIfUnpersisted?: boolean;
@@ -327,6 +336,7 @@ export function createUserTurnTranscriptRecorder(
     if (!options.message && !message && !params.resolveInput) {
       return undefined;
     }
+    persistenceRestrictions.restrict(options);
     if (options.waitForRuntime) {
       await waitForRuntimePersistence();
     }
@@ -358,18 +368,25 @@ export function createUserTurnTranscriptRecorder(
         candidate: PersistedUserTurnMessage,
         candidateUpdateMode: UserTurnTranscriptUpdateMode,
       ) => {
+        const restriction = persistenceRestrictions.capture(
+          resolvedTarget.expectedSessionId,
+          resolvedTarget.sessionId,
+        );
         const persist = () =>
           persistUserTurnTranscript({
             ...resolvedTarget,
             logicalTurnId,
             message: candidate,
             sessionTurnMutation: params.sessionTurnMutation,
-            expectedSessionId: options.expectedSessionId || resolvedTarget.expectedSessionId,
-            expectedLifecycleRevision: params.expectedLifecycleRevision,
+            ...restriction,
             sessionLifecyclePatch: options.sessionLifecyclePatch ?? params.sessionLifecyclePatch,
             expectedSessionState: options.expectedSessionState ?? params.expectedSessionState,
             updateMode: candidateUpdateMode,
             beforeMessageWrite: params.beforeMessageWrite ?? resolvedTarget.beforeMessageWrite,
+            beforeFreshMessageCommit:
+              candidate === resolvedMessage || candidate.idempotencyKey === message?.idempotencyKey
+                ? recorder.assertOriginalInputCommit
+                : undefined,
             onOriginalInputCommitted: notifyOriginalInputCommitted,
           });
         // Collection can resolve its media lazily during admission. Bind custody
@@ -595,6 +612,7 @@ export function createUserTurnTranscriptRecorder(
         updateMode: options?.updateMode,
         cwd: options?.cwd,
         expectedSessionId: options?.expectedSessionId,
+        expectedLifecycleRevision: options?.expectedLifecycleRevision,
         expectedSessionState: options?.expectedSessionState,
         sessionLifecyclePatch: options?.sessionLifecyclePatch,
         retryIfUnpersisted: options?.retryIfUnpersisted,
@@ -631,6 +649,7 @@ export function createUserTurnTranscriptRecorder(
     message: () => admittedMessage,
     blocked: () => blocked || confirmedSteerTargetRunId !== undefined,
     sentToProvider: () => sentToProvider,
+    restrictSourceDatabase: persistenceRestrictions.restrictSourceDatabase,
     refresh: refreshAdmission,
   });
   return recorder;
