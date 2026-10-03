@@ -13,10 +13,7 @@ import {
 } from "../../config/sessions/session-accessor.sqlite-transcript-write.js";
 import { resolveSessionTranscriptReadFence } from "../../config/sessions/session-transcript-read-fence.js";
 import { startSessionTranscriptIndexReconcile } from "../../config/sessions/session-transcript-reconcile.js";
-import {
-  captureTranscriptEntryProvenance,
-  rememberTranscriptMessageProvenance,
-} from "../../config/sessions/transcript-entry-provenance.js";
+import { captureTranscriptEntryProvenance } from "../../config/sessions/transcript-entry-provenance.js";
 import {
   captureSessionTranscriptTargetBinding,
   sameSessionTranscriptTargetBinding,
@@ -46,6 +43,7 @@ import { SessionManagerCore } from "./session-manager-core.js";
 import type { SessionMetadataWorkerOperations } from "./session-manager-metadata.worker.js";
 import {
   adoptCommittedMessagePayload,
+  adoptCommittedWorkerMessagePayload,
   canonicalizeSessionEntry,
   transcriptAppendNeedsReload,
   type PersistRecordOptions,
@@ -370,23 +368,16 @@ export class SessionManagerPersistence extends SessionManagerCore {
           if (!("messageId" in receipt) || !message) {
             throw new Error(`Session transcript parent entry was not persisted: ${entry.id}`);
           }
-          // Fresh worker replies omit their retained payload; provenance and adoption
-          // must consume the same canonical receipt.
-          const messageReceipt = {
-            ...receipt,
-            message: receipt.message ?? message.prepared.persistedMessage,
-          };
           // A successful message snapshot validated the canonical row in its original transaction.
           // Its reply retains the nullable revision; this native owner retains the original file.
-          rememberTranscriptMessageProvenance(
-            [messageReceipt],
-            captureTranscriptEntryProvenance(database, {
+          adoptCommittedWorkerMessagePayload(entry, receipt, message.prepared.persistedMessage, {
+            idempotencyLookup: message.idempotencyLookup,
+            provenance: captureTranscriptEntryProvenance(database, {
               sessionId,
               lifecycleRevision: committed.lifecycleRevision,
             }),
-            captured,
-          );
-          adoptCommittedMessagePayload(entry, messageReceipt, message.idempotencyLookup);
+            source: captured,
+          });
         }
         const effectiveParentId =
           "effectiveParentId" in receipt && receipt.effectiveParentId !== undefined
