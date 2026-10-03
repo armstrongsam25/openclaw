@@ -71,8 +71,6 @@ const {
   bindingServiceMocks,
 } = await import("./dispatch-acp.shared.test-harness.js");
 
-type MockTtsReply = import("./dispatch-acp.shared.test-harness.js").MockTtsReply;
-
 describe("tryDispatchAcpReplyCore", () => {
   it("records an accepted channel input in the canonical participant store", async () => {
     await expectAcpSessionParticipantInput(sessionKey, async () => {
@@ -1230,7 +1228,7 @@ describe("tryDispatchAcpReplyCore", () => {
       ttsMocks.maybeApplyTtsToPayload.mockResolvedValueOnce({
         mediaUrl,
         audioAsVoice: true,
-      } as MockTtsReply);
+      });
       const attempted: Array<{ kind: string; text?: string; mediaUrl?: string }> = [];
       const dispatcher = createReplyDispatcher({
         transformReplyPayload:
@@ -1348,7 +1346,7 @@ describe("tryDispatchAcpReplyCore", () => {
         audioAsVoice: true,
         spokenText: text,
         ttsSupplement: { spokenText: text },
-      } as MockTtsReply);
+      });
       mockVisibleTextTurn(text);
       const controller = new AbortController();
       const started = createDeferred();
