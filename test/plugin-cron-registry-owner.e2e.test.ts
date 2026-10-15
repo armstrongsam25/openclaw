@@ -29,7 +29,6 @@ const OWNER_FIRE = "CRON_OWNER_SURVIVAL_FIRE";
 const PINNED_FIRE = "CRON_PINNED_LATE_FIRE";
 const E2E_TIMEOUT_MS = 180_000;
 const WAIT_OPTIONS = { timeout: 45_000, interval: 50 } as const;
-const TEST_API_KEY = "test-token-placeholder";
 
 type MockModelRequest = {
   body: Record<string, unknown>;
@@ -295,6 +294,9 @@ describe("plugin cron registry ownership e2e", () => {
           JSON.stringify({
             id: pluginId,
             providers: [pluginId],
+            syntheticAuthRefs: [pluginId],
+            // The loopback fixture has no account; its resolver returns a public marker.
+            nonSecretAuthMarkers: ["cron-fixture"],
             activation: { onStartup: false, onProviders: [pluginId] },
             configSchema: { type: "object", additionalProperties: false },
           }),
@@ -354,7 +356,6 @@ describe("plugin cron registry ownership e2e", () => {
             "cron-owner": {
               baseUrl: `${server.baseUrl}/v1`,
               api: "openai-responses",
-              apiKey: TEST_API_KEY,
               request: { allowPrivateNetwork: true },
               models: [model("default"), model("agent-default")],
             },
@@ -539,7 +540,6 @@ describe("plugin cron registry ownership e2e", () => {
           providers: {
             "cron-owner": {
               baseUrl: `${modelServer.baseUrl}/v1`,
-              apiKey: TEST_API_KEY,
               api: "openai-responses",
               request: { allowPrivateNetwork: true },
               models: [

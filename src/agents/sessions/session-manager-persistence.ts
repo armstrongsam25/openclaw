@@ -1,4 +1,5 @@
 import { publishCommittedSessionIdentity } from "../../config/sessions/session-accessor.sqlite-identity.js";
+import { resolveSqliteSessionKey } from "../../config/sessions/session-accessor.sqlite-scope-helpers.js";
 import {
   prepareTranscriptMessageAppendForWorker,
   type PreparedTranscriptMessageAppend,
@@ -222,7 +223,11 @@ export class SessionManagerPersistence extends SessionManagerNativePersistence {
                 }
               : undefined,
           ),
-          source: captured,
+          source: {
+            agentId: captured.agentId,
+            sessionKey: resolveSqliteSessionKey(captured.sessionKey, captured.agentId),
+            sessionId: captured.sessionId,
+          },
         });
       }
       return {

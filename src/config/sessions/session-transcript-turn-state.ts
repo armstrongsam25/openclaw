@@ -20,8 +20,6 @@ export function buildRestartRecoveryExpectedState(
   const expectedMainRestartRecovery = mainRestartRecovery ?? entry.mainRestartRecovery;
   return {
     acpSourceTurn: entry.acpSourceTurn,
-    activeWriterRunId: entry.activeWriterRunId,
-    lifecycleRunId: entry.lifecycleRunId,
     abortedLastRun: entry.abortedLastRun,
     mainRestartRecoveryCycleId: expectedMainRestartRecovery?.cycleId,
     mainRestartRecoveryRevision: expectedMainRestartRecovery?.revision,

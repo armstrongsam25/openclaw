@@ -52,7 +52,11 @@ export async function interruptAcpSourceTurnWithNotice(params: {
     ...params,
     expectedSessionId: turn.sourceSessionId,
     expectedLifecycleRevision: turn.sourceLifecycleRevision ?? null,
-    expectedSessionState: buildRestartRecoveryExpectedState(params.entry),
+    expectedSessionState: {
+      ...buildRestartRecoveryExpectedState(params.entry),
+      activeWriterRunId: params.entry.activeWriterRunId,
+      lifecycleRunId: params.entry.lifecycleRunId,
+    },
     sessionLifecyclePatch: {
       ...buildMainSessionRecoverySettlementPatch({
         entry: params.entry,

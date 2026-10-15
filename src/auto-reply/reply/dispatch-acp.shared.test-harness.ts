@@ -141,6 +141,7 @@ export {
   bindingServiceMocks,
 };
 
+// mock-isolation: Use synthetic ACP bindings without mixing the process-wide adapter registry.
 vi.mock("../../infra/outbound/session-binding-service.js", () => bindingServiceModule);
 vi.mock("./dispatch-acp-manager.runtime.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./dispatch-acp-manager.runtime.js")>()),
@@ -152,16 +153,16 @@ vi.mock("./dispatch-acp-manager.runtime.js", async (importOriginal) => ({
 vi.mock("../../agents/command/acp-lifecycle.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../agents/command/acp-lifecycle.js")>();
   return {
-    createAcpToolLifecycleTracker: actual.createAcpToolLifecycleTracker,
+    ...actual,
     emitAcpLifecycleStart: auditMocks.emitAcpLifecycleStart,
     emitAcpRuntimeEvent: auditMocks.emitAcpRuntimeEvent,
     emitAcpLifecycleEnd: auditMocks.emitAcpLifecycleEnd,
     emitAcpLifecycleError: auditMocks.emitAcpLifecycleError,
-    resolveAcpLifecycleEndFields: actual.resolveAcpLifecycleEndFields,
   };
 });
 
-vi.mock("../../acp/policy.js", () => ({
+vi.mock("../../acp/policy.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../acp/policy.js")>()),
   resolveAcpDispatchPolicyError: (cfg: OpenClawConfig) =>
     policyMocks.resolveAcpDispatchPolicyError(cfg),
   resolveAcpAgentPolicyError: (cfg: OpenClawConfig, agent: string) =>
@@ -173,16 +174,19 @@ vi.mock("./route-reply.js", async (importOriginal) => ({
   routeReply: (params: unknown) => routeMocks.routeReply(params),
 }));
 
+// mock-isolation: Fix channel account and visibility facts independently of active or bundled plugins.
 vi.mock("../../channels/plugins/index.js", () => ({
   getChannelPlugin: (channelId: string) => channelPluginMocks.getChannelPlugin(channelId),
   getLoadedChannelPlugin: (channelId: string) => channelPluginMocks.getChannelPlugin(channelId),
   normalizeChannelId: (channelId?: string | null) => channelId?.trim().toLowerCase() || null,
 }));
 
-vi.mock("../../infra/outbound/message-action-runner.js", () => ({
+vi.mock("../../infra/outbound/message-action-runner.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../infra/outbound/message-action-runner.js")>()),
   runMessageAction: (params: unknown) => messageActionMocks.runMessageAction(params),
 }));
 
+// mock-isolation: Avoid installing global speech availability and machine-preference resolvers.
 vi.mock("../../tts/tts.runtime.js", () => ({
   maybeApplyTtsToPayload: (params: unknown) => ttsMocks.maybeApplyTtsToPayload(params),
 }));
@@ -197,7 +201,8 @@ vi.mock("../../tts/captioned-final.js", async () => {
   };
 });
 
-vi.mock("../../tts/status-config.js", () => ({
+vi.mock("../../tts/status-config.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../tts/status-config.js")>()),
   resolveStatusTtsSnapshot: () => ({
     autoMode: "always",
     provider: "auto",
@@ -206,6 +211,7 @@ vi.mock("../../tts/status-config.js", () => ({
   }),
 }));
 
+// mock-isolation: Keep attachment bytes and roots in memory without host reads or media-provider execution.
 vi.mock("./dispatch-acp-media.runtime.js", async () => {
   const attachmentNormalization = await vi.importActual<
     typeof import("../../media-understanding/attachments.normalize.js")
@@ -257,7 +263,8 @@ vi.mock("../../logging/diagnostic.js", async (importOriginal) => ({
   markDiagnosticSessionProgress: diagnosticMocks.markDiagnosticSessionProgress,
 }));
 
-vi.mock("./dispatch-acp-transcript.runtime.js", () => ({
+vi.mock("./dispatch-acp-transcript.runtime.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./dispatch-acp-transcript.runtime.js")>()),
   persistAcpDispatchTranscript: (params: unknown) =>
     transcriptMocks.persistAcpDispatchTranscript(params),
 }));
