@@ -94,10 +94,23 @@ async function readJsonRequest(req: IncomingMessage): Promise<Record<string, unk
   return body ? (JSON.parse(body) as Record<string, unknown>) : {};
 }
 
-function writeModelResponse(res: ServerResponse, sequence: number): void {
+function writeModelResponse(res: ServerResponse, sequence: number, completionModel?: string): void {
   const messageId = `msg_cron_owner_${sequence}`;
   const responseId = `resp_cron_owner_${sequence}`;
   const text = `CRON_OWNER_RESPONSE_${sequence}`;
+  if (completionModel) {
+    writeOpenAiResponsesSse(res, [
+      {
+        id: `chatcmpl_cron_owner_${sequence}`,
+        object: "chat.completion.chunk",
+        created: 1,
+        model: completionModel,
+        choices: [{ index: 0, delta: { role: "assistant", content: text }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      },
+    ]);
+    return;
+  }
   const message = {
     type: "message",
     id: messageId,
@@ -149,7 +162,8 @@ async function startMockModelServer(rejectModel?: string): Promise<MockModelServ
         res.end(JSON.stringify({ data: [{ id: "cron-owner", object: "model" }] }));
         return;
       }
-      if (req.method !== "POST" || url.pathname !== "/v1/responses") {
+      const chatCompletions = url.pathname === "/v1/chat/completions";
+      if (req.method !== "POST" || (!chatCompletions && url.pathname !== "/v1/responses")) {
         res.writeHead(404).end();
         return;
       }
@@ -161,7 +175,7 @@ async function startMockModelServer(rejectModel?: string): Promise<MockModelServ
         res.end(JSON.stringify({ error: { code: "model_not_found", message: "Model not found" } }));
         return;
       }
-      writeModelResponse(res, requests.length);
+      writeModelResponse(res, requests.length, chatCompletions ? String(body.model) : undefined);
     })();
   });
   await new Promise<void>((resolve, reject) => {
@@ -317,6 +331,11 @@ describe("plugin cron registry ownership e2e", () => {
       }
       const server = await startMockModelServer("unavailable");
       modelServers.push(server);
+      // Cross-provider cron fallback uses the supported credentialless local transport.
+      const selectedTransport =
+        route === "cron"
+          ? { api: "openai-completions" as const, apiKey: "cron-fixture" }
+          : { api: "openai-responses" as const };
       const model = (id: string) => ({
         id,
         name: id,
@@ -361,13 +380,13 @@ describe("plugin cron registry ownership e2e", () => {
             },
             [provider]: {
               baseUrl: `${server.baseUrl}/v1`,
-              api: "openai-responses",
+              ...selectedTransport,
               request: { allowPrivateNetwork: true },
               models: [model("unavailable")],
             },
             [fallbackProvider]: {
               baseUrl: `${server.baseUrl}/v1`,
-              api: "openai-responses",
+              ...selectedTransport,
               request: { allowPrivateNetwork: true },
               models: [model("available")],
             },
