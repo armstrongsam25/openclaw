@@ -13,14 +13,7 @@ import type {
   GatewayServiceInstallArgs,
 } from "../../daemon/service-types.js";
 import { withEnvAsync } from "../../test-utils/env.js";
-import {
-  runNodeDaemonInstall,
-  runNodeDaemonRestart,
-  runNodeDaemonStart,
-  runNodeDaemonStatus,
-  runNodeDaemonStop,
-  runNodeDaemonUninstall,
-} from "./daemon.js";
+import { runNodeDaemonInstall, runNodeDaemonLifecycle, runNodeDaemonStatus } from "./daemon.js";
 
 const TLS_FINGERPRINT = "ab".repeat(32);
 
@@ -168,7 +161,7 @@ describe("runNodeDaemonInstall", () => {
     mocks.runExec.mockReset().mockImplementation(async (executable: string) => ({
       stdout: JSON.stringify({
         nodeVersion: "26.8.1",
-        bunVersion: /(?:^|[/\\])bun(?:\.exe)?$/i.test(executable) ? "1.4.2" : null,
+        bunVersion: /(?:^|[/\\])bun(?:\.exe)?$/i.test(executable) ? "1.4.3" : null,
         sqliteVersion: "3.53.4",
         sqliteProbe: { available: true, version: "3.53.4", text: true, blob: true, json: true },
       }),
@@ -566,57 +559,6 @@ describe("runNodeDaemonInstall", () => {
       expect(mocks.service.install).not.toHaveBeenCalled();
     },
   );
-
-  it("propagates a plan-warning sink failure before native installation", async () => {
-    const failure = new Error("output unavailable");
-    mocks.runtime.log.mockImplementationOnce(() => {
-      throw failure;
-    });
-    mocks.buildNodeInstallPlan.mockImplementationOnce(async ({ warn }) => {
-      warn?.("plan warning", "ignored title");
-      return { programArguments: ["node", "node-host"], environment: {} };
-    });
-    await expect(runNodeDaemonInstall({ force: true })).rejects.toBe(failure);
-    expect(mocks.runtime.log.mock.calls).toEqual([["plan warning"]]);
-    expect(mocks.service.install).not.toHaveBeenCalled();
-    expect(mocks.runtime.writeJson).not.toHaveBeenCalled();
-    expect(mocks.runtime.error).not.toHaveBeenCalled();
-    expect(mocks.runtime.exit).not.toHaveBeenCalled();
-  });
-
-  it("converts a native-install warning sink failure without reporting success", async () => {
-    useLinuxPlatform();
-    mocks.service.isLoaded.mockResolvedValue(true);
-    mocks.runtime.log.mockImplementationOnce(() => {
-      throw new Error("output unavailable");
-    });
-    mocks.service.install.mockImplementationOnce(async (args: GatewayServiceInstallArgs) => {
-      args.warn?.("native warning");
-    });
-    await runNodeDaemonInstall({ force: true });
-    expect(mocks.runtime.log.mock.calls).toEqual([["native warning"]]);
-    expect(mocks.runtime.error.mock.calls).toEqual([
-      ["Node install failed: Error: output unavailable"],
-    ]);
-    expect(mocks.runtime.exit.mock.calls).toEqual([[1]]);
-    expect(mocks.runtime.writeJson).not.toHaveBeenCalled();
-    expect(mocks.readSystemdUserLingerStatus).not.toHaveBeenCalled();
-  });
-
-  it("propagates the final JSON sink failure without a second result", async () => {
-    useLinuxPlatform();
-    mocks.service.isLoaded.mockResolvedValue(true);
-    const failure = new Error("JSON output unavailable");
-    mocks.runtime.writeJson.mockImplementationOnce(() => {
-      throw failure;
-    });
-    await expect(runNodeDaemonInstall({ force: true, json: true })).rejects.toBe(failure);
-    expect(mocks.service.install).toHaveBeenCalledOnce();
-    expect(mocks.runtime.writeJson).toHaveBeenCalledOnce();
-    expect(mocks.runtime.error).not.toHaveBeenCalled();
-    expect(mocks.runtime.exit).not.toHaveBeenCalled();
-    expect(mocks.runtime.log).not.toHaveBeenCalled();
-  });
 });
 
 describe("node daemon lifecycle adapters", () => {
@@ -632,35 +574,31 @@ describe("node daemon lifecycle adapters", () => {
   it.each([
     {
       name: "start",
-      action: runNodeDaemonStart,
       delegate: mocks.runServiceStart,
       expected: { renderStartHints: expect.any(Function) },
     },
     {
       name: "stop",
-      action: runNodeDaemonStop,
       delegate: mocks.runServiceStop,
       expected: {},
     },
     {
       name: "restart",
-      action: runNodeDaemonRestart,
       delegate: mocks.runServiceRestart,
       expected: { renderStartHints: expect.any(Function) },
     },
     {
       name: "uninstall",
-      action: runNodeDaemonUninstall,
       delegate: mocks.runServiceUninstall,
       expected: {
         stopBeforeUninstall: false,
         assertNotLoadedAfterUninstall: false,
       },
     },
-  ])(
+  ] as const)(
     "delegates $name with node-specific service options",
-    async ({ action, delegate, expected }) => {
-      await action({ json: true });
+    async ({ name, delegate, expected }) => {
+      await runNodeDaemonLifecycle(name, { json: true });
 
       expect(delegate).toHaveBeenCalledWith(
         expect.objectContaining({

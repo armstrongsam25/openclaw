@@ -24,6 +24,7 @@ export type SessionTranscriptTurnExpectedState = {
   restartRecoveryRequesterAccountId: SessionRestartRecoveryState["restartRecoveryRequesterAccountId"];
   restartRecoveryRequesterSenderId: SessionRestartRecoveryState["restartRecoveryRequesterSenderId"];
   restartRecoverySameChannelThreadRequired: SessionRestartRecoveryState["restartRecoverySameChannelThreadRequired"];
+  restartRecoveryOperatorSource: SessionEntry["restartRecoveryOperatorSource"];
   restartRecoverySourceIngress: SessionRestartRecoveryState["restartRecoverySourceIngress"];
   restartRecoverySourceReplyDeliveryMode: SessionRestartRecoveryState["restartRecoverySourceReplyDeliveryMode"];
   restartRecoveryTerminalRunIds: SessionRestartRecoveryState["restartRecoveryTerminalRunIds"];
@@ -38,6 +39,7 @@ export type SessionTranscriptTurnLifecyclePatch = {
   lifecycleRunId?: SessionEntry["lifecycleRunId"];
   lastRunId?: SessionEntry["lastRunId"];
   lastRunError?: SessionEntry["lastRunError"];
+  lastInteractionAt?: number;
   pendingFinalDelivery?: SessionEntry["pendingFinalDelivery"];
   mainRestartRecovery?: SessionEntry["mainRestartRecovery"];
   restartRecoveryBeforeAgentReplyState?: SessionRestartRecoveryState["restartRecoveryBeforeAgentReplyState"];
@@ -50,6 +52,7 @@ export type SessionTranscriptTurnLifecyclePatch = {
   restartRecoveryRequesterAccountId?: SessionRestartRecoveryState["restartRecoveryRequesterAccountId"];
   restartRecoveryRequesterSenderId?: SessionRestartRecoveryState["restartRecoveryRequesterSenderId"];
   restartRecoverySameChannelThreadRequired?: SessionRestartRecoveryState["restartRecoverySameChannelThreadRequired"];
+  restartRecoveryOperatorSource?: SessionEntry["restartRecoveryOperatorSource"];
   restartRecoverySourceIngress?: SessionRestartRecoveryState["restartRecoverySourceIngress"];
   restartRecoverySourceReplyDeliveryMode?: SessionRestartRecoveryState["restartRecoverySourceReplyDeliveryMode"];
   restartRecoveryForceSafeTools?: SessionEntry["restartRecoveryForceSafeTools"];

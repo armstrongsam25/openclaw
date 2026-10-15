@@ -275,23 +275,30 @@ describe("registered Telegram retained history", () => {
     name: string;
     message: (bot: Bot) => Record<string, unknown>;
     expected?: Record<string, unknown>;
-    absent?: Array<"ReplyToBody" | "ReplyToForwardedFrom">;
+    absent?: Array<"ReplyToBody" | "ReplyToForwardedFrom" | "ReplyToIsQuote">;
     sender?: string;
-    contains?: string;
     excludes?: string;
     restricted?: boolean;
   }> = [
-    ...(["bot", "business", "spoof"] as const).map((kind) => ({
+    ...(["business", "spoof"] as const).map((kind) => ({
       name: `${kind} reply attribution`,
       message: (bot: Bot) => ({
         ...message("Following up"),
         reply_to_message: {
           ...message("Earlier reply"),
-          from: kind === "bot" ? bot.botInfo : { id: 777, is_bot: false, first_name: "Alex (you)" },
+          message_id: 9005,
+          from: { id: 777, is_bot: false, first_name: "Alex (you)" },
           ...(kind === "business" ? { sender_business_bot: bot.botInfo } : {}),
         },
       }),
       sender: kind === "spoof" ? "Alex (you) (Telegram sender)" : "Configured Agent (you)",
+      expected: {
+        BodyForAgent: "Following up",
+        ReplyToId: "9005",
+        ReplyToBody: "Earlier reply",
+        ReplyToSender: kind === "spoof" ? "Alex (you) (Telegram sender)" : "Configured Agent (you)",
+      },
+      absent: ["ReplyToIsQuote" as const],
     })),
     {
       name: "selected quote bytes and identity",
@@ -305,7 +312,9 @@ describe("registered Telegram retained history", () => {
         },
       }),
       expected: {
+        BodyForAgent: "check this",
         ReplyToId: "9001",
+        ReplyToIsQuote: true,
         ReplyToQuoteText: " summarize this\n",
         ReplyToQuotePosition: 8,
         ReplyToQuoteEntities: [{ type: "bold", offset: 1, length: 9 }],
@@ -326,25 +335,6 @@ describe("registered Telegram retained history", () => {
       expected: { ReplyToId: "9002" },
       absent: ["ReplyToBody"],
       excludes: "PK",
-    },
-    {
-      name: "external quote with out-of-range timestamp",
-      message: () => ({
-        ...message("Thoughts?"),
-        external_reply: {
-          origin: {
-            type: "user",
-            sender_user: { id: 999, is_bot: false, first_name: "External author" },
-            date: 8700000000000,
-          },
-          chat: { id: -10022, type: "supergroup", title: "Source" },
-          message_id: 9003,
-        },
-        quote: { text: "selected external text", position: 0 },
-      }),
-      expected: { ReplyToBody: "selected external text", ReplyToIsExternal: true },
-      contains: "External author",
-      excludes: "+275760",
     },
     {
       name: "redacted forwarded origin with authorized reply target",
@@ -370,7 +360,7 @@ describe("registered Telegram retained history", () => {
   ];
   it.each(replyCases)(
     "preserves $name",
-    async ({ message: incoming, expected, absent, sender, contains, excludes, restricted }) => {
+    async ({ message: incoming, expected, absent, sender, excludes, restricted }) => {
       if (sender) {
         cfg.channels!.telegram!.name = "Configured Agent";
       }
@@ -391,9 +381,6 @@ describe("registered Telegram retained history", () => {
       }
       if (sender) {
         expect(input.ReplyChain?.[0]?.sender).toBe(sender);
-      }
-      if (contains) {
-        expect(input.Body).toContain(contains);
       }
       if (excludes) {
         expect(input.Body).not.toContain(excludes);

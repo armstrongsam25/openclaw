@@ -174,26 +174,21 @@ function resolveQaBuiltBundledPluginTreeRoot(params: { repoRoot: string; sourceD
   return null;
 }
 
-async function symlinkQaStagedDirEntry(params: {
-  sourcePath: string;
-  targetPath: string;
-  directory?: boolean;
-}) {
+async function symlinkQaStagedDirEntry(sourcePath: string, targetPath: string, directory: boolean) {
   await fs.symlink(
-    params.sourcePath,
-    params.targetPath,
-    params.directory ? (process.platform === "win32" ? "junction" : "dir") : "file",
+    sourcePath,
+    targetPath,
+    directory ? (process.platform === "win32" ? "junction" : "dir") : "file",
   );
 }
 
 async function symlinkQaStagedEntry(sourceDir: string, targetDir: string, entry: Dirent) {
   const sourcePath = path.join(sourceDir, entry.name);
-  await symlinkQaStagedDirEntry({
+  await symlinkQaStagedDirEntry(
     sourcePath,
-    targetPath: path.join(targetDir, entry.name),
-    directory:
-      entry.isDirectory() || (entry.isSymbolicLink() && (await fs.stat(sourcePath)).isDirectory()),
-  });
+    path.join(targetDir, entry.name),
+    entry.isDirectory() || (entry.isSymbolicLink() && (await fs.stat(sourcePath)).isDirectory()),
+  );
 }
 
 async function seedQaStagedNodeModules(params: { repoRoot: string; stagedRoot: string }) {
@@ -232,35 +227,6 @@ async function seedQaStagedBuiltTreeRoots(params: {
   }
 }
 
-export async function resolveQaRuntimeHostVersion(params: {
-  repoRoot: string;
-  allowedPluginIds: readonly string[];
-}) {
-  const rootPackageRaw = await fs.readFile(path.join(params.repoRoot, "package.json"), "utf8");
-  const rootPackage = JSON.parse(rootPackageRaw) as { version?: string };
-  let selected = coerceSemver(rootPackage.version);
-  for (const { sourceDir } of collectQaBundledPluginSources(params).values()) {
-    const packagePath = path.join(sourceDir, "package.json");
-    if (!existsSync(packagePath)) {
-      continue;
-    }
-    const packageRaw = await fs.readFile(packagePath, "utf8");
-    const packageJson = JSON.parse(packageRaw) as {
-      openclaw?: {
-        install?: {
-          minHostVersion?: string;
-        };
-      };
-    };
-    const candidate = coerceSemver(packageJson.openclaw?.install?.minHostVersion);
-    if (candidate && (!selected || candidate.compare(selected) > 0)) {
-      selected = candidate;
-    }
-  }
-
-  return selected?.version;
-}
-
 export function resolveQaStagedBundledPluginsRoot(params: { repoRoot: string; tempRoot: string }) {
   return path.join(params.repoRoot, ".artifacts", "qa-runtime", path.basename(params.tempRoot));
 }
@@ -278,6 +244,9 @@ export async function createQaBundledPluginsDir(params: {
     path.join(params.repoRoot, "package.json"),
     path.join(stagedRoot, "package.json"),
   );
+  const rootPackageRaw = await fs.readFile(path.join(params.repoRoot, "package.json"), "utf8");
+  const rootPackage = JSON.parse(rootPackageRaw) as { version?: string };
+  let hostVersion = coerceSemver(rootPackage.version);
   await seedQaStagedNodeModules({
     repoRoot: params.repoRoot,
     stagedRoot,
@@ -311,11 +280,7 @@ export async function createQaBundledPluginsDir(params: {
   if (stagedTreeName === "dist-runtime" && !existsSync(path.join(stagedRoot, "dist"))) {
     const repoDistDir = path.join(params.repoRoot, "dist");
     const stagedDistTarget = existsSync(repoDistDir) ? repoDistDir : stagedTreeRoot;
-    await symlinkQaStagedDirEntry({
-      sourcePath: stagedDistTarget,
-      targetPath: path.join(stagedRoot, "dist"),
-      directory: true,
-    });
+    await symlinkQaStagedDirEntry(stagedDistTarget, path.join(stagedRoot, "dist"), true);
   }
   const bundledPluginsDir = path.join(stagedTreeRoot, "extensions");
   await fs.mkdir(bundledPluginsDir, { recursive: true });
@@ -327,14 +292,31 @@ export async function createQaBundledPluginsDir(params: {
     if (manifestPath) {
       await fs.copyFile(manifestPath, path.join(targetDir, "openclaw.plugin.json"));
     }
+    const packagePath = path.join(sourceDir, "package.json");
+    if (!existsSync(packagePath)) {
+      continue;
+    }
+    const packageRaw = await fs.readFile(packagePath, "utf8");
+    const packageJson = JSON.parse(packageRaw) as {
+      openclaw?: {
+        install?: {
+          minHostVersion?: string;
+        };
+      };
+    };
+    const candidate = coerceSemver(packageJson.openclaw?.install?.minHostVersion);
+    if (candidate && (!hostVersion || candidate.compare(hostVersion) > 0)) {
+      hostVersion = candidate;
+    }
   }
-  await symlinkQaStagedDirEntry({
-    sourcePath: path.join(stagedRoot, "dist"),
-    targetPath: path.join(stagedOpenClawPackageDir, "dist"),
-    directory: true,
-  });
+  await symlinkQaStagedDirEntry(
+    path.join(stagedRoot, "dist"),
+    path.join(stagedOpenClawPackageDir, "dist"),
+    true,
+  );
   return {
     bundledPluginsDir,
     stagedRoot,
+    runtimeHostVersion: hostVersion?.version,
   };
 }

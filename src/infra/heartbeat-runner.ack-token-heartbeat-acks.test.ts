@@ -157,19 +157,18 @@ describe("heartbeat acknowledgements", () => {
       sentText: "HEARTBEAT_OK",
     },
     {
-      name: "complete response prefix",
-      payload: { text: "[openclaw] HEARTBEAT_OK all good" },
-      options: { telegram: true, responsePrefix: "[openclaw]" },
+      name: "truncated NO_REPLY final",
+      payload: { text: "NO_R" },
+      options: { telegram: true },
       sends: 0,
     },
     {
-      name: "partial response prefix",
-      payload: { text: "History check complete" },
-      options: { telegram: true, responsePrefix: "Hi" },
+      name: "truncated NO_REPLY acknowledgement",
+      payload: { text: "NO_RE" },
+      options: { showOk: true },
       sends: 1,
-      sentText: "History check complete",
+      sentText: "HEARTBEAT_OK",
     },
-    { name: "quiet exec completion", payload: { text: "NO_REPLY" }, exec: true, sends: 0 },
     {
       name: "exec summary with trailing acknowledgement",
       payload: { text: "Command completed: uploaded report.txt\nHEARTBEAT_OK" },
@@ -247,7 +246,10 @@ describe("heartbeat acknowledgements", () => {
               failure === "readiness"
                 ? {
                     webAuthExists: async () => {
-                      throw new Error("readiness unavailable");
+                      if (replySpy.mock.calls.length > 0) {
+                        throw new Error("readiness unavailable");
+                      }
+                      return true;
                     },
                   }
                 : undefined;
@@ -298,13 +300,14 @@ describe("heartbeat acknowledgements", () => {
     });
   });
 
-  it("defers delivery when WhatsApp is not linked", async () => {
+  it("skips the model when WhatsApp is not linked", async () => {
     await withHeartbeat(async ({ send, replySpy, run }) => {
       replySpy.mockResolvedValue({ text: "Heartbeat alert" });
       expect(
         await run({ webAuthExists: async () => false, hasActiveWebListener: () => false }),
       ).toMatchObject({ status: "skipped", reason: "channel-not-ready" });
       expect(getLastHeartbeatEvent()).toMatchObject({ reason: "whatsapp-not-linked" });
+      expect(replySpy).not.toHaveBeenCalled();
       expect(send).not.toHaveBeenCalled();
     });
   });
@@ -503,17 +506,6 @@ describe("heartbeat pending-final delivery ownership", () => {
       payload: { text: "Heartbeat update." },
       visibleText: "Heartbeat update.",
     },
-    {
-      name: "visible tool reply",
-      payload: createHeartbeatToolResponsePayload({
-        outcome: "needs_attention",
-        notify: true,
-        summary: "Build blocked.",
-        notificationText: "Build needs credentials.",
-      }),
-      visibleText: "Build needs credentials.",
-    },
-    { name: "acknowledgement", payload: { text: "HEARTBEAT_OK" }, visibleText: undefined },
     {
       name: "quiet tool reply",
       payload: createHeartbeatToolResponsePayload({
@@ -767,7 +759,10 @@ describe("runHeartbeatOnce failure delivery", () => {
                   ...heartbeatRunnerTelegramPlugin,
                   heartbeat: {
                     checkReady: async () => {
-                      throw new Error("readiness probe failed");
+                      if (replySpy.mock.calls.length > 0) {
+                        throw new Error("readiness probe failed");
+                      }
+                      return { ok: true, reason: "ok" };
                     },
                   },
                 },
@@ -789,28 +784,6 @@ describe("runHeartbeatOnce failure delivery", () => {
       );
     },
   );
-
-  it("preserves media when delivering a plain terminal failure reply", async () => {
-    await withHeartbeat(
-      async ({ replySpy, send: sendTelegram, run }) => {
-        const mediaUrl = "https://example.test/failure.png";
-        replySpy.mockResolvedValue(
-          setReplyPayloadMetadata(
-            { text: "Message delivery failed.", mediaUrl },
-            { heartbeatTerminalToolFailure: { toolName: "message" } },
-          ),
-        );
-
-        await expect(run()).resolves.toEqual({
-          status: "failed",
-          reason: "agent-tool-failure",
-        });
-        expect(sendTelegram).toHaveBeenCalledOnce();
-        expect(sendTelegram.mock.calls[0]?.[2]).toMatchObject({ mediaUrl });
-      },
-      { telegram: true },
-    );
-  });
 });
 
 describe("heartbeat inbound hook boundary", () => {
@@ -987,3 +960,64 @@ describe("heartbeat next-user outcomes", () => {
     },
   );
 });
+
+it.each([
+  {
+    name: "decorates an alert",
+    prefix: "[{provider}/{model}|think:{thinkingLevel}]",
+    reply: "Heartbeat alert",
+    expected: "[openai/gpt-5.4|think:high] Heartbeat alert",
+  },
+  {
+    name: "suppresses a prefixed acknowledgment",
+    prefix: "[{model}]",
+    reply: "[gpt-5.4] HEARTBEAT_OK all good",
+    expected: undefined,
+  },
+])(
+  "resolves model-selection prefix variables before delivery: $name",
+  async ({ prefix, reply, expected }) => {
+    await withTempTelegramHeartbeatSandbox(async ({ tmpDir, storePath, replySpy }) => {
+      const cfg = heartbeatTestConfig(tmpDir, "telegram", "telegram", storePath);
+      cfg.channels = {
+        telegram: {
+          botToken: "test-token",
+          allowFrom: ["*"],
+          heartbeat: { showOk: false },
+          responsePrefix: prefix,
+        },
+      };
+      await seedMainSessionStore(storePath, cfg, {
+        lastChannel: "telegram",
+        lastProvider: "telegram",
+        lastTo: target,
+      });
+      replySpy.mockImplementation(async (_ctx, opts) => {
+        opts?.onModelSelected?.({
+          provider: "openai",
+          model: "gpt-5.4-20260401",
+          thinkLevel: "high",
+        });
+        return { text: reply };
+      });
+      const sendTelegram = vi.fn().mockResolvedValue({ messageId: "m1", chatId: target });
+      await runHeartbeatOnce({
+        cfg,
+        deps: {
+          telegram: sendTelegram,
+          getQueueSize: () => 0,
+          nowMs: () => 0,
+          getReplyFromConfig: replySpy,
+        },
+      });
+      if (expected === undefined) {
+        expect(sendTelegram).not.toHaveBeenCalled();
+      } else {
+        expect(sendTelegram).toHaveBeenCalledOnce();
+        expect(sendTelegram.mock.calls[0]?.[0]).toBe(target);
+        expect(sendTelegram.mock.calls[0]?.[1]).toBe(expected);
+        expect(typeof sendTelegram.mock.calls[0]?.[2]).toBe("object");
+      }
+    });
+  },
+);

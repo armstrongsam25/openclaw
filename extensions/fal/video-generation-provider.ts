@@ -3,23 +3,25 @@ import {
   resolveGeneratedMediaMaxBytes,
 } from "openclaw/plugin-sdk/media-generation-runtime";
 import { resolvePositiveTimerTimeoutMs } from "openclaw/plugin-sdk/number-runtime";
-import { isProviderApiKeyConfigured } from "openclaw/plugin-sdk/provider-auth";
+import { isProviderApiKeyConfiguredAsync } from "openclaw/plugin-sdk/provider-auth";
 import {
   assertOkOrThrowHttpError,
   createProviderOperationDeadline,
   readProviderJsonResponse,
   type ProviderOperationDeadline,
 } from "openclaw/plugin-sdk/provider-http";
+import { sleep } from "openclaw/plugin-sdk/runtime-env";
 import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/ssrf-runtime";
 import {
   isRecord,
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
 } from "openclaw/plugin-sdk/string-coerce-runtime";
-import type {
-  GeneratedVideoAsset,
-  VideoGenerationProvider,
-  VideoGenerationRequest,
+import {
+  normalizeVideoGenerationDuration,
+  type GeneratedVideoAsset,
+  type VideoGenerationProvider,
+  type VideoGenerationRequest,
 } from "openclaw/plugin-sdk/video-generation";
 import { resolveFalHttpRequestConfig } from "./http-config.js";
 
@@ -197,10 +199,10 @@ function resolveFalDuration(
   durationSeconds: number | undefined,
   model: string,
 ): number | string | undefined {
-  if (typeof durationSeconds !== "number" || !Number.isFinite(durationSeconds)) {
+  const duration = normalizeVideoGenerationDuration({ durationSeconds });
+  if (duration === undefined) {
     return undefined;
   }
-  const duration = Math.max(1, Math.round(durationSeconds));
   if (isFalSeedance2Model(model)) {
     return SEEDANCE_2_DURATION_SECONDS.includes(
       duration as (typeof SEEDANCE_2_DURATION_SECONDS)[number],
@@ -414,9 +416,7 @@ async function waitForFalQueueResult(params: {
       throw new Error(FAL_VIDEO_MALFORMED_RESPONSE);
     }
     const pollDelayMs = resolveFalQueueRemainingMs(params.deadline, lastStatus, POLL_INTERVAL_MS);
-    await new Promise((resolve) => {
-      setTimeout(resolve, pollDelayMs);
-    });
+    await sleep(pollDelayMs);
   }
 }
 
@@ -462,7 +462,7 @@ export function buildFalVideoGenerationProvider(): VideoGenerationProvider {
       "fal-ai/wan/v2.2-a14b/text-to-video",
       "fal-ai/wan/v2.2-a14b/image-to-video",
     ],
-    isConfigured: (ctx) => isProviderApiKeyConfigured({ provider: "fal", ...ctx }),
+    isConfiguredAsync: (ctx) => isProviderApiKeyConfiguredAsync({ provider: "fal", ...ctx }),
     capabilities: {
       generate: buildFalVideoModeCapabilities(SEEDANCE_2_VIDEO_MODELS),
       imageToVideo: {

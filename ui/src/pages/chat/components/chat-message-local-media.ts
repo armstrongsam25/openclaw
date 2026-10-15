@@ -41,30 +41,15 @@ export function buildAssistantAttachmentUrl(
   mediaTicket?: string | null,
   context?: AssistantMediaContext,
   filename?: string,
+  variant?: "thumbnail",
 ): string {
   if (!isLocalAssistantAttachmentSource(source)) {
     return source;
   }
-  return buildAssistantMediaUrl(source, resourceBasePath, mediaTicket, context, filename);
-}
-
-export function appendAttachmentUrlSearchParam(
-  source: string,
-  name: string,
-  value: string,
-): string {
-  const trimmed = source.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-  const hashIndex = trimmed.indexOf("#");
-  const hash = hashIndex === -1 ? "" : trimmed.slice(hashIndex);
-  const withoutHash = hashIndex === -1 ? trimmed : trimmed.slice(0, hashIndex);
-  const queryIndex = withoutHash.indexOf("?");
-  const path = queryIndex === -1 ? withoutHash : withoutHash.slice(0, queryIndex);
-  const params = new URLSearchParams(queryIndex === -1 ? "" : withoutHash.slice(queryIndex + 1));
-  params.set(name, value);
-  return `${path}?${params.toString()}${hash}`;
+  const url = buildAssistantMediaUrl(source, resourceBasePath, mediaTicket, context, filename);
+  return variant === "thumbnail" && isCanonicalInboundMediaSource(source)
+    ? `${url}&variant=thumbnail`
+    : url;
 }
 
 export function applyResourceBasePath(

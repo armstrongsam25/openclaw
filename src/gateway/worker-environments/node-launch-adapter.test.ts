@@ -32,7 +32,9 @@ import type {
 import {
   createNodeWorkerLaunchAdapter,
   measureNodeWorkerLaunchBytes,
+  nodeWorkerSpawnResultFromReceipt,
 } from "./node-launch-adapter.js";
+import { registerNodeLaunchAdapterNativeInferenceSuite } from "./node-launch-adapter.native-inference.suite.js";
 
 const DEVICE_ID = "device-session-host";
 const WORKER_RUNS = {
@@ -55,6 +57,7 @@ function nodeProof(connId = "conn-1", available = 2): NodeWorkerSupervisorNodePr
       capacity: { total: 2, available },
       environmentSession: 1,
       capturedExecPolicy: true,
+      promptContext: 1,
     },
     commands: ["system.run"],
   };
@@ -135,6 +138,22 @@ function wireError(code: string, message: string) {
   return { ok: false, error: { code, message } };
 }
 
+it.each(["interrupted", "failed", "cancelled"] as const)(
+  "preserves the supervisor's %s cause without inferring node loss from diagnostics",
+  (state) => {
+    const terminal = { ...receipt(launchInput(), state), state, errorText: "same diagnostic" };
+    const result = nodeWorkerSpawnResultFromReceipt(terminal);
+    expect(result).toMatchObject({
+      code: 1,
+      stderr: "same diagnostic",
+      ...(state === "interrupted" ? { nodeLoss: { code: "node-lost" } } : {}),
+    });
+    if (state !== "interrupted") {
+      expect(result).not.toHaveProperty("nodeLoss");
+    }
+  },
+);
+
 function admissionDeadlineReceipt(input: NodeWorkerLaunchInput): NodeWorkerSupervisorReceipt {
   return {
     ...receipt(input, "completed"),
@@ -203,7 +222,7 @@ describe("node worker launch adapter", () => {
     [true, false],
     [true, true],
   ])(
-    "snapshots the launch plan and negotiates idle retention for node=%s and bundle=%s",
+    "negotiates idle retention for node=%s and bundle=%s without changing the caller's options",
     async (nodeSupports, bundleSupports) => {
       const input = launchInput();
       if (!bundleSupports) {
@@ -225,18 +244,15 @@ describe("node worker launch adapter", () => {
         return wire(receipt(expected, "completed"));
       });
       const adapter = createNodeWorkerLaunchAdapter({
-        getTransport: () =>
-          transportWith(invoke, async () => {
-            input.descriptor.assignment.prompt = "mutated after launch call";
-            return [node];
-          }),
+        getTransport: () => transportWith(invoke, async () => [node]),
       });
       expect(await adapter.launch(launchRequest(input))).toEqual(receipt(expected, "completed"));
       expect(input).not.toHaveProperty("idleRetention");
-      expect(input.descriptor.assignment.prompt).toBe("mutated after launch call");
       expect(invoke).toHaveBeenCalledOnce();
     },
   );
+
+  registerNodeLaunchAdapterNativeInferenceSuite();
 
   it("cancels an in-flight status wait through the existing terminal cancellation receipt", async () => {
     const input = launchInput();
@@ -612,7 +628,7 @@ describe("node worker launch adapter", () => {
     },
   );
 
-  it.each(["environmentSession", "capturedExecPolicy"] as const)(
+  it.each(["environmentSession", "capturedExecPolicy", "promptContext"] as const)(
     "requires %s support before dispatching a turn",
     async (feature) => {
       const node = nodeProof();
@@ -622,7 +638,10 @@ describe("node worker launch adapter", () => {
         getTransport: () => transportWith(invoke, async () => [node]),
       });
 
-      await expect(adapter.launch(launchRequest())).rejects.toThrow("openclaw update");
+      await expect(adapter.launch(launchRequest())).rejects.toMatchObject({
+        code: "node_runner_update_required",
+        message: expect.stringContaining("openclaw update"),
+      });
       expect(invoke).not.toHaveBeenCalled();
     },
   );

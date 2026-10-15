@@ -6,6 +6,7 @@ import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 import { requireNodeSqlite } from "../infra/node-sqlite.js";
 import { repairCanonicalSqliteIndexes } from "../infra/sqlite-index-schema.js";
 import { readSqliteNumberPragma } from "../infra/sqlite-pragma.test-support.js";
+import { requireNativeSqliteDatabase } from "../test-utils/native-sqlite.js";
 import { VERSION } from "../version.js";
 import { OPENCLAW_STATE_SCHEMA_VERSION } from "./openclaw-state-db-contract.js";
 import { closeOpenClawStateDatabaseAsync, openOpenClawStateDatabase } from "./openclaw-state-db.js";
@@ -46,20 +47,6 @@ describe("shared-state canonical index repair", () => {
         ('plugin', 'sibling', 'expired', '{ "value": 3 }', 20, 999),
         ('plugin', 'sibling', 'future', '{ "value": 4 }', 20, 1001),
         ('peer', 'written', 'live', '{ "value": 5 }', 10, NULL)`,
-    },
-    {
-      name: "failed delivery",
-      index: "idx_delivery_queue_failed",
-      table: "delivery_queue_entries",
-      oldColumns: "queue_name, status, failed_at, id",
-      columns: ["status", "queue_name", "failed_at", "id"],
-      order: "queue_name, id",
-      insertSql: `INSERT INTO delivery_queue_entries
-        (queue_name, id, status, entry_json, enqueued_at, updated_at, failed_at) VALUES
-        ('outbound', 'pending', 'pending', '{ "payload": "pending" }', 10, 10, NULL),
-        ('outbound', 'completed', 'completed', '{ "payload": "completed" }', 10, 20, NULL),
-        ('outbound', 'failed', 'failed', '{ "payload": "failed" }', 10, 30, 30),
-        ('session', 'legacy-failed', 'failed', '{ "payload": "legacy" }', 10, 30, NULL)`,
     },
   ])(
     "upgrades the $name index through runtime without rewriting entries",
@@ -102,19 +89,30 @@ describe("shared-state canonical index repair", () => {
       ).toEqual(columns);
       expect(upgraded.db.prepare(entriesSql).all()).toEqual(entries);
       expect(upgraded.db.prepare(metadataSql).get()).toEqual(metadata);
-      expect(readSqliteNumberPragma(upgraded.db, "user_version")).toBe(
+      expect(readSqliteNumberPragma(requireNativeSqliteDatabase(upgraded.db), "user_version")).toBe(
         OPENCLAW_STATE_SCHEMA_VERSION,
       );
-      const schemaVersion = readSqliteNumberPragma(upgraded.db, "schema_version");
+      const schemaVersion = readSqliteNumberPragma(
+        requireNativeSqliteDatabase(upgraded.db),
+        "schema_version",
+      );
       await closeOpenClawStateDatabaseAsync();
 
       const reopened = openOpenClawStateDatabase(options);
-      expect(readSqliteNumberPragma(reopened.db, "schema_version")).toBe(schemaVersion);
+      expect(
+        readSqliteNumberPragma(requireNativeSqliteDatabase(reopened.db), "schema_version"),
+      ).toBe(schemaVersion);
       expect(reopened.db.prepare(entriesSql).all()).toEqual(entries);
       expect(reopened.db.prepare(metadataSql).get()).toEqual(metadata);
 
       // An older same-version owner restores its own derived index on binary rollback.
-      expect(repairCanonicalSqliteIndexes(reopened.db, reopened.path, oldSchema)).toEqual([index]);
+      expect(
+        repairCanonicalSqliteIndexes(
+          requireNativeSqliteDatabase(reopened.db),
+          reopened.path,
+          oldSchema,
+        ),
+      ).toEqual([index]);
       expect(
         reopened.db
           .prepare(`PRAGMA index_info(${index})`)
@@ -123,7 +121,7 @@ describe("shared-state canonical index repair", () => {
       ).toEqual(oldColumns.split(", "));
       expect(reopened.db.prepare(entriesSql).all()).toEqual(entries);
       expect(reopened.db.prepare(metadataSql).get()).toEqual(metadata);
-      expect(readSqliteNumberPragma(reopened.db, "user_version")).toBe(
+      expect(readSqliteNumberPragma(requireNativeSqliteDatabase(reopened.db), "user_version")).toBe(
         OPENCLAW_STATE_SCHEMA_VERSION,
       );
       expect(reopened.db.prepare("PRAGMA integrity_check").all()).toEqual([

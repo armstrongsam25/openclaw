@@ -2,14 +2,7 @@ function readDiscordChannelPropertySafe(channel: unknown, key: string): unknown 
   if (!channel || typeof channel !== "object") {
     return undefined;
   }
-  try {
-    if (!(key in channel)) {
-      return undefined;
-    }
-    return (channel as Record<string, unknown>)[key];
-  } catch {
-    return undefined;
-  }
+  return (channel as Record<string, unknown>)[key];
 }
 
 function resolveDiscordChannelStringPropertySafe(
@@ -18,14 +11,6 @@ function resolveDiscordChannelStringPropertySafe(
 ): string | undefined {
   const value = readDiscordChannelPropertySafe(channel, key);
   return typeof value === "string" ? value : undefined;
-}
-
-function resolveDiscordChannelNumberPropertySafe(
-  channel: unknown,
-  key: string,
-): number | undefined {
-  const value = readDiscordChannelPropertySafe(channel, key);
-  return typeof value === "number" ? value : undefined;
 }
 
 function resolveDiscordChannelStringWithAliasSafe(
@@ -74,10 +59,13 @@ export function resolveDiscordChannelParentSafe(channel: unknown): unknown {
 
 export function resolveDiscordChannelInfoSafe(channel: unknown): DiscordChannelInfoSafe {
   const parent = resolveDiscordChannelParentSafe(channel);
+  const name = resolveDiscordChannelNameSafe(channel);
+  const topic = resolveDiscordChannelTopicSafe(channel);
+  const type = readDiscordChannelPropertySafe(channel, "type");
   return {
-    name: resolveDiscordChannelNameSafe(channel),
-    topic: resolveDiscordChannelTopicSafe(channel),
-    type: resolveDiscordChannelNumberPropertySafe(channel, "type"),
+    name,
+    topic,
+    type: typeof type === "number" ? type : undefined,
     parentId: resolveDiscordChannelParentIdSafe(channel),
     ownerId: resolveDiscordChannelStringWithAliasSafe(channel, "ownerId", "owner_id"),
     parentName: resolveDiscordChannelNameSafe(parent),

@@ -8,6 +8,7 @@ import {
   type AgentRunTerminalOutcome,
 } from "../agents/agent-run-terminal-outcome.js";
 import { hasCurrentAcpSourceTurn } from "../config/sessions/acp-source-turn-state.js";
+import { buildRestartRecoveryClaimCleanupPatch } from "../config/sessions/restart-recovery-state.js";
 import { patchSessionEntryCore } from "../config/sessions/session-accessor.js";
 import { withSessionEntryReadOnlyInWorker } from "../config/sessions/session-entry-read-runtime.js";
 import type { CapturedSessionEntryReadSource } from "../config/sessions/session-entry-read-source.types.js";
@@ -254,7 +255,7 @@ async function claimAcpSourceTurn(params: {
         startedAt: Date.now(),
         endedAt: undefined,
         runtimeMs: undefined,
-        status: "running",
+        status: undefined,
         abortedLastRun: false,
       };
     },
@@ -299,6 +300,13 @@ async function settleAcpSourceTurn(params: {
         return null;
       }
       return {
+        ...(entry.restartRecoveryDeliveryRunId === params.runId
+          ? buildRestartRecoveryClaimCleanupPatch({
+              entry,
+              recordTerminalSource: true,
+              terminalRunId: params.runId,
+            })
+          : {}),
         acpSourceTurn: undefined,
         activeWriterRunId: undefined,
         abortedLastRun: false,

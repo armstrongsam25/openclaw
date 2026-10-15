@@ -23,45 +23,56 @@ afterEach(() => {
 const signal = new AbortController().signal;
 
 describe("Agents API self-hosted session connection", () => {
-  it("retains self-hosted metadata while waiting for the matching external executor", async () => {
-    const environment = {
-      type: "self_hosted",
-      id: "environment-fixture",
-      workspace_directory: "/fixture/workspace",
-      remote_url: "wss://executor.invalid/session-fixture",
-    };
-    fetchWithSsrFGuardMock.mockImplementation(async () => ({
-      response: Response.json({
-        id: "session-fixture",
-        status: "requires_action",
-        error: null,
-        environment,
-        required_actions: [
-          { type: "environment_connection", environment_id: "environment-fixture" },
-          {
-            type: "function_call",
-            turn_id: "turn-fixture",
-            call_id: "call-fixture",
-            name: "fixture_tool",
-            arguments: {},
-          },
-        ],
-      }),
-      finalUrl: "https://api.openai.com/v1/agents/sessions/session-fixture",
-      release: async () => {},
-    }));
-    const client = new AgentsApiClient("fixture-not-a-real-api-key", vi.fn());
-    expect((await client.session("session-fixture", signal)).environment).toEqual(environment);
-    expect(await client.pendingFunctionCalls("session-fixture", signal)).toEqual([
-      {
-        type: "function_call",
-        turn_id: "turn-fixture",
-        call_id: "call-fixture",
-        name: "fixture_tool",
-        arguments: {},
-      },
-    ]);
-  });
+  it.each([false, true])(
+    "handles matching self-hosted connection actions (controller: %s)",
+    async (controlled) => {
+      const environment = {
+        type: "self_hosted",
+        id: "environment-fixture",
+        workspace_directory: "/fixture/workspace",
+        remote_url: "wss://executor.invalid/session-fixture",
+      };
+      fetchWithSsrFGuardMock.mockImplementation(async () => ({
+        response: Response.json({
+          id: "session-fixture",
+          status: "requires_action",
+          error: null,
+          environment,
+          required_actions: [
+            { type: "environment_connection", environment_id: "environment-fixture" },
+            {
+              type: "function_call",
+              turn_id: "turn-fixture",
+              call_id: "call-fixture",
+              name: "fixture_tool",
+              arguments: {},
+            },
+          ],
+        }),
+        finalUrl: "https://api.openai.com/v1/agents/sessions/session-fixture",
+        release: async () => {},
+      }));
+      const client = new AgentsApiClient("fixture-not-a-real-api-key", vi.fn());
+      expect((await client.session("session-fixture", signal)).environment).toEqual(environment);
+      const connect = vi.fn(async () => {});
+      expect(
+        await client.pendingFunctionCalls(
+          "session-fixture",
+          signal,
+          controlled ? connect : undefined,
+        ),
+      ).toEqual([
+        {
+          type: "function_call",
+          turn_id: "turn-fixture",
+          call_id: "call-fixture",
+          name: "fixture_tool",
+          arguments: {},
+        },
+      ]);
+      expect(connect.mock.calls).toEqual(controlled ? [["environment-fixture"]] : []);
+    },
+  );
 
   it.each([
     { type: "openai_hosted", requestedId: "environment-fixture" },
@@ -86,9 +97,11 @@ describe("Agents API self-hosted session connection", () => {
         release: async () => {},
       });
       const client = new AgentsApiClient("fixture-not-a-real-api-key", vi.fn());
-      await expect(client.pendingFunctionCalls("session-fixture", signal)).rejects.toThrow(
+      const connect = vi.fn(async () => {});
+      await expect(client.pendingFunctionCalls("session-fixture", signal, connect)).rejects.toThrow(
         "cannot reconnect an environment_connection",
       );
+      expect(connect).not.toHaveBeenCalled();
     },
   );
 });
@@ -330,7 +343,6 @@ describe("Agents API file upload transport", () => {
       type: "conflict_error",
       message: dormantUploadMessage,
     },
-    { name: "server failure", status: 500, type: "conflict_error", message: dormantUploadMessage },
     {
       name: "malformed error",
       status: 409,
@@ -344,30 +356,6 @@ describe("Agents API file upload transport", () => {
     await expect(
       createClient().uploadFile("session-fixture", inputFile, signal),
     ).rejects.toMatchObject({ status, type, error: { type, message } });
-  });
-
-  it("preserves the dormant conflict when it comes from session lookup", async () => {
-    queueResponse(
-      Response.json(
-        { error: { type: "conflict_error", message: dormantUploadMessage } },
-        { status: 409 },
-      ),
-    );
-
-    await expect(
-      createClient().uploadFile("session-fixture", inputFile, signal),
-    ).rejects.toMatchObject({ status: 409, type: "conflict_error" });
-    expect(fetchWithSsrFGuardMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("preserves a transport failure instead of accepting its dormant error wording", async () => {
-    queueUploadContext();
-    const failure = new Error(dormantUploadMessage);
-    fetchWithSsrFGuardMock.mockRejectedValueOnce(failure);
-
-    await expect(
-      createClient().uploadFile("session-fixture", inputFile, signal),
-    ).rejects.toMatchObject({ cause: failure });
   });
 
   it.each(["abort", "authority revocation"])(

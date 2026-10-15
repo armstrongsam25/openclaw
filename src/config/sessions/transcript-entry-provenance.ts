@@ -104,6 +104,25 @@ export function rememberTranscriptMessageProvenance(
   }
 }
 
+/** Commit adapters may enrich the same acknowledged receipt without losing its original facts. */
+export function copyTranscriptMessageProvenance(
+  source: TranscriptMessageAppendResult<unknown>,
+  derived: TranscriptMessageAppendResult<unknown>,
+): void {
+  const retained = entryProvenance.get(source);
+  if (!retained) {
+    return;
+  }
+  if (
+    source.messageId !== retained.origin.entryId ||
+    derived.messageId !== retained.origin.entryId ||
+    derived.appended !== source.appended
+  ) {
+    throw new Error("Transcript provenance cannot be rebound to another input.");
+  }
+  entryProvenance.set(derived, retained);
+}
+
 /** Deferred projection retains the original write facts across its later read. */
 export function copyTranscriptMessageProvenanceToAnchor(
   message: TranscriptMessageAppendResult<unknown>,

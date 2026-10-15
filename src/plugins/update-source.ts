@@ -83,6 +83,29 @@ export type PluginUpdateOutcome =
       code?: string;
     });
 
+export function createOperatorManagedPluginUpdateOutcome(
+  update: OperatorManagedPluginUpdate,
+  coreVersion?: string,
+): PluginUpdateOutcome {
+  const [pluginId] = update.pluginIds;
+  const { source, rootDir, shadowedInstallOwner, shadowedInstallRecord } = update;
+  const shadowed = shadowedInstallRecord
+    ? ` It shadows the ${shadowedInstallRecord.source} install ${shadowedInstallRecord.spec ?? pluginId}${shadowedInstallRecord.installPath ? ` at ${shadowedInstallRecord.installPath}` : ""}.`
+    : "";
+  const guidance = `This copy was not updated; verify it against ${coreVersion ?? "the updated OpenClaw version"} or remove it from plugins.load.paths.`;
+  return {
+    pluginId,
+    status: "skipped",
+    code: "plugin-operator-managed",
+    source,
+    rootDir,
+    shadowedInstallOwner,
+    shadowedInstallRecord,
+    message: `Plugin "${pluginId}" is operator-managed by plugins.load.paths. ${guidance} Source: ${rootDir}.${shadowed}`,
+    guidance: [guidance],
+  };
+}
+
 export type PluginUpdateSummary = {
   config: OpenClawConfig;
   changed: boolean;
@@ -537,6 +560,36 @@ export function resolveClawHubUpdateSpecs(params: {
     coreVersion: params.coreVersion,
     versionBoundToCore: params.versionBoundToCore,
   });
+}
+
+/** Only a catalog-declared alternate may satisfy an implicit exact ClawHub target. */
+export function resolveClawHubNpmUpdateFallback(
+  officialInstall: ReturnType<
+    typeof officialInstallRecords.resolveTrustedSourceLinkedOfficialClawHubInstall
+  >,
+  clawhubSpecs: { installSpec?: string; recordSpec?: string } | undefined,
+) {
+  const { npmSpec, expectedIntegrity } = officialInstall ?? {};
+  const target = parseClawHubPluginSpec(clawhubSpecs?.installSpec ?? "");
+  if (
+    !npmSpec ||
+    clawhubSpecs?.installSpec === clawhubSpecs?.recordSpec ||
+    !target?.version ||
+    !isExactSemverVersion(target.version)
+  ) {
+    return undefined;
+  }
+  const installSpec = resolveDefaultNpmSpec(npmSpec)
+    ? `${resolveNpmSpecPackageName(npmSpec)}@${target.version}`
+    : npmSpec;
+  if (resolveExactNpmSpecVersion(installSpec) !== target.version) {
+    return undefined;
+  }
+  return {
+    installSpec,
+    recordSpec: npmSpec,
+    expectedIntegrity: installSpec === npmSpec ? expectedIntegrity : undefined,
+  };
 }
 
 /** Identity matching permits id/path cleanup, never an implicit registry-source switch. */

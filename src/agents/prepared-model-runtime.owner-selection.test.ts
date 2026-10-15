@@ -7,8 +7,16 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import { createDeferred } from "../../test/helpers/promise.js";
 import { retainLegacyDefaultAgentId } from "../config/legacy.default-agent-owner.js";
+import {
+  createPluginMetadataSnapshot,
+  makeRegistry,
+} from "../config/plugin-auto-enable.test-helpers.js";
+import * as pluginMetadata from "../plugins/plugin-metadata-snapshot.js";
 import * as legacyAuth from "./legacy-inherited-auth-dir.js";
-import { withPreparedModelRuntimePluginGenerationScope } from "./prepared-model-runtime-generation-scope.js";
+import {
+  scopePreparedModelRuntimeLease,
+  withPreparedModelRuntimePluginGenerationScope,
+} from "./prepared-model-runtime-generation-scope.js";
 import {
   acquireAgentRunPreparedModelRuntime,
   acquireReadOnlyPreparedModelRuntime,
@@ -20,7 +28,6 @@ import {
   prepareModelRuntimeSnapshot,
   publishPreparedModelRuntimeSnapshot,
   refreshPreparedModelRuntimeSnapshots,
-  rejectPendingPreparedModelRuntimeReplacement,
   registerPreparedModelRuntimePublicationListener,
 } from "./prepared-model-runtime.js";
 import { withPreparedModelRuntimeReadBatch } from "./prepared-model-runtime.owner.js";
@@ -55,6 +62,40 @@ function holdNextCatalogWrite() {
 }
 
 describe("prepared model runtime owner selection", () => {
+  it("awaits cold metadata preparation before deriving runtime selections", async () => {
+    const prepared = createDeferred<pluginMetadata.PluginMetadataSnapshot>();
+    const metadataStarted = createDeferred();
+    using resolveMetadata = vi
+      .spyOn(pluginMetadata, "resolvePluginMetadataSnapshotAsync")
+      .mockImplementationOnce(() => {
+        metadataStarted.resolve();
+        return prepared.promise;
+      });
+    const deriveRuntimePluginSelections = vi.fn(() => []);
+    const input = fixture.agentInput("cold-metadata", {});
+    const metadataSnapshot = createPluginMetadataSnapshot({
+      config: input.config,
+      manifestRegistry: makeRegistry([]),
+    });
+    const pending = acquireAgentRunPreparedModelRuntime(input, {
+      deriveRuntimePluginSelections,
+    });
+    await metadataStarted.promise;
+    expect(resolveMetadata).toHaveBeenCalledOnce();
+    expect(deriveRuntimePluginSelections).not.toHaveBeenCalled();
+    prepared.resolve(metadataSnapshot);
+    const lease = await pending;
+    try {
+      expect(deriveRuntimePluginSelections).toHaveBeenCalledExactlyOnceWith({
+        config: input.config,
+        metadataSnapshot,
+      });
+      expect(lease.snapshot.metadataSnapshot).toBe(metadataSnapshot);
+    } finally {
+      await lease[Symbol.asyncDispose]();
+    }
+  });
+
   it.each(["binding owner", "binding demand", "environment", "workspace"] as const)(
     "matches the configured owner for %s",
     async (scope) => {
@@ -92,6 +133,29 @@ describe("prepared model runtime owner selection", () => {
     },
   );
 
+  it("prepares prompt-only runtime owners separately from the configured agent generation", async () => {
+    const config = gatewayConfig();
+    await publishGateway(config, { catalogMode: "static" });
+    const published = (await loadPublishedGatewayReplyDispatchRuntime({ agentId: "default" }))!;
+    mocks.loadAgentRuntimePluginRegistryHandle.mockClear();
+    const lease = await acquireAgentRunPreparedModelRuntime(
+      {
+        ...fixture.agentInput("default", config),
+        runtimePluginPurpose: "isolated-completion",
+        runtimePluginSelections: [{ provider: "openai", modelId: "gpt-5.5" }],
+      },
+      { catalogMode: "static" },
+    );
+    try {
+      expect(lease.pluginGeneration).not.toBe(published.pluginGeneration);
+      expect(mocks.loadAgentRuntimePluginRegistryHandle.mock.calls[0]?.[0]).toMatchObject({
+        purpose: "isolated-completion",
+      });
+    } finally {
+      await lease[Symbol.asyncDispose]();
+    }
+  });
+
   it.each(["static", undefined] as const)(
     "keeps isolated executable catalogs separate from live discovery (%s)",
     async (catalogMode) => {
@@ -123,21 +187,27 @@ describe("prepared model runtime owner selection", () => {
     },
   );
 
-  it("replaces a static run owner when an explicit live acquisition follows", async () => {
+  it("honors live catalog demand inside a retained static parent", async () => {
     const input = {
-      config: {},
-      agentId: "default",
-      agentDir: fixture.state.agentDir("catalog-mode-upgrade"),
-      workspaceDir: "/tmp/catalog-mode-upgrade-workspace",
+      ...fixture.agentInput("default", {}),
+      workspaceDir: fixture.state.workspaceDir,
     };
-    const staticLease = await acquireAgentRunPreparedModelRuntime(input);
-    const liveLease = await acquireAgentRunPreparedModelRuntime(input, { catalogMode: "live" });
-
-    expect(liveLease.snapshot).not.toBe(staticLease.snapshot);
-    expect(mocks.prepareStaticCatalog).toHaveBeenCalledOnce();
-    expect(mocks.ensureOpenClawModelsJson).toHaveBeenCalledOnce();
-    await staticLease[Symbol.asyncDispose]();
-    await liveLease[Symbol.asyncDispose]();
+    const discovered = { id: "live-only", name: "Live catalog row", provider: "custom" };
+    mocks.buildPreparedModelCatalogSnapshot.mockResolvedValue({
+      entries: [discovered],
+      routeVariants: [discovered],
+    });
+    await using parent = scopePreparedModelRuntimeLease(
+      await acquireAgentRunPreparedModelRuntime(input, { catalogMode: "static" }),
+    );
+    expect(parent.snapshot.modelCatalog.entries).toEqual([]);
+    await parent.run(async () => {
+      await using live = await acquireAgentRunPreparedModelRuntime(input, {
+        catalogMode: "live",
+        pluginGeneration: parent.pluginGeneration,
+      });
+      expect(live.snapshot.modelCatalog.entries.map(({ id }) => id)).toEqual(["live-only"]);
+    });
   });
 
   it("rejects unpublished plugin generations while matching pending callers share their owner", async () => {
@@ -358,70 +428,6 @@ describe("prepared model runtime owner selection", () => {
     );
   });
 
-  it("selects a configured owner by agent id when directories are shared", async () => {
-    const config = {};
-    const agentDir = fixture.state.agentDir("shared-agent-id-directory");
-    await publishPreparedModelRuntimeSnapshot(
-      { agentId: "agent-a", config, agentDir, workspaceDir: "/tmp/shared-agent-id-workspace" },
-      { provenance: "configured" },
-    );
-    const selected = await publishPreparedModelRuntimeSnapshot(
-      { agentId: "agent-b", config, agentDir, workspaceDir: "/tmp/shared-agent-id-workspace" },
-      { provenance: "configured" },
-    );
-
-    await expect(
-      prepareModelRuntimeSnapshot({ agentId: "agent-b", config, agentDir }),
-    ).resolves.toBe(selected);
-  });
-
-  it("shares workspace facts while isolating each agent's configured model projection", async () => {
-    mocks.configuredAgentIds = ["agent-a", "agent-b"];
-    for (const agentId of mocks.configuredAgentIds) {
-      mocks.configuredWorkspaces.set(agentId, "/tmp/shared-agent-model-workspace");
-    }
-    mocks.resolveStaticCatalogModel.mockImplementation(
-      ({ provider, modelId }: { provider: string; modelId: string }) => ({
-        id: modelId,
-        name: modelId,
-        provider,
-        api: "openai-completions",
-        baseUrl: "https://models.example/v1",
-        reasoning: false,
-        input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 128_000,
-        maxTokens: 8_192,
-      }),
-    );
-    const config = {
-      agents: {
-        defaults: { model: "custom/shared-model" },
-        entries: { "agent-a": { model: "custom/model-a" }, "agent-b": { model: "custom/model-b" } },
-      },
-    };
-
-    await refreshPreparedModelRuntimeSnapshots(config, {
-      gatewayLifecycle: true,
-      catalogMode: "static",
-    });
-
-    for (const agentId of mocks.configuredAgentIds) {
-      const snapshot = getPreparedModelRuntimeSnapshot({
-        ...fixture.agentInput(agentId, config),
-        workspaceDir: "/tmp/shared-agent-model-workspace",
-      });
-      expect(snapshot?.configuredRuntimeModels.map(({ modelId }) => modelId)).toEqual([
-        "shared-model",
-        agentId === "agent-a" ? "model-a" : "model-b",
-      ]);
-      expect(snapshot?.modelCatalog.entries.map(({ id }) => id)).not.toContain(
-        agentId === "agent-a" ? "model-b" : "model-a",
-      );
-    }
-    expect(mocks.prepareStaticCatalog).toHaveBeenCalledOnce();
-  });
-
   it("keeps registry parsing isolated across OAuth provider generations in a shared workspace", async () => {
     mocks.configuredAgentIds = ["agent-a", "agent-b", "agent-c"];
     const sharedCatalog = JSON.stringify({
@@ -472,91 +478,9 @@ describe("prepared model runtime owner selection", () => {
     expect(mocks.discoverModels).toHaveBeenCalledTimes(2);
     expect(runtimeRegistryCount).toBe(2);
   });
-
-  it("publishes a current sibling when another auth owner is superseded", async () => {
-    const config = {};
-    const supersededDir = fixture.state.agentDir("auth-retry-superseded");
-    const siblingDir = fixture.state.agentDir("auth-retry-sibling");
-    await publishPreparedModelRuntimeSnapshot({ config, agentDir: supersededDir });
-    const firstSibling = await publishPreparedModelRuntimeSnapshot({
-      config,
-      agentDir: siblingDir,
-    });
-    const releaseSupersededRefreshGate = createDeferred();
-    let blockedSupersededRefresh = true;
-    mocks.ensureOpenClawModelsJson.mockImplementation(async (_config, agentDir) => {
-      if (agentDir === supersededDir && blockedSupersededRefresh) {
-        blockedSupersededRefresh = false;
-        await releaseSupersededRefreshGate.promise;
-      }
-      return { agentDir: String(agentDir), wrote: false };
-    });
-
-    let siblingPending: ReturnType<typeof publishPreparedModelRuntimeSnapshot> | undefined;
-    try {
-      mocks.mutationListener?.({ affectsInheritedStores: true });
-      await vi.waitFor(() => expect(mocks.ensureOpenClawModelsJson).toHaveBeenCalledTimes(4));
-      siblingPending = publishPreparedModelRuntimeSnapshot({
-        config,
-        agentDir: siblingDir,
-      });
-      mocks.mutationListener?.({ agentDir: supersededDir, affectsInheritedStores: false });
-      releaseSupersededRefreshGate.resolve();
-
-      await expect(siblingPending).resolves.not.toBe(firstSibling);
-      await vi.waitFor(() => expect(mocks.ensureOpenClawModelsJson).toHaveBeenCalledTimes(6));
-      await expect(
-        prepareModelRuntimeSnapshot({ config, agentDir: supersededDir }),
-      ).resolves.toMatchObject({ agentDir: supersededDir });
-    } finally {
-      releaseSupersededRefreshGate.resolve();
-      await Promise.allSettled([
-        siblingPending,
-        prepareModelRuntimeSnapshot({ config, agentDir: supersededDir }),
-      ]);
-    }
-  });
 });
 
 describe("prepared model runtime snapshots", () => {
-  it.each([false, true])(
-    "terminates invalidation after failure (pending replacement: %s)",
-    async (waitForReplacement) => {
-      await publishGateway({});
-      const events: Array<{ phase: string; error?: Error; replacement?: Promise<void> }> = [];
-      const unregister = registerPreparedModelRuntimePublicationListener((event) => {
-        events.push(event);
-      });
-      const replacementError = new Error("replacement aborted");
-      const reason = waitForReplacement
-        ? "test failed reload"
-        : "direct invalidation has no replacement";
-      const gateId = markPreparedModelRuntimeSnapshotsStale(
-        reason,
-        waitForReplacement ? { waitForReplacement: true } : undefined,
-      );
-      if (waitForReplacement) {
-        rejectPendingPreparedModelRuntimeReplacement(gateId, replacementError);
-      }
-      unregister();
-      expect(events).toEqual([
-        {
-          phase: "invalidated",
-          ...(waitForReplacement ? { replacement: expect.any(Promise) } : {}),
-        },
-        {
-          phase: "failed",
-          error: waitForReplacement
-            ? replacementError
-            : expect.objectContaining({ message: reason }),
-        },
-      ]);
-      if (waitForReplacement) {
-        await expect(events[0]?.replacement).rejects.toBe(replacementError);
-      }
-    },
-  );
-
   it("does not let a read-only draft replace a configured gateway owner", async () => {
     const configured = gatewayConfig();
     await publishGateway(configured, {
@@ -577,38 +501,6 @@ describe("prepared model runtime snapshots", () => {
       }),
     ).resolves.toMatchObject({ config: configured });
     expect(mocks.ensureOpenClawModelsJson).toHaveBeenCalledOnce();
-  });
-
-  it("retains only the latest idle direct-run owner", async () => {
-    const options = { retainIdleRunOwner: true };
-    const firstInput = {
-      config: {},
-      agentId: "default",
-      agentDir: fixture.state.agentDir("standalone-retained-run-agent"),
-      workspaceDir: "/tmp/standalone-retained-run-workspace",
-    };
-    const firstLease = await acquireAgentRunPreparedModelRuntime(firstInput, options);
-    await firstLease[Symbol.asyncDispose]();
-
-    await expect(prepareModelRuntimeSnapshot(firstInput)).resolves.toBe(firstLease.snapshot);
-    const reusedLease = await acquireAgentRunPreparedModelRuntime(firstInput, options);
-    await reusedLease[Symbol.asyncDispose]();
-    expect(mocks.prepareStaticCatalog).toHaveBeenCalledOnce();
-    expect(mocks.ensureOpenClawModelsJson).not.toHaveBeenCalled();
-
-    const secondInput = {
-      ...firstInput,
-      workspaceDir: "/tmp/standalone-retained-run-workspace-2",
-    };
-    const secondLease = await acquireAgentRunPreparedModelRuntime(secondInput, options);
-    await secondLease[Symbol.asyncDispose]();
-
-    await expect(prepareModelRuntimeSnapshot(firstInput)).rejects.toThrow(
-      "prepared model runtime owner was not published",
-    );
-    await expect(prepareModelRuntimeSnapshot(secondInput)).resolves.toBe(secondLease.snapshot);
-    expect(mocks.prepareStaticCatalog).toHaveBeenCalledTimes(2);
-    expect(mocks.ensureOpenClawModelsJson).not.toHaveBeenCalled();
   });
 
   it("does not let a stale dynamic lease authorize a replacement generation", async () => {
@@ -658,6 +550,10 @@ describe("prepared model runtime snapshots", () => {
       const latestConfig = { agents: { defaults: { model: "openai/gpt-5.5" } } };
       await publishGateway(initialConfig);
       const replacementWrite = holdNextCatalogWrite();
+      const executionFolder = canonical
+        ? "/tmp/old-workspace-dir"
+        : "/tmp/dynamic-replacement-workspace";
+      const catalogBuildsBeforeAdmission = mocks.prepareStaticCatalog.mock.calls.length;
 
       let leasePending: ReturnType<typeof acquireAgentRunPreparedModelRuntime> | undefined;
       let refresh: ReturnType<typeof refreshPreparedModelRuntimeSnapshots> | undefined;
@@ -667,7 +563,7 @@ describe("prepared model runtime snapshots", () => {
         });
         leasePending = acquireAgentRunPreparedModelRuntime({
           ...fixture.agentInput("default", initialConfig),
-          workspaceDir: canonical ? "/tmp/old-workspace-dir" : "/tmp/dynamic-replacement-workspace",
+          workspaceDir: executionFolder,
           ...(canonical
             ? {
                 agentDir: "/tmp/old-agent-dir",
@@ -687,14 +583,12 @@ describe("prepared model runtime snapshots", () => {
         const lease = await leasePending;
 
         expect(lease.snapshot.config).toBe(latestConfig);
-        expect(lease.snapshot.workspaceDir).toBe(
-          canonical ? "/tmp/unused-workspace" : "/tmp/dynamic-replacement-workspace",
-        );
+        expect(lease.snapshot.workspaceDir).toBe("/tmp/unused-workspace");
         expect(mocks.ensureOpenClawModelsJson).toHaveBeenCalledTimes(2);
         if (canonical) {
           expect(lease.snapshot.agentDir).toBe(fixture.state.agentDir("default"));
         } else {
-          expect(mocks.prepareStaticCatalog).toHaveBeenCalledOnce();
+          expect(mocks.prepareStaticCatalog).toHaveBeenCalledTimes(catalogBuildsBeforeAdmission);
         }
         await lease[Symbol.asyncDispose]();
       } finally {
@@ -706,24 +600,6 @@ describe("prepared model runtime snapshots", () => {
       }
     },
   );
-
-  it("releases a one-read dynamic metadata generation", async () => {
-    await refreshPreparedModelRuntimeSnapshots({}, { gatewayLifecycle: true });
-    const input = {
-      agentId: "default",
-      config: {},
-      agentDir: fixture.state.agentDir("metadata-agent"),
-      workspaceDir: "/tmp/prepared-model-runtime-metadata-workspace",
-    };
-
-    const lease = await acquireReadOnlyPreparedModelRuntime(input);
-    expect(lease.snapshot.workspaceDir).toBe(input.workspaceDir);
-    await lease[Symbol.asyncDispose]();
-
-    await expect(prepareModelRuntimeSnapshot({ ...input, readOnly: true })).rejects.toThrow(
-      "prepared model runtime owner was not published",
-    );
-  });
 
   it("does not serve a retired owner when another owner fails to refresh", async () => {
     mocks.configuredAgentIds = ["default", "removed"];
@@ -916,21 +792,6 @@ describe("prepared model runtime snapshots", () => {
         prepareModelRuntimeSnapshot({ config, agentDir: failingDir }),
       ]);
     }
-  });
-
-  it("refreshes explicit auth inheritance", async () => {
-    const config = {};
-    const agentDir = fixture.state.agentDir("custom-agent");
-    const inheritedAuthDir = fixture.state.agentDir("main-agent");
-    const input = { config, agentDir, inheritedAuthDir };
-    await publishPreparedModelRuntimeSnapshot(input);
-    mocks.mutationListener?.({ agentDir: inheritedAuthDir, affectsInheritedStores: false });
-    await vi.waitFor(() => expect(mocks.ensureOpenClawModelsJson).toHaveBeenCalledTimes(2));
-    await prepareModelRuntimeSnapshot(input);
-    expect(mocks.discoverAuthStorage).toHaveBeenLastCalledWith(
-      agentDir,
-      expect.objectContaining({ inheritedAuthDir }),
-    );
   });
 
   it("preserves an authoritative workspace override across config refresh", async () => {

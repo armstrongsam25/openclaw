@@ -78,9 +78,9 @@ describe("public ACP source settlement physical ownership", () => {
             }
             databasePath = receipt.storePath;
             sourceAtCompletion = loadSessionEntryReadOnly({ ...target, storePath: databasePath });
+            expect(sourceAtCompletion?.status).toBeUndefined();
             expect(sourceAtCompletion).toMatchObject({
               sessionId: target.sessionId,
-              status: "running",
               activeWriterRunId: runId,
               lifecycleRunId: runId,
               acpSourceTurn: { sourceSessionId: target.sessionId, runId },

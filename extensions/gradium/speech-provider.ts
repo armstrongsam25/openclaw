@@ -14,13 +14,7 @@ import {
 import { DEFAULT_GRADIUM_VOICE_ID, GRADIUM_VOICES, normalizeGradiumBaseUrl } from "./shared.js";
 import { gradiumTTS } from "./tts.js";
 
-type GradiumProviderConfig = {
-  apiKey?: string;
-  baseUrl: string;
-  voiceId: string;
-};
-
-function normalizeGradiumProviderConfig(rawConfig: Record<string, unknown>): GradiumProviderConfig {
+function normalizeGradiumProviderConfig(rawConfig: Record<string, unknown>) {
   const providers = asOptionalRecord(rawConfig.providers);
   const raw = asOptionalRecord(providers?.gradium) ?? asOptionalRecord(rawConfig.gradium);
   return {
@@ -33,7 +27,7 @@ function normalizeGradiumProviderConfig(rawConfig: Record<string, unknown>): Gra
   };
 }
 
-function readGradiumProviderConfig(config: SpeechProviderConfig): GradiumProviderConfig {
+function readGradiumProviderConfig(config: SpeechProviderConfig) {
   return normalizeGradiumProviderConfig({
     gradium: { ...config, apiKey: trimToUndefined(config.apiKey) },
   });
@@ -89,6 +83,8 @@ function parseDirectiveToken(ctx: SpeechDirectiveTokenParseContext) {
 }
 
 export function buildGradiumSpeechProvider(): SpeechProviderPlugin {
+  const isConfigured: NonNullable<SpeechProviderPlugin["isConfigured"]> = ({ providerConfig }) =>
+    isGradiumProviderConfigured(providerConfig);
   return {
     id: "gradium",
     label: "Gradium",
@@ -97,7 +93,9 @@ export function buildGradiumSpeechProvider(): SpeechProviderPlugin {
     resolveConfig: ({ rawConfig }) => normalizeGradiumProviderConfig(rawConfig),
     parseDirectiveToken,
     listVoices: async () => GRADIUM_VOICES.map((v) => ({ id: v.id, name: v.name })),
-    isConfigured: ({ providerConfig }) => isGradiumProviderConfigured(providerConfig),
+    // Retained for synchronous SDK consumers through 2026-12-31.
+    isConfigured,
+    isConfiguredAsync: async (ctx) => isConfigured(ctx),
     synthesize: async (req) => {
       const wantsVoiceNote = req.target === "voice-note";
       const outputFormat = wantsVoiceNote ? "opus" : "wav";

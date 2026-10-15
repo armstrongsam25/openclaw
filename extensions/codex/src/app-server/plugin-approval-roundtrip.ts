@@ -47,7 +47,6 @@ export function codexApprovalTimeoutText(kind: CodexApprovalKind): string {
   return `${CODEX_APPROVAL_TIMEOUT_SUBJECTS[kind]} timed out before an operator responded.`;
 }
 
-/** Normalized Codex app-server approval outcome after a gateway decision. */
 export type AppServerApprovalOutcome =
   | "approved-once"
   | "approved-session"
@@ -90,20 +89,6 @@ export async function requestPluginApproval(params: {
   });
 }
 
-/** Detects the gateway's explicit null-decision marker for unavailable approvals. */
-export function approvalRequestExplicitlyUnavailable(result: unknown): boolean {
-  if (result === null || result === undefined || typeof result !== "object") {
-    return false;
-  }
-  let descriptor: PropertyDescriptor | undefined;
-  try {
-    descriptor = Object.getOwnPropertyDescriptor(result, "decision");
-  } catch {
-    return false;
-  }
-  return descriptor !== undefined && "value" in descriptor && descriptor.value === null;
-}
-
 /** Waits for the gateway's final approval decision, respecting turn aborts. */
 export async function waitForPluginApprovalDecision(params: {
   hostCapabilities: AgentHarnessHostCapabilities;
@@ -129,7 +114,6 @@ export async function waitForPluginApprovalDecision(params: {
   );
 }
 
-/** Converts a gateway exec approval decision into the app-server approval outcome enum. */
 export function mapExecDecisionToOutcome(
   decision: ExecApprovalDecision | null | undefined,
 ): Exclude<AppServerApprovalOutcome, "cancelled"> {
@@ -158,13 +142,10 @@ export async function requestPluginApprovalOutcome(
     if (!approvalId) {
       return "unavailable";
     }
-    const approvalResult = approvalRequestExplicitlyUnavailable(requestResult)
-      ? undefined
-      : await waitForPluginApprovalDecision({
-          hostCapabilities: params.hostCapabilities,
-          approvalId,
-          signal: params.signal,
-        });
+    const approvalResult =
+      requestResult?.decision === null
+        ? undefined
+        : await waitForPluginApprovalDecision({ ...params, approvalId });
     if (params.signal?.aborted) {
       return "cancelled";
     }

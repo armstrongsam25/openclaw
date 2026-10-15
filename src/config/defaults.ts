@@ -1,4 +1,3 @@
-// Provides canonical default config values and model/provider defaults.
 import { normalizeProviderId } from "@openclaw/model-catalog-core/provider-id";
 import {
   collectManifestModelIdNormalizationPolicies,
@@ -41,7 +40,6 @@ type ProviderPolicyDefaultsOptions = {
 const defaultWarnState: WarnState = { warned: false };
 
 export const DEFAULT_MODEL_ALIASES: Readonly<Record<string, string>> = {
-  // Anthropic (shared model runtime catalog uses "latest" ids without date suffix)
   opus: "anthropic/claude-opus-5-5",
   sonnet: "anthropic/claude-sonnet-5-5",
 
@@ -49,10 +47,9 @@ export const DEFAULT_MODEL_ALIASES: Readonly<Record<string, string>> = {
   "gpt-mini": "openai/gpt-5.4-mini",
   "gpt-nano": "openai/gpt-5.4-nano",
 
-  // Google Gemini (3.x — flash-lite is GA; pro and flash are still preview)
-  gemini: "google/gemini-3.1-pro-preview",
-  "gemini-flash": "google/gemini-3-flash-preview",
-  "gemini-flash-lite": "google/gemini-3.1-flash-lite",
+  gemini: "google/gemini-4-argon",
+  "gemini-flash": "google/gemini-3.8-flash",
+  "gemini-flash-lite": "google/gemini-3.5-flash-lite",
 };
 
 const DEFAULT_MODEL_COST: ModelDefinitionConfig["cost"] = {

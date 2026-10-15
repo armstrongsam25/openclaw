@@ -3,7 +3,7 @@ import { afterAll, expect, test, vi } from "vitest";
 import { observeHostDataSql } from "../../test/helpers/sqlite-statement-execution-counter.js";
 import { AcpSessionManager } from "../acp/control-plane/manager.core.js";
 import { disposeAcpSessionManagerInstance } from "../acp/control-plane/manager.lifecycle.js";
-import { writeAcpSessionMetaForMigration } from "../acp/runtime/session-meta.js";
+import { seedCanonicalAcpSessionMeta } from "../acp/runtime/session-meta-fixture.test-support.js";
 import {
   closeAdmittedRunDelegatedAuthority,
   createOperationalRunInstanceRef,
@@ -25,7 +25,7 @@ import { createSqliteTranscriptTarget } from "./user-turn-transcript.test-suppor
 
 const sessionDirs = useSessionStoreTempDirs(afterAll, "openclaw-acp-source-turn-");
 
-test("admits a canonical source routed to legacy ACP metadata without inventing a target incarnation", async () => {
+test("admits a canonical source routed to unbound canonical ACP metadata without inventing a target incarnation", async () => {
   await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
     const source = {
       agentId: "main",
@@ -36,7 +36,7 @@ test("admits a canonical source routed to legacy ACP metadata without inventing 
     await replaceSessionEntry(source, { sessionId: source.sessionId, updatedAt: 1 });
     const cfg = { session: { store: source.storePath } };
     const sessionKey = "agent:main:acp:legacy-target";
-    writeAcpSessionMetaForMigration({
+    seedCanonicalAcpSessionMeta({
       env: state.env,
       sessionKey,
       meta: {
@@ -53,11 +53,11 @@ test("admits a canonical source routed to legacy ACP metadata without inventing 
       const target = await manager.resolveSessionAsync({ cfg, sessionKey });
       expect(target).toMatchObject({ kind: "ready", sessionKey, entry: undefined });
       if (target.kind !== "ready") {
-        throw new Error("Legacy ACP metadata was not resolved");
+        throw new Error("Unbound canonical ACP metadata was not resolved");
       }
       const recorder = createUserTurnTranscriptRecorder({
         target: { ...source, sessionEntry: undefined },
-        input: { text: "Continue through the existing legacy ACP target" },
+        input: { text: "Continue through the existing unbound ACP target" },
       });
       await prepareAcpSourceTurnInput(
         recorder,
@@ -67,8 +67,8 @@ test("admits a canonical source routed to legacy ACP metadata without inventing 
         async () => {},
       );
       const running = loadSessionEntryReadOnly(source);
+      expect(running?.status).toBeUndefined();
       expect(running).toMatchObject({
-        status: "running",
         activeWriterRunId: "legacy-source-run",
         acpSourceTurn: {
           sourceSessionId: source.sessionId,
@@ -101,6 +101,9 @@ test("channel ACP claim and settlement use the database worker and fresh lifecyc
     sessionId: target.sessionId,
     updatedAt: 2,
     activeWriterRunId: "previous-native-run",
+    restartRecoveryDeliveryRunId: "channel-acp-run",
+    restartRecoveryDeliverySourceRunId: "channel-user-source",
+    restartRecoverySourceIngress: "channel",
     lastRunId: "previous-native-run",
     lastRunError: "previous native failure",
     status: "failed",
@@ -130,8 +133,8 @@ test("channel ACP claim and settlement use the database worker and fresh lifecyc
   }
   expect.soft(claimSql.queries).toEqual([]);
   const running = loadSessionEntryReadOnly(target);
+  expect(running?.status).toBeUndefined();
   expect(running).toMatchObject({
-    status: "running",
     activeWriterRunId: "channel-acp-run",
     lifecycleRunId: "channel-acp-run",
     acpSourceTurn: { sourceSessionId: target.sessionId, runId: "channel-acp-run" },
@@ -168,6 +171,13 @@ test("channel ACP claim and settlement use the database worker and fresh lifecyc
   expect(completed).toMatchObject({ status: "done", runtimeMs: 25, lastRunId: "channel-acp-run" });
   expect(completed?.acpSourceTurn).toBeUndefined();
   expect(completed?.activeWriterRunId).toBeUndefined();
+  expect(completed?.restartRecoveryDeliveryRunId).toBeUndefined();
+  expect(completed?.restartRecoveryDeliverySourceRunId).toBeUndefined();
+  expect(completed?.restartRecoverySourceIngress).toBeUndefined();
+  expect(completed?.restartRecoveryTerminalRunIds).toEqual([
+    "channel-user-source",
+    "channel-acp-run",
+  ]);
 });
 
 test.each(["claim", "settlement"] as const)(
@@ -241,8 +251,8 @@ test.each(["claim", "settlement"] as const)(
         expect(entry?.acpSourceTurn).toBeUndefined();
         expect(entry?.activeWriterRunId).toBeUndefined();
       } else {
+        expect(entry?.status).toBeUndefined();
         expect(entry).toMatchObject({
-          status: "running",
           activeWriterRunId: runId,
           acpSourceTurn: { sourceSessionId: target.sessionId, runId },
         });

@@ -17,6 +17,7 @@ import {
 import { expectDefined } from "@openclaw/normalization-core";
 import { normalizeUniqueStringEntries } from "@openclaw/normalization-core/string-normalization";
 import type { Dispatcher } from "undici";
+import { raceWithTimeout } from "../../../packages/retry/src/index.js";
 import { createDeferredCore } from "../../shared/deferred.js";
 import { normalizeHostname } from "./hostname.js";
 import {
@@ -103,17 +104,15 @@ export function mergeSsrFPolicies(
     if (!policy) {
       continue;
     }
-    if (policy.allowPrivateNetwork) {
-      merged.allowPrivateNetwork = true;
-    }
-    if (policy.dangerouslyAllowPrivateNetwork) {
-      merged.dangerouslyAllowPrivateNetwork = true;
-    }
-    if (policy.allowRfc2544BenchmarkRange) {
-      merged.allowRfc2544BenchmarkRange = true;
-    }
-    if (policy.allowIpv6UniqueLocalRange) {
-      merged.allowIpv6UniqueLocalRange = true;
+    for (const key of [
+      "allowPrivateNetwork",
+      "dangerouslyAllowPrivateNetwork",
+      "allowRfc2544BenchmarkRange",
+      "allowIpv6UniqueLocalRange",
+    ] as const) {
+      if (policy[key]) {
+        merged[key] = true;
+      }
     }
     for (const key of [
       "allowedHostnames",
@@ -472,7 +471,9 @@ export function createPinnedLookup(params: {
     const candidates =
       requestedFamily === 4 || requestedFamily === 6
         ? records.filter((entry) => entry.family === requestedFamily)
-        : automaticRecords;
+        : opts.all
+          ? records
+          : automaticRecords;
     const usable = candidates.length > 0 ? candidates : automaticRecords;
     // Match dns.lookup's asynchronous callback contract so connection errors
     // cannot fire before the socket owner attaches its error listener.
@@ -651,16 +652,22 @@ export function createPinnedDispatcher(
   policy?: PinnedDispatcherPolicy,
   ssrfPolicy?: SsrFPolicy,
   timeoutMs?: number,
+  streamTimeoutMs?: number,
 ): Dispatcher {
   const lookup = resolvePinnedDispatcherLookup(pinned, policy?.pinnedHostname, ssrfPolicy);
+  const streamTimeouts = { bodyTimeout: streamTimeoutMs, headersTimeout: streamTimeoutMs };
 
   if (!policy || policy.mode === "direct") {
-    return createHttp1Agent({ connect: withPinnedLookup(lookup, policy?.connect) }, timeoutMs);
+    return createHttp1Agent(
+      { ...streamTimeouts, connect: withPinnedLookup(lookup, policy?.connect) },
+      timeoutMs,
+    );
   }
 
   if (policy.mode === "env-proxy") {
     return createHttp1EnvHttpProxyAgent(
       {
+        ...streamTimeouts,
         connect: withPinnedLookup(lookup, policy.connect),
         ...(policy.proxyTls ? { proxyTls: { ...policy.proxyTls } } : {}),
       },
@@ -672,6 +679,7 @@ export function createPinnedDispatcher(
   const requestTls = withPinnedLookup(lookup, policy.proxyTls);
   return createHttp1ProxyAgent(
     {
+      ...streamTimeouts,
       uri: proxyUrl,
       // `PinnedDispatcherPolicy.proxyTls` historically carried target-hop
       // transport hints for explicit proxies. Translate that to undici's
@@ -701,26 +709,16 @@ async function waitForDispatcherClose(candidate: ClosableDispatcher): Promise<vo
     destroyDispatcher(candidate);
     return;
   }
-  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    await Promise.race([
+    await raceWithTimeout(
       Promise.resolve(close.call(candidate)),
-      new Promise<void>((resolve) => {
-        timeout = setTimeout(() => {
-          timeout = undefined;
-          destroyDispatcher(candidate);
-          resolve();
-        }, DISPATCHER_CLOSE_TIMEOUT_MS);
-        timeout.unref?.();
-      }),
-    ]);
+      DISPATCHER_CLOSE_TIMEOUT_MS,
+      () => destroyDispatcher(candidate),
+      { ref: false },
+    );
   } catch (err) {
     destroyDispatcher(candidate);
     throw err;
-  } finally {
-    if (timeout) {
-      clearTimeout(timeout);
-    }
   }
 }
 

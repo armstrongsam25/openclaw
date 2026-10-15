@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-// Generates release dependency evidence artifacts and summaries.
 import { execFileSync } from "node:child_process";
 import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -10,7 +9,7 @@ import { parseFlagArgs, stringFlag } from "./lib/arg-utils.mts";
 import { REPORT_CLI_PARSE_OPTIONS } from "./lib/report-cli-helpers.mts";
 import type { generateNpmPackageLocksReport } from "./npm-package-locks-report.mts";
 
-export const DEPENDENCY_EVIDENCE_REPORTS = [
+const DEPENDENCY_EVIDENCE_REPORTS = [
   {
     name: "Dependency advisory vulnerability gate",
     command: "pnpm deps:vuln:gate",
@@ -178,7 +177,7 @@ export function resolvePreviousReleaseTag({
   );
 }
 
-export function createDependencyEvidenceManifest({
+function createDependencyEvidenceManifest({
   generatedAt = new Date().toISOString(),
   releaseTag,
   releaseRef,

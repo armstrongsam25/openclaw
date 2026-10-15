@@ -40,6 +40,9 @@ export async function runDispatch(params: {
   bodyForAgent: string;
   runId?: string;
   onAgentRunStart?: Parameters<typeof tryDispatchAcpReplyCore>[0]["onAgentRunStart"];
+  onPreparedAgentRunStart?: Parameters<
+    typeof tryDispatchAcpReplyCore
+  >[0]["onPreparedAgentRunStart"];
   userTurnTranscriptRecorder?: Parameters<
     typeof tryDispatchAcpReplyCore
   >[0]["userTurnTranscriptRecorder"];
@@ -82,6 +85,7 @@ export async function runDispatch(params: {
     dispatcher: params.dispatcher ?? createDispatcher().dispatcher,
     ...(params.runId ? { runId: params.runId } : {}),
     onAgentRunStart: params.onAgentRunStart,
+    onPreparedAgentRunStart: params.onPreparedAgentRunStart,
     userTurnTranscriptRecorder: params.userTurnTranscriptRecorder,
     prepareAssistantTranscriptMessage: params.prepareAssistantTranscriptMessage,
     sessionKey: targetSessionKey,
@@ -98,8 +102,8 @@ export async function runDispatch(params: {
           originatingTo: params.originatingTo ?? "telegram:thread-1",
         }
       : {}),
-    shouldSendToolSummaries: true,
-    shouldSendFullToolDetails: false,
+    shouldSendToolSummaries: async () => true,
+    shouldSendFullToolDetails: async () => false,
     bypassForCommand: false,
     toolsAllow: params.toolsAllow,
     ...(params.onReplyStart ? { onReplyStart: params.onReplyStart } : {}),

@@ -8,6 +8,7 @@ import type {
   SessionTranscriptTurnExpectedState,
   SessionTranscriptTurnLifecyclePatch,
 } from "./session-transcript-turn-lifecycle.types.js";
+import type { SqliteSessionTurnOptions } from "./session-turn.types.js";
 import type { InternalSessionEntry as SessionEntry } from "./types.js";
 
 // Metadata timestamps do not fence recovery; writer and lifecycle checks are separate.
@@ -33,6 +34,7 @@ export function buildRestartRecoveryExpectedState(
     restartRecoveryRequesterAccountId: entry.restartRecoveryRequesterAccountId,
     restartRecoveryRequesterSenderId: entry.restartRecoveryRequesterSenderId,
     restartRecoverySameChannelThreadRequired: entry.restartRecoverySameChannelThreadRequired,
+    restartRecoveryOperatorSource: entry.restartRecoveryOperatorSource,
     restartRecoverySourceIngress: entry.restartRecoverySourceIngress,
     restartRecoverySourceReplyDeliveryMode: entry.restartRecoverySourceReplyDeliveryMode,
     restartRecoveryTerminalRunIds: entry.restartRecoveryTerminalRunIds,
@@ -45,6 +47,7 @@ export function sessionMatchesExpectedTranscriptTurn<T extends { entry: SessionE
   expected: {
     expectedLifecycleRevision?: SessionLifecycleRevisionExpectation;
     expectedWriterRunId?: SessionTranscriptTurnExpectedState["expectedWriterRunId"];
+    expectedOwner?: Pick<SessionEntry, "lifecycleRevision" | "activeWriterRunId">;
     expectedSessionState?: SessionTranscriptTurnExpectedState;
     expectedSessionId: string;
   },
@@ -57,6 +60,9 @@ export function sessionMatchesExpectedTranscriptTurn<T extends { entry: SessionE
       selected.entry.lifecycleRevision === (expected.expectedLifecycleRevision ?? undefined)) &&
     (expected.expectedWriterRunId === undefined ||
       selected.entry.activeWriterRunId === expected.expectedWriterRunId) &&
+    (expected.expectedOwner === undefined ||
+      (selected.entry.lifecycleRevision === expected.expectedOwner.lifecycleRevision &&
+        selected.entry.activeWriterRunId === expected.expectedOwner.activeWriterRunId)) &&
     (expectedState === undefined ||
       (isDeepStrictEqual(selected.entry.acpSourceTurn, expectedState.acpSourceTurn) &&
         (!("activeWriterRunId" in expectedState) ||
@@ -85,6 +91,10 @@ export function sessionMatchesExpectedTranscriptTurn<T extends { entry: SessionE
           expectedState.restartRecoveryRequesterSenderId &&
         selected.entry.restartRecoverySameChannelThreadRequired ===
           expectedState.restartRecoverySameChannelThreadRequired &&
+        isDeepStrictEqual(
+          selected.entry.restartRecoveryOperatorSource,
+          expectedState.restartRecoveryOperatorSource,
+        ) &&
         selected.entry.restartRecoverySourceIngress ===
           expectedState.restartRecoverySourceIngress &&
         selected.entry.restartRecoverySourceReplyDeliveryMode ===
@@ -101,22 +111,21 @@ export function buildExpectedTranscriptTurnSessionPatch(params: {
   appendedMessages: readonly { appended: boolean }[];
   currentEntry: SessionEntry;
   expectedSessionState?: SessionTranscriptTurnExpectedState;
-  sessionFile: string;
   sessionLifecyclePatch?: SessionTranscriptTurnLifecyclePatch;
   touchSessionEntry?: boolean;
 }): Partial<SessionEntry> {
-  const appendedCount = params.appendedMessages.filter((message) => message.appended).length;
+  const hasAppendedMessage = params.appendedMessages.some((message) => message.appended);
   const acceptedMessage =
-    appendedCount > 0 ||
+    hasAppendedMessage ||
     (params.expectedSessionState !== undefined &&
       params.appendedMessages.some((message) => !message.appended));
-  const touchUpdatedAt = params.touchSessionEntry === true && appendedCount > 0 ? Date.now() : 0;
+  const touchUpdatedAt = params.touchSessionEntry === true && hasAppendedMessage ? Date.now() : 0;
   const interruptedAcpRunId = params.currentEntry.acpSourceTurn?.runId;
   const clearsInterruptedAcpWriter =
     acceptedMessage &&
     interruptedAcpRunId !== undefined &&
     params.currentEntry.activeWriterRunId === interruptedAcpRunId &&
-    params.sessionLifecyclePatch?.status === "interrupted" &&
+    params.sessionLifecyclePatch?.status === "killed" &&
     Object.hasOwn(params.sessionLifecyclePatch, "acpSourceTurn") &&
     params.sessionLifecyclePatch.acpSourceTurn === undefined;
   const restartRecoveryTerminalRunIds = params.sessionLifecyclePatch?.restartRecoveryTerminalRunIds
@@ -140,4 +149,37 @@ export function buildExpectedTranscriptTurnSessionPatch(params: {
         }
       : {}),
   };
+}
+
+/** Prepare the shared entry-selection policy without opening a database. */
+export function prepareSessionTranscriptTurnEntry(options: SqliteSessionTurnOptions) {
+  const initialEntry = options.initialSessionEntry
+    ? structuredClone(options.initialSessionEntry)
+    : undefined;
+  if (
+    initialEntry &&
+    (initialEntry.sessionId !== options.expectedSessionId ||
+      options.expectedLifecycleRevision !== undefined ||
+      options.expectedWriterRunId !== undefined ||
+      options.expectedSessionState !== undefined)
+  ) {
+    throw new Error(
+      "Session initialization requires its new identity and no existing writer state.",
+    );
+  }
+  const resolveExpectedEntry = (selected: { entry: SessionEntry } | undefined) => {
+    if (
+      options.selectedSessionId !== undefined &&
+      ((selected?.entry.sessionId ?? null) !== options.selectedSessionId ||
+        selected?.entry.lifecycleRevision !== (options.selectedLifecycleRevision ?? undefined))
+    ) {
+      return undefined;
+    }
+    // A prepared creation cannot adopt a row that appeared while admission was awaiting work.
+    if (initialEntry) {
+      return selected ? undefined : initialEntry;
+    }
+    return sessionMatchesExpectedTranscriptTurn(selected, options) ? selected.entry : undefined;
+  };
+  return { initialEntry, resolveExpectedEntry };
 }

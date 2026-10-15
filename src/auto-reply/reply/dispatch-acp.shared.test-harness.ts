@@ -168,7 +168,8 @@ vi.mock("../../acp/policy.js", () => ({
     policyMocks.resolveAcpAgentPolicyError(cfg, agent),
 }));
 
-vi.mock("./route-reply.runtime.js", () => ({
+vi.mock("./route-reply.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./route-reply.js")>()),
   routeReply: (params: unknown) => routeMocks.routeReply(params),
 }));
 

@@ -1,7 +1,7 @@
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "../../agents/agent-scope.js";
 import { runAgentHarnessBeforeMessageWriteHook } from "../../agents/harness/hook-helpers.js";
-import { conversationIdentityFromMsgContext } from "../../config/sessions/conversation-identity.js";
+import { conversationIdentityFromMsgContext } from "../../config/sessions/conversation-identity-inbound.js";
 import { resolveSessionStorePathCore } from "../../config/sessions/paths.js";
 import { withSessionEntryReadOnlyInWorker } from "../../config/sessions/session-entry-read-runtime.js";
 import { buildRestartRecoveryExpectedState } from "../../config/sessions/session-transcript-turn-state.js";
@@ -14,6 +14,7 @@ import {
   prepareAcpSourceTurnInput,
   type AcpSourceTurnInputIdentity,
 } from "../../sessions/acp-source-turn.js";
+import { bindUserTurnInput } from "../../sessions/user-turn-transcript-runtime-context.js";
 import {
   createUserTurnTranscriptRecorder,
   type UserTurnTranscriptRecorder,
@@ -47,16 +48,20 @@ export function createAcpSourceTurnInputOwner(params: {
     assertAcpSourceTurnDatabaseCurrent(sourceIdentity, recorder?.getAdmissionReceipt());
     assertAcpSourceTurnDatabaseCurrent(admittedSourceIdentity, recorder?.getAdmissionReceipt());
   };
-  const assertCurrent = () => {
+  const assertOwnerCurrent = () => {
     params.abortSignal?.throwIfAborted();
-    recorder?.withPendingInput?.(() => {});
     assertSourceDatabaseCurrent();
   };
+  let input = bindUserTurnInput(recorder, assertOwnerCurrent);
+  const assertCurrent = () => input.assertNativeCurrent();
   return {
     get recorder() {
       return recorder;
     },
     assertCurrent,
+    assertNativeCurrent: assertCurrent,
+    assertLifetimeCurrent: () => input.assertLifetimeCurrent(),
+    withCurrent: <T>(run: () => T): Promise<Awaited<T>> => input.withCurrent(run),
     // Settlement retains the physical source after producer custody has completed.
     assertSourceDatabaseCurrent,
     async prepare(
@@ -66,33 +71,36 @@ export function createAcpSourceTurnInputOwner(params: {
       assertRouteCurrent: () => Promise<void>,
       assertRuntimeAuthority: () => void,
     ) {
-      assertAdmittedCurrent();
-      const captured = await captureCanonicalSource(params, assertAdmittedCurrent);
-      sourceIdentity = captured?.source;
-      const createsRecorder = !recorder && captured !== undefined;
-      const assertSourceCurrent = () => {
+      await input.withCurrent(async () => {
         assertAdmittedCurrent();
-        assertCurrent();
-        if (createsRecorder) {
-          assertRuntimeAuthority();
+        const captured = await captureCanonicalSource(params, assertAdmittedCurrent);
+        sourceIdentity = captured?.source;
+        const createsRecorder = !recorder && captured !== undefined;
+        const assertSourceCurrent = () => {
+          assertAdmittedCurrent();
+          assertCurrent();
+          if (createsRecorder) {
+            assertRuntimeAuthority();
+          }
+        };
+        if (!recorder && captured) {
+          recorder = createCanonicalSourceRecorder(params, captured, assertSourceCurrent);
+          input = bindUserTurnInput(recorder, assertOwnerCurrent);
         }
-      };
-      if (!recorder && captured) {
-        recorder = createCanonicalSourceRecorder(params, captured, assertSourceCurrent);
-      }
-      await prepareAcpSourceTurnInput(
-        recorder,
-        target,
-        runId,
-        assertSourceCurrent,
-        assertRouteCurrent,
-        {
-          identity: captured?.source,
-          onSourceCaptured: (identity) => {
-            admittedSourceIdentity = identity;
+        await prepareAcpSourceTurnInput(
+          recorder,
+          target,
+          runId,
+          assertSourceCurrent,
+          assertRouteCurrent,
+          {
+            identity: captured?.source,
+            onSourceCaptured: (identity) => {
+              admittedSourceIdentity = identity;
+            },
           },
-        },
-      );
+        );
+      });
     },
   };
 }

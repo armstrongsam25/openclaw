@@ -1,16 +1,17 @@
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import type { InternalSessionEntry as SessionEntry } from "../../config/sessions.js";
 import { hasCurrentAcpSourceTurn } from "../../config/sessions/acp-source-turn-state.js";
-import {
-  loadSessionEntry,
-  type SessionTranscriptTurnExpectedState,
-  type SessionTranscriptTurnLifecyclePatch,
+import type {
+  SessionTranscriptTurnExpectedState,
+  SessionTranscriptTurnLifecyclePatch,
 } from "../../config/sessions/session-accessor.js";
+import { readSessionEntryReadOnlyInWorker } from "../../config/sessions/session-entry-read-runtime.js";
 import { buildRestartRecoveryExpectedState } from "../../config/sessions/session-transcript-turn-state.js";
 import { appendAssistantMessageToSessionTranscript } from "../../config/sessions/transcript.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import type { GatewayRecoveryRuntime } from "../../gateway/server-instance-runtime.types.js";
 import type { DeliveryContext } from "../../utils/delivery-context.shared.js";
+import { buildMainSessionRecoverySettlementPatch } from "./main-session-recovery-clear.js";
 import type { MainSessionRecoveryObservation } from "./main-session-recovery-state.js";
 import { commitMainSessionRecovery } from "./main-session-recovery-store.js";
 import { resolveRestartRecoveryDeliveryContext } from "./main-session-restart-recovery-delivery.js";
@@ -19,10 +20,13 @@ import {
   resolveRestartRecoveryTerminalClientRunId,
 } from "./main-session-restart-recovery-shared.js";
 
-const TOMBSTONED_SESSION_NOTICE =
-  "I couldn't continue this session after a gateway restart. " +
-  "Your transcript is safe. In WebChat, use Resume in new session to continue it; " +
-  "in other channels, use /new or /reset to start a replacement session.";
+function buildTombstonedSessionNotice(reason: string): string {
+  return (
+    `I couldn't continue this session after a gateway restart: ${reason}. ` +
+    "Your transcript is safe. In WebChat, use Resume in new session to continue it; " +
+    "in other channels, use /new or /reset to start a replacement session."
+  );
+}
 
 const INTERRUPTED_ACP_SOURCE_NOTICE =
   "This ACP request was interrupted by a gateway restart. " +
@@ -50,6 +54,11 @@ export async function interruptAcpSourceTurnWithNotice(params: {
     expectedLifecycleRevision: turn.sourceLifecycleRevision ?? null,
     expectedSessionState: buildRestartRecoveryExpectedState(params.entry),
     sessionLifecyclePatch: {
+      ...buildMainSessionRecoverySettlementPatch({
+        entry: params.entry,
+        recordTerminalSource: true,
+        terminalRunId: turn.runId,
+      }),
       acpSourceTurn: undefined,
       abortedLastRun: false,
       endedAt: now,
@@ -58,7 +67,7 @@ export async function interruptAcpSourceTurnWithNotice(params: {
       mainRestartRecovery: undefined,
       restartRecoveryRuns: undefined,
       runtimeMs: Math.max(0, now - (params.entry.startedAt ?? now)),
-      status: "interrupted",
+      status: "killed",
       updatedAt: now,
     },
     text: INTERRUPTED_ACP_SOURCE_NOTICE,
@@ -111,7 +120,7 @@ async function sendRestartRecoveryTombstoneNotice(params: {
       to: params.deliveryContext.to,
       accountId: params.deliveryContext.accountId,
       threadId: params.deliveryContext.threadId,
-      text: TOMBSTONED_SESSION_NOTICE,
+      text: buildTombstonedSessionNotice(params.reason),
       idempotencyKey: buildRestartRecoveryTombstoneNoticeKey(params.entry),
     });
     mainSessionRecoveryLog.info(
@@ -131,11 +140,12 @@ async function writeRestartRecoveryTombstoneNotice(params: {
   storePath: string;
   expectedSessionState: SessionTranscriptTurnExpectedState;
   sessionLifecyclePatch: SessionTranscriptTurnLifecyclePatch;
+  reason: string;
 }): Promise<"failed" | "stale" | "written"> {
   const result = await appendAssistantMessageToSessionTranscript({
     ...params,
     expectedSessionId: params.entry.sessionId,
-    text: TOMBSTONED_SESSION_NOTICE,
+    text: buildTombstonedSessionNotice(params.reason),
     idempotencyKey: buildRestartRecoveryTombstoneNoticeKey(params.entry),
   }).catch((error: unknown) => ({ ok: false as const, reason: String(error) }));
   if (!result.ok) {
@@ -206,7 +216,7 @@ export async function tombstoneMainRestartRecoveryWithNotice(params: {
       if (notice === "failed") {
         return "notice_failed";
       }
-      const current = loadSessionEntry({
+      const current = await readSessionEntryReadOnlyInWorker({
         agentId: params.agentId,
         sessionKey: params.sessionKey,
         storePath: params.storePath,
@@ -218,7 +228,6 @@ export async function tombstoneMainRestartRecoveryWithNotice(params: {
         current.sessionId !== params.entry.sessionId ||
         state?.cycleId !== params.observation.cycleId ||
         state.tombstone ||
-        current.status !== "running" ||
         current.abortedLastRun !== true
       ) {
         return "skipped";

@@ -4,7 +4,7 @@ import type { AcpRuntimeEvent } from "@openclaw/acp-core/runtime/types";
 import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 import { afterAll, afterEach, describe, expect, test, vi } from "vitest";
 import type { WebSocket } from "ws";
-import { createDeferred } from "../../test/helpers/promise.js";
+import { createDeferred, withinTest } from "../../test/helpers/promise.js";
 import { resolveStoredAcpSession } from "../acp/control-plane/manager.utils.js";
 import { AcpRuntimeError } from "../acp/runtime/errors.js";
 import { readAcpSessionEntryAsync } from "../acp/runtime/session-meta-read.js";
@@ -157,7 +157,7 @@ describe("Gateway ACP completion ownership", () => {
     },
     { name: "replaced transcript target", rebound: true },
   ];
-  test.each(cases)("completes $name once with truthful transcript ownership", async (scenario) => {
+  test.for(cases)("completes $name once", async (scenario, { signal }) => {
     const storePath = path.join(tempDirs.make(), "sessions.json");
     testState.sessionStorePath = storePath;
     const mediaFile = path.join(path.dirname(storePath), "photo.png");
@@ -337,7 +337,23 @@ describe("Gateway ACP completion ownership", () => {
         errorKind?: string;
       };
     }> = [];
-    const capture = (data: Buffer) => frames.push(JSON.parse(data.toString()));
+    let lifecycleStarted = createDeferred();
+    let lifecycleDelivered = createDeferred();
+    const capture = (data: Buffer) => {
+      const frame: (typeof frames)[number] = JSON.parse(data.toString());
+      frames.push(frame);
+      if (
+        frame.event === "agent" &&
+        frame.payload?.runId === activeRunId &&
+        frame.payload.stream === "lifecycle"
+      ) {
+        if (frame.payload.data?.phase === "start") {
+          lifecycleStarted.resolve();
+        } else if (frame.payload.data?.phase === "end" || frame.payload.data?.phase === "error") {
+          lifecycleDelivered.resolve();
+        }
+      }
+    };
     ws.on("message", capture);
     try {
       // Preserve the observed order: one cold turn, then the same session and
@@ -349,6 +365,8 @@ describe("Gateway ACP completion ownership", () => {
         dispatchAdmissions.set(runId, admissionCapture);
         turnStarted = createDeferred();
         releaseTurn = createDeferred();
+        lifecycleStarted = createDeferred();
+        lifecycleDelivered = createDeferred();
         const expectedState = scenario.rpcAbort
           ? "aborted"
           : scenario.fail || scenario.persistFail || scenario.timeout || scenario.rebound
@@ -369,9 +387,11 @@ describe("Gateway ACP completion ownership", () => {
           idempotencyKey: runId,
         };
         const accepted = await rpcReq(ws, "chat.send", sendParameters);
-        expect(accepted.ok).toBe(true);
+        expect(accepted.ok, JSON.stringify(accepted)).toBe(true);
         if (scenario.rpcAbort) {
           await turnStarted.promise;
+          // Stop suppresses a start still awaiting publication; this case aborts after start.
+          await withinTest(lifecycleStarted.promise, signal);
           const aborted = await rpcReq(ws, "chat.abort", { sessionKey, runId });
           expect(aborted.payload).toMatchObject({ aborted: true, runIds: [runId] });
           releaseTurn.resolve();
@@ -407,6 +427,8 @@ describe("Gateway ACP completion ownership", () => {
         expect.soft(waited.payload).toMatchObject({
           status: scenario.cancel ? "error" : expectedStatus,
         });
+        // Run settlement does not join the asynchronous lifecycle subscriber.
+        await withinTest(lifecycleDelivered.promise, signal);
         const finals = frames.filter(
           (frame) =>
             frame.event === "chat" &&
@@ -463,11 +485,26 @@ describe("Gateway ACP completion ownership", () => {
         );
         expect
           .soft(lifecycle.map((frame) => frame.payload?.data?.phase))
-          .toEqual(
-            scenario.rpcAbort
-              ? ["start", "end", scenario.persistFail ? "error" : "end"]
-              : ["start", expectedState === "error" ? "error" : "end"],
-          );
+          .toEqual(["start", expectedState === "error" ? "error" : "end"]);
+        if (scenario.rpcAbort) {
+          expect.soft(lifecycle.at(-1)?.payload?.data).toMatchObject({
+            phase: "end",
+            status: "cancelled",
+            aborted: true,
+            stopReason: "rpc",
+          });
+          // This terminal-only reply was never shown; there is no visible partial to save.
+          expect
+            .soft(
+              frames.filter(
+                (frame) =>
+                  frame.payload?.runId === runId &&
+                  (frame.payload.stream === "assistant" || frame.payload.state === "delta"),
+              ),
+            )
+            .toEqual([]);
+          expect.soft(finals[0]?.payload?.message).toBeUndefined();
+        }
         expect
           .soft(
             frames.filter(
@@ -682,7 +719,8 @@ describe("Gateway ACP completion ownership", () => {
       ).toBe(true);
       await started.promise;
       snapshot = loadSessionEntryReadOnly({ agentId: "main", sessionKey: sourceKey, storePath });
-      expect(snapshot).toMatchObject({ sessionId: sourceSessionId, status: "running" });
+      expect(snapshot).toMatchObject({ sessionId: sourceSessionId, activeWriterRunId: runId });
+      expect(snapshot?.status).toBeUndefined();
       expect(snapshot?.acp).toBeUndefined();
       expect(snapshot).toMatchObject({
         acpSourceTurn: {
@@ -825,7 +863,7 @@ describe("Gateway ACP completion ownership", () => {
             sessionKey: sourceKey,
             storePath: coldStorePath,
           }),
-        ).toMatchObject({ status: "interrupted", abortedLastRun: false });
+        ).toMatchObject({ status: "killed", abortedLastRun: false });
         const messages = readTranscriptMessages({
           agentId: "main",
           sessionKey: sourceKey,
@@ -840,7 +878,12 @@ describe("Gateway ACP completion ownership", () => {
             ]),
           }),
         );
-        await recoverRestartAbortedMainSessions({ cfg: recoveryCfg, gatewayRuntime });
+        expect(
+          await markStartupOrphanedMainSessionsForRecovery({ cfg: recoveryCfg }),
+        ).toMatchObject({ marked: 0 });
+        expect(
+          await recoverRestartAbortedMainSessions({ cfg: recoveryCfg, gatewayRuntime }),
+        ).toMatchObject({ started: 0, settled: 0 });
         expect(
           readTranscriptMessages({
             agentId: "main",

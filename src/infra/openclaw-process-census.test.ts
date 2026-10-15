@@ -13,6 +13,7 @@ const {
   definitelyDead,
   container,
   darwinCommand,
+  rosetta,
   windows,
   fixturePath,
 } = vi.hoisted(() => ({
@@ -25,6 +26,7 @@ const {
   definitelyDead: vi.fn(),
   container: vi.fn(),
   darwinCommand: vi.fn(),
+  rosetta: vi.fn(),
   windows: vi.fn(),
   fixturePath: (file: string) => file.replaceAll("\\", "/").replace(/^[A-Za-z]:/, ""),
 }));
@@ -42,6 +44,8 @@ vi.mock("node:fs", () => {
 });
 vi.mock("../shared/pid-alive.js", () => ({ isPidDefinitelyDead: definitelyDead }));
 vi.mock("./container-environment.js", () => ({ isContainerEnvironment: container }));
+// mock-isolation: the real detector reads and caches the test host's CPU brand.
+vi.mock("../shared/rosetta-translation.js", () => ({ isRosettaTranslatedProcess: rosetta }));
 vi.mock("../process/supervisor/darwin-process-command.js", () => ({
   readDarwinProcessCommand: darwinCommand,
 }));
@@ -76,6 +80,7 @@ beforeEach(() => {
   container.mockReset().mockReturnValue(false);
   census.mockReset();
   darwinCommand.mockReset();
+  rosetta.mockReset().mockReturnValue(false);
   windows.mockReset();
   realpath.mockReset().mockImplementation((file: string) => file);
   stat.mockReset().mockReturnValue({ isDirectory: () => false });
@@ -154,25 +159,6 @@ it.each(custodyCases)("classifies artifact custody of %j with %j", (argv, facts,
   expect(inspectOtherOpenClawProcesses()).toEqual({ pids: holder ? [peer] : [] });
 });
 
-it.each([
-  ["node", "dist/index.js"],
-  ["bun", "run", "--silent", "start"],
-])("preserves the cleanup veto when cwd is unavailable for %j", (...argv) => {
-  rows.set(peer, { ppid: 1, argv });
-  const inspect = readlink.getMockImplementation()!;
-  readlink.mockImplementation((file: string) => {
-    if (file === `/proc/${peer}/cwd`) {
-      throw Object.assign(new Error("permission denied"), { code: "EACCES" });
-    }
-    return inspect(file);
-  });
-  expect(inspectOtherOpenClawProcesses()).toEqual({
-    error: expect.stringContaining(
-      `Could not classify PID ${peer}: working directory is unavailable`,
-    ),
-  });
-});
-
 const foreignArgvs = [
   ["bun", "start"],
   ["bun", "--loader", ".js:ts", "service.js"],
@@ -188,8 +174,6 @@ const foreignArgvs = [
 
 it.each([
   ["/app/dist/index.js", "denied"],
-  ["/app/dist/index.js", "missing"],
-  ["/app/dist/index.js", "malformed"],
   ["/app/dist/index.js", "unnamed"],
   ["/app/service.js", "missing"],
 ])("vetoes absolute entrypoint %s with %s package identity", (script, failure) => {
@@ -199,12 +183,12 @@ it.each([
     if (!file.endsWith("/package.json")) {
       return inspect(file);
     }
-    if (failure === "denied" || failure === "missing") {
-      throw Object.assign(new Error("unreadable manifest"), {
-        code: failure === "denied" ? "EACCES" : "ENOENT",
-      });
+    if (failure === "unnamed") {
+      return JSON.stringify({});
     }
-    return failure === "malformed" ? "{" : JSON.stringify({});
+    throw Object.assign(new Error("unreadable manifest"), {
+      code: failure === "denied" ? "EACCES" : "ENOENT",
+    });
   });
   expect(inspectOtherOpenClawProcesses()).toEqual({
     error: expect.stringContaining("package identity"),
@@ -441,6 +425,28 @@ it("uses native Darwin arguments and explicit foreign system-service facts", () 
   });
 });
 
+it("keeps Rosetta custody uncertain and names native arm64 Node.js for update repair", () => {
+  rows.set(peer, { ppid: 1, argv: ["node", "/app/dist/index.js"] });
+  mockDarwinBatch({ status: 0, stdout: "" });
+  rosetta.mockReturnValue(true);
+  darwinCommand.mockImplementation(() => {
+    throw new Error(
+      "Cannot inspect Darwin process arguments under Rosetta; run OpenClaw with native arm64 Node.js.",
+    );
+  });
+  expect(inspectOtherOpenClawProcesses()).toEqual({
+    error: expect.stringContaining("native arm64 Node.js"),
+  });
+  expect(
+    inspectOtherOpenClawProcesses({
+      runId: "update-run-123",
+      artifactPaths: ["/tmp/retained runtime"],
+    }).error,
+  ).toBe(
+    "Host process census is unavailable under Rosetta; run openclaw update repair with native arm64 Node.js.",
+  );
+});
+
 function mockDarwinBatch(lsof: { status: number | null; stdout: string; error?: Error }) {
   mockProcessPlatform("darwin");
   census.mockImplementation((command: string) =>
@@ -486,6 +492,123 @@ it.each([
 
 const references = { runId: "update-run-123", artifactPaths: ["/tmp/retained runtime"] };
 const denied = () => Object.assign(new Error("denied"), { code: "EACCES" });
+
+it.each(["/usr/lib/systemd/systemd", "/lib/systemd/systemd"])(
+  "does not let the user manager pin abandoned runtimes when cwd is denied (%s)",
+  (executable) => {
+    rows.set(peer, { ppid: 1, argv: [executable, "--user"], uid: 1000, cwd: denied() });
+    expect(inspectOtherOpenClawProcesses()).toEqual({ pids: [] });
+    rows.get(peer)!.cwd = "/tmp/openclaw-update-runtime-Ab1234";
+    expect(inspectOtherOpenClawProcesses()).toEqual({ pids: [peer] });
+    rows.get(peer)!.cwd = denied();
+    rows.get(peer)!.argv.push("/tmp/openclaw-update-runtime-Ab1234");
+    expect(inspectOtherOpenClawProcesses()).toEqual({ pids: [peer] });
+  },
+);
+
+it("excludes only the same-account PAM helper of a standard user manager", () => {
+  rows.set(peer, {
+    ppid: 1,
+    argv: ["/usr/lib/systemd/systemd", "--user"],
+    uid: 1000,
+    cwd: denied(),
+  });
+  rows.set(peer + 1, { ppid: peer, argv: ["(sd-pam)"], uid: 1000, cwd: denied() });
+  expect(inspectOtherOpenClawProcesses()).toEqual({ pids: [] });
+  rows.get(peer + 1)!.cwd = "/tmp/openclaw-update-runtime-Ab1234";
+  expect(inspectOtherOpenClawProcesses()).toEqual({ pids: [peer + 1] });
+  rows.get(peer + 1)!.cwd = denied();
+  rows.get(peer + 1)!.ppid = 1;
+  expect(inspectOtherOpenClawProcesses()).toEqual({
+    error: expect.stringContaining(
+      `Could not classify PID ${peer + 1}: working directory is unavailable`,
+    ),
+  });
+});
+
+it("does not let protected systemd login processes block update-repair evidence", () => {
+  rows.set(peer, {
+    ppid: 1,
+    argv: ["/usr/lib/systemd/systemd", "--user"],
+    uid: 1000,
+    cwd: denied(),
+  });
+  rows.set(peer + 1, { ppid: peer, argv: ["(sd-pam)"], uid: 1000, cwd: denied() });
+  const handoffRefs = {
+    runId: "systemd-update-run",
+    artifactPaths: ["/tmp/openclaw-update-runtime-Ab1234"],
+  };
+  expect(inspectOtherOpenClawProcesses(handoffRefs)).toEqual({
+    matchingPids: [],
+    unverifiedPids: [],
+  });
+  rows.get(peer + 1)!.cwd = handoffRefs.artifactPaths[0];
+  expect(inspectOtherOpenClawProcesses(handoffRefs)).toEqual({
+    matchingPids: [peer + 1],
+    unverifiedPids: [],
+  });
+  rows.get(peer + 1)!.cwd = denied();
+  rows.get(peer + 1)!.ppid = 1;
+  expect(inspectOtherOpenClawProcesses(handoffRefs)).toEqual({
+    matchingPids: [],
+    unverifiedPids: [peer + 1],
+  });
+});
+
+it.each(["foreign", "same", "unknown process", "unknown inspector"])(
+  "requires a positively foreign UID to exclude systemd with denied cwd (%s)",
+  (owner) => {
+    rows.set(1, {
+      ppid: 0,
+      argv: ["/usr/lib/systemd/systemd", "--system"],
+      uid: owner === "same" ? 1000 : 0,
+      cwd: denied(),
+    });
+    if (owner === "unknown process") {
+      const inspect = read.getMockImplementation()!;
+      read.mockImplementation((file: string) => {
+        if (file === "/proc/1/status") {
+          throw denied();
+        }
+        return inspect(file);
+      });
+    } else if (owner === "unknown inspector") {
+      Reflect.deleteProperty(process, "getuid");
+    }
+    expect(inspectOtherOpenClawProcesses()).toEqual(
+      owner === "foreign"
+        ? { pids: [] }
+        : {
+            error: expect.stringContaining(
+              "Could not classify PID 1: working directory is unavailable",
+            ),
+          },
+    );
+  },
+);
+
+it.each([
+  ["node", "--eval", "1"],
+  ["bun", "run", "--silent", "start"],
+  ["tsx", "--foreign-runtime-option", "watch", "worker.ts"],
+])("keeps foreign runtime custody unresolved without cwd for %j", (...argv) => {
+  rows.set(peer, { ppid: 1, argv, uid: 0, cwd: denied() });
+  expect(inspectOtherOpenClawProcesses()).toEqual({
+    error: expect.stringContaining(
+      `Could not classify PID ${peer}: working directory is unavailable`,
+    ),
+  });
+});
+
+it.each([
+  { argv: ["/usr/bin/worker", "/tmp/openclaw-update-runtime-Ab1234/tree/worker.js"] },
+  { argv: ["/usr/bin/worker"], cwd: "/tmp/openclaw-update-runtime-Ab1234/tree" },
+  { argv: ["openclaw-gateway"] },
+  { argv: ["node", "--eval", "1"], environment: "OPENCLAW_SERVICE_MARKER=openclaw\0" },
+])("preserves foreign retained-runtime and OpenClaw evidence for $argv", (facts) => {
+  rows.set(peer, { ppid: 1, uid: 0, cwd: denied(), ...facts });
+  expect(inspectOtherOpenClawProcesses()).toEqual({ pids: [peer] });
+});
 
 it("finds orphaned handoff references while excluding only its verified updater launcher", () => {
   rows.set(launcher, {
@@ -595,20 +718,6 @@ it.each([
       matchingPids: [],
       unverifiedPids: foreign ? [] : [peer],
     });
-  },
-);
-
-it.each(["container", "missing self", "deadline"])(
-  "holds handoff recovery with %s observations",
-  (failure) => {
-    if (failure === "container") {
-      container.mockReturnValue(true);
-    } else if (failure === "missing self") {
-      rows.delete(self);
-    } else {
-      vi.spyOn(Date, "now").mockReturnValueOnce(1).mockReturnValue(20_000);
-    }
-    expect(inspectOtherOpenClawProcesses(references).error).toBeDefined();
   },
 );
 

@@ -215,8 +215,9 @@ describe("ACP source input lifecycle", () => {
           .map(([payload]) => payload.text ?? "")
           .join("");
         expect(deliveredText).toContain(text);
-        expect(loadSessionEntryReadOnly(target)).toMatchObject({
-          status: "running",
+        const sourceEntry = loadSessionEntryReadOnly(target);
+        expect(sourceEntry?.status).toBeUndefined();
+        expect(sourceEntry).toMatchObject({
           activeWriterRunId: event.runId,
           acpSourceTurn: { sourceSessionId: target.sessionId, runId: event.runId },
         });
@@ -330,8 +331,8 @@ describe("ACP source input lifecycle", () => {
         });
         expect(submitted).toBe(true);
         expect(replyResolver).not.toHaveBeenCalled();
+        expect(sourceAtSubmission.value?.status).toBeUndefined();
         expect(sourceAtSubmission.value).toMatchObject({
-          status: "running",
           activeWriterRunId: "acp-public-without-recorder",
           acpSourceTurn: {
             sourceSessionId: target.sessionId,

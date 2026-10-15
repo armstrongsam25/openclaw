@@ -23,6 +23,12 @@ Gateway and account changes still refresh hidden Dashboard windows. Saved web
 drafts recover within the same Gateway address and authenticated account; they
 are not copied to a different Gateway, account, or recreated SSH tunnel address.
 
+If the Dashboard cannot load, it shows a recovery page with **Reload** and
+**Connection Settings…**. Choose **Navigate → Reload** or press **Cmd-R** while a
+Dashboard window is active to reload its current page. Gateway HTTP errors with
+plain-text or JSON bodies use the recovery page; HTML sign-in pages from an
+authenticated proxy remain available in the window.
+
 The native chat features below connect to the Gateway and default to the primary
 session for the selected agent (`main`, or `global` when `session.scope` is
 `global`). Quick Chat remains a native floating composer in either experience.
@@ -37,6 +43,11 @@ roster, Cmd-K palette, menus, window management, and Gateway selection remain
 native. Selecting a thread in the sidebar or palette navigates the existing web
 pane without reloading it. **New Thread** stays in the sidebar and on Shift-Cmd-N:
 it creates the session through the native owner, then opens it in that pane.
+
+The Web experience shares the desktop web rail and panel layout with the Tauri desktop app on macOS, Linux, and Windows.
+Its panel header and content header occupy the same 52px titlebar row, with back/forward before the content title and search in the rail.
+On macOS, the panel title clears the traffic lights and the rail starts below them; Linux/Windows keep the rail aligned with the top row and reserve the top-right caption buttons.
+Sessions, Pages, and Online each have a trailing Collapse sidebar button; collapsing leaves only expand-sidebar beside the rail, which continues to own New session and search.
 
 The web pane owns sending, drafts, queues, history, read acknowledgements, Find,
 and export. Pane-local keys such as Cmd-F, Return, Shift-Return, and Escape go to
@@ -291,6 +302,17 @@ disappear if they become ineligible. **View Activity** opens that person's Activ
 page in the Dashboard for the same Gateway. Thread rows show other viewers,
 combining duplicate connections and excluding your own identity.
 
+The identity card at the bottom of the native sidebar uses your name and avatar
+from **Online**. When healthy, it shows the current Gateway's name and **Primary**
+when applicable; otherwise it shows **Connecting…**. Click it for the Gateway
+list, current and primary indicators, the option to make an eligible profile
+primary, **Manage Gateways…**, **Open Dashboard**, **Settings…**, **Usage**, and
+**About OpenClaw**. **Retry now** appears while disconnected. The adjacent
+attention button counts requests of the same kind as the oldest pending request
+(questions or approvals); click it for details without changing conversations.
+A separate retry button appears if thread groups fail to load. Batch actions
+stay above the footer.
+
 ## Pending questions and approvals
 
 Thread rows, agent rows, and collapsed group headings show a question or approval
@@ -397,10 +419,10 @@ Right-click the OpenClaw Dock icon for **Open Dashboard** and **Settings…**.
 When more than one Gateway is configured, this menu also lists every Gateway;
 the checkmark follows the selected experience's frontmost Gateway window.
 
-The menu probes health only while open, retaining cached facts between openings.
-Before the first result a card shows **checking…**; failed probes show
+The menu checks health only while open, retaining cached facts between openings.
+Before the first result a card shows **checking…**; failed checks show
 **unreachable** and the last successful contact time when known. Closing the menu
-cancels in-flight probes and closes idle probe connections for saved Gateways with
+cancels in-flight checks and closes idle check connections for saved Gateways with
 no open Web or Native windows. It never disconnects the primary Gateway.
 
 The app also reopens your selected Gateway in the chosen experience after an app

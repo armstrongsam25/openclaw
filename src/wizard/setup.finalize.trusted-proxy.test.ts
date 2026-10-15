@@ -16,10 +16,6 @@ const readPin = vi.hoisted(() => vi.fn());
 vi.mock("../daemon/runtime-pin-state.js", () => ({ readDaemonRuntimePinForInstall: readPin }));
 
 const runTui = vi.hoisted(() => vi.fn<(options: unknown) => Promise<void>>(async () => {}));
-const setupCleanupExitTimer = vi.hoisted(() => ({ unref: vi.fn() }));
-const scheduleProcessExitAfterTuiReturn = vi.hoisted(() => vi.fn(() => setupCleanupExitTimer));
-const cancelProcessExitAfterTuiReturn = vi.hoisted(() => vi.fn());
-const resolveTuiShutdownHardExitMs = vi.hoisted(() => vi.fn(() => 122_000));
 const restoreTerminalState = vi.hoisted(() => vi.fn());
 const probeGatewayReachable = vi.hoisted(() =>
   vi.fn<() => Promise<{ ok: boolean; detail?: string }>>(async () => ({ ok: true })),
@@ -175,14 +171,6 @@ vi.mock("../commands/gateway-install-token.js", () => ({
   resolveGatewayInstallToken,
 }));
 
-vi.mock("../commands/daemon-runtime.js", () => ({
-  DEFAULT_GATEWAY_DAEMON_RUNTIME: "node",
-  GATEWAY_DAEMON_RUNTIME_OPTIONS: [
-    { value: "node", label: "Node" },
-    { value: "bun", label: "Bun 1.4+" },
-  ],
-}));
-
 vi.mock("../commands/health-format.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../commands/health-format.js")>()),
   formatHealthCheckFailure: vi.fn(() => "health failed"),
@@ -256,12 +244,8 @@ vi.mock("../../packages/terminal-core/src/restore.js", () => ({
   restoreTerminalState,
 }));
 
-vi.mock("../tui/tui.js", () => ({
-  cancelProcessExitAfterTuiReturn,
-  resolveTuiShutdownHardExitMs,
-  runTui,
-  scheduleProcessExitAfterTuiReturn,
-}));
+// mock-isolation: Onboarding handoff fixtures isolate the interactive terminal graph.
+vi.mock("../tui/tui.js", () => ({ runTui }));
 
 vi.mock("../commands/auth-choice.js", () => ({
   applyAuthChoice: vi.fn(),
@@ -354,11 +338,6 @@ describe("finalizeSetupWizard", () => {
   beforeEach(() => {
     readPin.mockReset().mockReturnValue({ revision: "empty", stored: false });
     runTui.mockClear();
-    setupCleanupExitTimer.unref.mockClear();
-    scheduleProcessExitAfterTuiReturn.mockReset();
-    scheduleProcessExitAfterTuiReturn.mockReturnValue(setupCleanupExitTimer);
-    cancelProcessExitAfterTuiReturn.mockClear();
-    resolveTuiShutdownHardExitMs.mockClear();
     restoreTerminalState.mockClear();
     probeGatewayReachable.mockReset();
     probeGatewayReachable.mockResolvedValue({ ok: false, detail: "offline" });

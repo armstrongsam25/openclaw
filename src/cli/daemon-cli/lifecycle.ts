@@ -1,6 +1,8 @@
 // Gateway service lifecycle runners, including unmanaged-process fallbacks and restart health checks.
 import { theme } from "../../../packages/terminal-core/src/theme.js";
+import { resolveGatewayStartupTiming } from "../../commands/gateway-startup-timing.js";
 import { resolveGatewayServiceProbeHosts } from "../../daemon/gateway-service-probe-hosts.js";
+import { stopStalledGatewayStartup } from "../../daemon/schtasks-process.js";
 import { mergeGatewayServiceEnv } from "../../daemon/service-env-merge.js";
 import {
   assertGatewayServiceUpdateCurrent,
@@ -23,6 +25,7 @@ import {
   formatGatewayPidList,
   signalVerifiedGatewayPidSync,
 } from "../../infra/gateway-processes.js";
+import { captureStalledGatewayStartup } from "../../infra/gateway-startup-owner.js";
 import {
   assertGatewayServiceMutationAllowed,
   formatExternalSupervisorActionRequired,
@@ -73,11 +76,9 @@ import { verifyGatewayStartReadiness } from "./start-health.js";
 import { repairLoadedGatewayServiceForStart } from "./start-repair.js";
 import type { DaemonLifecycleOptions } from "./types.js";
 
-const WINDOWS_POST_RESTART_HEALTH_TIMEOUT_MS = 180_000;
-
 function postRestartHealthAttempts(): number {
   return process.platform === "win32"
-    ? Math.ceil(WINDOWS_POST_RESTART_HEALTH_TIMEOUT_MS / DEFAULT_RESTART_HEALTH_DELAY_MS)
+    ? Math.ceil(resolveGatewayStartupTiming().deadlineMs / DEFAULT_RESTART_HEALTH_DELAY_MS)
     : DEFAULT_RESTART_HEALTH_ATTEMPTS;
 }
 
@@ -124,6 +125,21 @@ async function stopGatewayWithoutServiceManager(
     serviceContext?.env ?? process.env,
     serviceContext?.command ?? null,
   );
+  const stalled = captureStalledGatewayStartup(env);
+  if (stalled) {
+    await stopStalledGatewayStartup(stalled, assertGatewayServiceUpdateCurrent);
+    appendGatewayLifecycleAudit({
+      action: "stop",
+      source: "cli",
+      mode: "sigterm",
+      pid: stalled.pid,
+      env,
+    });
+    return {
+      result: "stopped" as const,
+      message: `Stopped stalled Gateway startup pid ${stalled.pid}.`,
+    };
+  }
   const listenerPids = findVerifiedGatewayListenerPidsOnPortSync(port, { env });
   // Listener discovery needs lsof, which minimal containers omit. The gateway
   // lock already names the verified owner of this port, so signal it instead of
@@ -575,6 +591,7 @@ export async function runDaemonRestart(opts: DaemonLifecycleOptions = {}): Promi
           port: managedRestartPort,
           attempts: restartHealthAttempts,
           delayMs: DEFAULT_RESTART_HEALTH_DELAY_MS,
+          ...(process.platform === "win32" ? { timeoutMs: restartWaitMs } : {}),
           env: managedRestartContext.env,
           ...(managedRestartContext.env.OPENCLAW_UPDATE_IN_PROGRESS !== "1"
             ? { requirePluginHealth: false }

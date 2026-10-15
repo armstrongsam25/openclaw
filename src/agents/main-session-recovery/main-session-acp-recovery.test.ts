@@ -44,7 +44,6 @@ it("keeps scanning ACP sources after interruption-notice persistence rejects", a
           sessionId,
           permissionMode: "guarded",
           updatedAt: Date.now() - 10_000,
-          status: "running",
           abortedLastRun: true,
           activeWriterRunId: runId,
           lifecycleRunId: runId,
@@ -85,13 +84,12 @@ it("keeps scanning ACP sources after interruption-notice persistence rejects", a
       transcriptMocks.appendAssistantMessageToSessionTranscript.mock.calls[0]?.[0],
     ).toMatchObject({ sessionKey: firstKey });
     expect(loadSessionEntry({ sessionKey: firstKey, storePath })).toMatchObject({
-      status: "running",
       activeWriterRunId: "acp-run-0",
       lifecycleRunId: "acp-run-0",
       acpSourceTurn: { runId: "acp-run-0" },
     });
     expect(loadSessionEntry({ sessionKey: nextKey, storePath })).toMatchObject({
-      status: "interrupted",
+      status: "killed",
       abortedLastRun: false,
     });
     expect(loadSessionEntry({ sessionKey: nextKey, storePath })?.acpSourceTurn).toBeUndefined();
